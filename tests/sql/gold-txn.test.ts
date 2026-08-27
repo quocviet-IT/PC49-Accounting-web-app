@@ -91,14 +91,27 @@ describe('flow rules from the Link sheet', () => {
     ).rejects.toThrow(/not a valid|flow/i)
   })
 
+  // A transfer leg has to belong to a conversion, so these two go through one.
   it('allows Rong Phung to arrive by Ra RP', async () => {
-    const id = await addTxn({ type: 'RA_RP', gold: 'RP', uom: 'LUONG', qty: 1, amount: 0 })
-    expect(id).toBeTruthy()
+    const c = await db.query<{ id: string }>(
+      `INSERT INTO pc49.gold_conversion (conv_date, kind) VALUES ('2026-01-03', 'RA_RP') RETURNING id`)
+    const r = await db.query<{ id: string }>(
+      `INSERT INTO pc49.gold_txn
+         (txn_date, txn_type, gold_type_code, uom, qty, amount, conversion_id)
+       VALUES ('2026-01-03', 'RA_RP', 'RP', 'LUONG', 1, 0, $1) RETURNING id`, [c.rows[0].id])
+    expect(r.rows[0].id).toBeTruthy()
   })
 
   it('allows Scrap Gold to leave for refining', async () => {
-    const id = await addTxn({ type: 'TRANSFER_OUT', gold: 'SG', uom: 'GRAM', qty: -195.09, amount: 0 })
-    expect(id).toBeTruthy()
+    const c = await db.query<{ id: string }>(
+      `INSERT INTO pc49.gold_conversion (conv_date, kind)
+       VALUES ('2026-01-06', 'REFINING_SEND') RETURNING id`)
+    const r = await db.query<{ id: string }>(
+      `INSERT INTO pc49.gold_txn
+         (txn_date, txn_type, gold_type_code, uom, qty, amount, conversion_id)
+       VALUES ('2026-01-06', 'TRANSFER_OUT', 'SG', 'GRAM', -195.09, 0, $1) RETURNING id`,
+      [c.rows[0].id])
+    expect(r.rows[0].id).toBeTruthy()
   })
 })
 
