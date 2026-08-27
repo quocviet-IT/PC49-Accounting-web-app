@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PC49 Web App
 
-## Getting Started
+Accounting and cash-management system for Pacific Four Nine (PC49), a gold trading company. Replaces a chain of linked Google Sheets.
 
-First, run the development server:
+## Documentation
+
+The specification lives outside this repository, alongside the client's source workbooks:
+
+| Document | Path |
+|---|---|
+| Business specification | `PC49-Accounting/docs/00-business-specification.md` |
+| Data model | `PC49-Accounting/docs/01-data-model.md` |
+| Implementation roadmap (packages P0–P9) | `PC49-Accounting/docs/02-implementation-roadmap.md` |
+| Acceptance fixtures | `PC49-Accounting/docs/fixtures/` |
+| Open questions for the US team | `PC49-Accounting/docs/open-questions-for-us.md` |
+
+Read the business specification before touching anything. The domain is not ordinary bookkeeping: every ledger line carries both money and gold weight, cost of goods sold moves with the daily spot price, and inventory has more than one correct value at the same time.
+
+## Stack
+
+Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Ant Design 6 · Supabase (Postgres + Auth + RLS) · vitest · deployed on Vercel.
+
+## Setup
 
 ```bash
+npm install
+cp .env.example .env.local     # then fill in the four values
+npm run migrate                # applies supabase/migrations in order
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`.env.local` needs:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Where to find it |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Settings → API → Project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Settings → API → anon public |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API → service_role |
+| `SUPABASE_DB_URL` | Supabase → Settings → Database → **Connection pooler** |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+> Use the **pooler** connection string, not the direct one. Direct Postgres ports are blocked on the development network; `npm run migrate` will hang and time out with a direct connection.
 
-## Learn More
+## Commands
 
-To learn more about Next.js, take a look at the following resources:
+| Command | What it does |
+|---|---|
+| `npm run dev` | Development server |
+| `npm run build` | Production build |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run lint` | ESLint |
+| `npm test` | Test suite |
+| `npm run test:watch` | Tests in watch mode |
+| `npm run migrate` | Applies pending migrations through the pooler; idempotent |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+CI runs typecheck, lint, tests and build on every push and pull request to `main`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Conventions
 
-## Deploy on Vercel
+- Money and weight are stored as `numeric`. Never `float`.
+- No hard deletes. Records are cancelled with `voided_at` and a reason.
+- Row-level security is on for every table in the `pc49` schema. Permissions are enforced in the database, not in the UI.
+- Business constants live in the `system_param` table, never hardcoded.
+- Interface labels come from `src/lib/i18n/dictionary.ts`. Never write a display string directly into a component — every label needs both a Vietnamese and an English form, and a test enforces that.
+- Migrations are numbered SQL files under `supabase/migrations/`, applied in filename order and recorded in `pc49.schema_migrations`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Data warning
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The client's source workbooks contain live production data: customer names, phone numbers, bank account numbers, balances, and staff salaries. Do not commit any of them, and do not commit extracts of them, to a public repository.
