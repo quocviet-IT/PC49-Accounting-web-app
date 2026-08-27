@@ -20,11 +20,11 @@ async function check(name, sql, expected) {
 }
 
 await check('migrations applied',
-  `SELECT count(*)::int AS n FROM pc49.schema_migrations`, 7)
+  `SELECT count(*)::int AS n FROM pc49.schema_migrations`, 11)
 await check('gold types seeded',
   `SELECT count(*)::int AS n FROM pc49.gold_type`, 9)
 await check('accounts seeded',
-  `SELECT count(*)::int AS n FROM pc49.account`, 45)
+  `SELECT count(*)::int AS n FROM pc49.account`, 46)
 await check('flow rules seeded',
   `SELECT count(*)::int AS n FROM pc49.gold_flow_rule`, 74)
 await check('system parameters seeded',
@@ -66,6 +66,47 @@ await check('cogs_price falls back to market price',
   `SELECT round(pc49.cogs_price('2026-01-31', '9999'), 6)::text AS v`, '5893.156627')
 
 await c.query(`DELETE FROM pc49.gold_price_daily WHERE price_date IN ('2026-01-30','2026-01-31')`)
+
+// The ledger, exercised end to end on the live database and then rolled back.
+await c.query('BEGIN')
+try {
+  const e = await c.query(
+    `INSERT INTO pc49.journal_entry (entry_date, period, memo, txn_kind)
+     VALUES ('2026-01-01', '2026-01', 'live check', 'MANUAL') RETURNING id`)
+  const id = e.rows[0].id
+  await c.query(
+    `INSERT INTO pc49.journal_line
+       (entry_id, seq, debit_account, credit_account, amount_usd, gold_type_code, uom, qty_native)
+     VALUES ($1, 1, '131', '511', 5310, 'RP', 'LUONG', -1)`, [id])
+  await c.query(`UPDATE pc49.journal_entry SET posted_at = now() WHERE id = $1`, [id])
+  await check('a balanced entry posts', `SELECT (pc49.entry_balance('${id}') = 0) AS v`, true)
+  await check('weight is derived from the unit',
+    `SELECT qty_gram::text AS v FROM pc49.journal_line WHERE entry_id = '${id}'`, '-37.5000')
+  await check('the post is audited',
+    `SELECT count(*)::int AS n FROM pc49.audit_log
+      WHERE entity_id = '${id}' AND action = 'POST'`, 1)
+
+  // A savepoint, so the deliberate failure below does not abort the outer
+  // transaction and take the remaining checks with it.
+  let refused = false
+  await c.query('SAVEPOINT deliberate_failure')
+  try {
+    const bad = await c.query(
+      `INSERT INTO pc49.journal_entry (entry_date, period, memo, txn_kind)
+       VALUES ('2026-01-01', '2026-01', 'unbalanced', 'MANUAL') RETURNING id`)
+    await c.query(
+      `INSERT INTO pc49.journal_line (entry_id, seq, debit_account, amount_usd)
+       VALUES ($1, 1, '1388', 100)`, [bad.rows[0].id])
+    await c.query(`UPDATE pc49.journal_entry SET posted_at = now() WHERE id = $1`, [bad.rows[0].id])
+  } catch {
+    refused = true
+  } finally {
+    await c.query('ROLLBACK TO SAVEPOINT deliberate_failure')
+  }
+  await check('an unbalanced entry is refused', `SELECT ${refused} AS v`, true)
+} finally {
+  await c.query('ROLLBACK')
+}
 
 await c.end()
 console.log(failures === 0 ? '\nALL LIVE CHECKS PASSED' : `\n${failures} CHECK(S) FAILED`)
