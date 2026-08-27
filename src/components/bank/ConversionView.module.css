@@ -1,0 +1,183 @@
+/*
+ * Two columns, because the work is a comparison: a bank amount on one side and
+ * the gold that explains it on the other. Anything that makes the reader look
+ * away from one to check the other costs them the thread.
+ *
+ * The residual is given the most prominent figure on the screen. It is the
+ * number the rule turns into cash, and the number that tells the accountant
+ * whether the transaction is finished.
+ */
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(280px, 34%) 1fr;
+  gap: 28px;
+  align-items: start;
+}
+
+@media (max-width: 880px) {
+  .split { grid-template-columns: 1fr; }
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 220px);
+  overflow: auto;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px 8px 0;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.item:hover { background: color-mix(in srgb, currentColor 4%, transparent); }
+
+.item[aria-current='true'] {
+  background: color-mix(in srgb, currentColor 7%, transparent);
+  box-shadow: inset 2px 0 0 currentColor;
+  padding-left: 10px;
+}
+
+.itemDate {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.itemAmount {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+.itemDesc {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lineGrid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.lineGrid th {
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  /* Matches the cell padding below, so a heading sits over its own column
+     rather than drifting into the next one. */
+  padding: 4px 14px 4px 0;
+  border-bottom: 1px solid var(--rule-strong);
+  white-space: nowrap;
+}
+
+.lineGrid td {
+  padding: 0 14px 0 0;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: middle;
+}
+
+/* The action column sizes to its label rather than squeezing it onto two lines:
+   a button that wraps reads as an accident. */
+.lineGrid td:last-child,
+.lineGrid th:last-child {
+  padding-right: 0;
+  width: 1%;
+  white-space: nowrap;
+}
+
+.field {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 6px 0;
+  font: inherit;
+  color: inherit;
+  outline-offset: -2px;
+}
+
+.field:focus {
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  outline: 2px solid currentColor;
+}
+
+.numField {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+
+/* An out-of-band price is not an error to be hidden. It is a decision to be
+   made, so it is stated plainly and the confirmation sits next to it. */
+.warn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--out);
+  padding: 6px 0;
+}
+
+.warnLabel { display: flex; align-items: center; gap: 6px; }
+
+.actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.button {
+  font: inherit;
+  white-space: nowrap;
+  font-size: 13px;
+  padding: 5px 12px;
+  border: 1px solid var(--rule-strong);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.button:hover { background: color-mix(in srgb, currentColor 6%, transparent); }
+.button:disabled { opacity: 0.5; cursor: default; }
+
+.summary {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  padding-top: 12px;
+  border-top: 2px solid var(--rule-strong);
+}
+
+.error {
+  font-size: 12px;
+  color: var(--out);
+}
