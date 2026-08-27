@@ -1,0 +1,159 @@
+/*
+ * The shared look for every read-only screen, matching the entry grid.
+ *
+ * Same reasoning: this is a ledger, not an app. Hairline rules, dense rows,
+ * figures in tabular numerals so a column of digits can be scanned by eye. The
+ * two signal colours mean the same thing everywhere - gold or money coming in
+ * reads one way, going out reads the other - so a number never has to be read
+ * twice to know its direction.
+ */
+
+.page {
+  --rule: color-mix(in srgb, currentColor 14%, transparent);
+  --rule-strong: color-mix(in srgb, currentColor 30%, transparent);
+  --muted: color-mix(in srgb, currentColor 55%, transparent);
+  --in: #0f7a4f;
+  --out: #a3372c;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .page { --in: #4bbd8a; --out: #e2705f; }
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.title {
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.note {
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 70ch;
+  margin: 0;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionTitle {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: fixed;
+}
+
+.table th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 6px 10px 6px 0;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.table td {
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+}
+
+.table tbody tr:last-child td { border-bottom: 0; }
+
+.table tfoot td {
+  padding-top: 8px;
+  border-top: 2px solid var(--rule-strong);
+  border-bottom: 0;
+  font-weight: 650;
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+
+.in { color: var(--in); }
+.out { color: var(--out); }
+.muted { color: var(--muted); }
+
+/* A row the reader should treat differently from the ones around it: a clearing
+   account among real bank accounts, a draft among posted entries. */
+.aside td {
+  color: var(--muted);
+}
+
+.empty {
+  padding: 16px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.stats {
+  display: flex;
+  gap: 40px;
+  flex-wrap: wrap;
+  padding-bottom: 4px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statLabel {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.statValue {
+  font-size: 22px;
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  letter-spacing: -0.02em;
+}
+
+.statNote {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  padding: 1px 6px;
+  border: 1px solid var(--rule-strong);
+  color: var(--muted);
+}
