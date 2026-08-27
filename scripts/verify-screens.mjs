@@ -32,6 +32,8 @@ const browser = await chromium.launch()
     ['/refining', 'Phân kim'],
     ['/journal', 'Sổ nhật ký'],
     ['/gold-transactions', 'Giao dịch vàng'],
+    ['/bank-conversion', 'Quy đổi giao dịch ngân hàng ra vàng'],
+    ['/reports', 'Báo cáo'],
   ]) {
     const res = await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' })
     const ok = res?.status() === 200
