@@ -14,7 +14,8 @@
     "verify:live": "node --env-file=.env.local scripts/verify-live.mjs",
     "seed:users": "node --env-file=.env.local scripts/seed-test-users.mjs",
     "verify:rls": "node --env-file=.env.local scripts/verify-rls.mjs",
-    "verify:signin": "node scripts/verify-signin.mjs"
+    "verify:signin": "node scripts/verify-signin.mjs",
+    "verify:grid": "node scripts/verify-grid.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",

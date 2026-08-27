@@ -163,3 +163,14 @@ describe('owner capital', () => {
     expect(r.rows).toEqual([{ code: '4111', account_type: 'EQUITY' }])
   })
 })
+
+describe('sales people', () => {
+  it('seeds the eight names that appear in the Dashboard', async () => {
+    const r = await db.query<{ code: string }>(
+      `SELECT code FROM pc49.sales_person WHERE is_active ORDER BY code`,
+    )
+    expect(r.rows).toHaveLength(8)
+    expect(r.rows.map((x) => x.code)).toContain('L.Thanh')
+    expect(r.rows.map((x) => x.code)).toContain('S.Mai')
+  })
+})

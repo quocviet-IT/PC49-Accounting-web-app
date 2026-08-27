@@ -50,3 +50,5 @@ next-env.d.ts
 # local dev server logs
 dev.log
 dev.err.log
+
+grid.png
