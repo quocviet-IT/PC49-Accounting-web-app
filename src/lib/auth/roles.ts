@@ -3,6 +3,7 @@ export type Role = 'KT' | 'GS_US' | 'OC' | 'ADMIN'
 export type Capability =
   | 'goldTxn.write'
   | 'bankImport.run'
+  | 'dataImport.run'
   | 'refining.write'
   | 'refining.approve'
   | 'journal.post'
@@ -13,11 +14,12 @@ export type Capability =
   | 'user.manage'
 
 const MATRIX: Record<Role, Capability[]> = {
-  KT: ['goldTxn.write', 'bankImport.run', 'refining.write', 'journal.post', 'journal.void', 'report.read'],
+  KT: ['goldTxn.write', 'bankImport.run', 'dataImport.run', 'refining.write',
+       'journal.post', 'journal.void', 'report.read'],
   GS_US: ['refining.write', 'refining.approve', 'period.close', 'report.read'],
   OC: ['report.read'],
   ADMIN: [
-    'goldTxn.write', 'bankImport.run', 'refining.write', 'refining.approve',
+    'goldTxn.write', 'bankImport.run', 'dataImport.run', 'refining.write', 'refining.approve',
     'journal.post', 'journal.void', 'period.close', 'report.read',
     'catalog.manage', 'user.manage',
   ],

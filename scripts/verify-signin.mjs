@@ -6,13 +6,15 @@ import { chromium } from 'playwright'
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const USERS = [
   { email: 'kt@pc49.test',    password: 'pc49-test-KT-2026',    role: 'KT',
-    expect: ['Tổng quan', 'Giao dịch vàng', 'Tồn kho', 'Phân kim', 'Tiền mặt & Ngân hàng', 'Sổ nhật ký', 'Báo cáo'] },
+    expect: ['Tổng quan', 'Giao dịch vàng', 'Tồn kho', 'Phân kim', 'Tiền mặt & Ngân hàng',
+             'Quy đổi giao dịch', 'Sổ nhật ký', 'Báo cáo', 'Nạp dữ liệu'] },
   { email: 'gsus@pc49.test',  password: 'pc49-test-GSUS-2026',  role: 'GS_US',
     expect: ['Tổng quan', 'Tồn kho', 'Phân kim', 'Báo cáo'] },
   { email: 'oc@pc49.test',    password: 'pc49-test-OC-2026',    role: 'OC',
     expect: ['Tổng quan', 'Tồn kho', 'Báo cáo'] },
   { email: 'admin@pc49.test', password: 'pc49-test-ADMIN-2026', role: 'ADMIN',
-    expect: ['Tổng quan', 'Giao dịch vàng', 'Tồn kho', 'Phân kim', 'Tiền mặt & Ngân hàng', 'Sổ nhật ký', 'Báo cáo', 'Cấu hình'] },
+    expect: ['Tổng quan', 'Giao dịch vàng', 'Tồn kho', 'Phân kim', 'Tiền mặt & Ngân hàng',
+             'Quy đổi giao dịch', 'Sổ nhật ký', 'Báo cáo', 'Nạp dữ liệu', 'Cấu hình'] },
 ]
 
 let failures = 0

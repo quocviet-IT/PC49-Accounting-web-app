@@ -12,6 +12,7 @@ const ALL: (NavItem & { requires: Capability | null })[] = [
   { key: 'bankGold', labelKey: 'nav.bankGold', href: '/bank-conversion', requires: 'goldTxn.write' },
   { key: 'journal', labelKey: 'nav.journal', href: '/journal', requires: 'journal.post' },
   { key: 'reports', labelKey: 'nav.reports', href: '/reports', requires: 'report.read' },
+  { key: 'import', labelKey: 'nav.import', href: '/import', requires: 'dataImport.run' },
   { key: 'settings', labelKey: 'nav.settings', href: '/settings', requires: 'catalog.manage' },
 ]
 

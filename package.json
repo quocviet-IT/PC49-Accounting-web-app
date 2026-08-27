@@ -17,7 +17,8 @@
     "verify:signin": "node scripts/verify-signin.mjs",
     "verify:grid": "node scripts/verify-grid.mjs",
     "verify:screens": "node scripts/verify-screens.mjs",
-    "verify:conversion": "node scripts/verify-conversion.mjs"
+    "verify:conversion": "node --env-file=.env.local scripts/verify-conversion.mjs",
+    "verify:import": "node --env-file=.env.local scripts/verify-import.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",

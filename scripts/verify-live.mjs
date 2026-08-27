@@ -1,5 +1,7 @@
 // Reads the live database and checks the P0/P1 acceptance criteria.
 // Run: npm run verify:live
+import { readdir } from 'node:fs/promises'
+import path from 'node:path'
 import pg from 'pg'
 
 const url = process.env.SUPABASE_DB_URL
@@ -19,8 +21,13 @@ async function check(name, sql, expected) {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name.padEnd(46)} ${ok ? '' : `got ${JSON.stringify(got)} want ${JSON.stringify(expected)}`}`)
 }
 
-await check('migrations applied',
-  `SELECT count(*)::int AS n FROM pc49.schema_migrations`, 28)
+// Counted off what is on disk rather than a number written here, so a migration
+// that was written but never applied fails this check instead of hiding until
+// something downstream breaks.
+const onDisk = (await readdir(path.join(process.cwd(), 'supabase', 'migrations')))
+  .filter((f) => f.endsWith('.sql')).length
+await check('every migration on disk is applied',
+  `SELECT count(*)::int AS n FROM pc49.schema_migrations`, onDisk)
 await check('gold types seeded',
   `SELECT count(*)::int AS n FROM pc49.gold_type`, 9)
 await check('accounts seeded',

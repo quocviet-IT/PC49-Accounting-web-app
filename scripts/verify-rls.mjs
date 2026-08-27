@@ -22,6 +22,11 @@ function check(name, ok, detail = '') {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name.padEnd(52)}${detail}`)
 }
 
+// A direct connection, used only to clear up after the write checks below.
+const admin49 = new pg.Client({
+  connectionString: process.env.SUPABASE_DB_URL, ssl: { rejectUnauthorized: false } })
+await admin49.connect()
+
 // Anonymous callers must see nothing at all.
 {
   const sb = createClient(url, pub)
@@ -60,8 +65,26 @@ for (const u of USERS) {
   check(`${u.role} ${u.role === 'ADMIN' ? 'may' : 'may not'} change a system parameter`,
     u.role === 'ADMIN' ? changed : !changed)
 
+  // Loading history rewrites the books, so only the accountant and an
+  // administrator may open a batch. Everyone may read one: knowing that a load
+  // happened is not the same as being able to run one.
+  const opened = await sb.schema('pc49').from('import_batch')
+    .insert({ source: 'OPENING_CASH', file_name: `rls-check-${u.role}.xlsx` }).select()
+  const mayLoad = u.role === 'KT' || u.role === 'ADMIN'
+  const didOpen = !opened.error && (opened.data?.length ?? 0) > 0
+  check(`${u.role} ${mayLoad ? 'may' : 'may not'} open an import batch`,
+    mayLoad ? didOpen : !didOpen, opened.error?.message?.slice(0, 40) ?? '')
+  if (didOpen) {
+    await admin49.query('DELETE FROM pc49.import_batch WHERE id = $1', [opened.data[0].id])
+  }
+
+  const read = await sb.schema('pc49').from('import_batch').select('id')
+  check(`${u.role} may read the list of batches`, !read.error, read.error?.message ?? '')
+
   await sb.auth.signOut()
 }
+
+await admin49.end()
 
 // Suspending a user must remove every permission.
 {

@@ -1,0 +1,152 @@
+// Loads a small batch the way the accountant will, against the real database:
+// stage rows, look at what was turned back and why, commit the rest, and watch
+// the reconciliation go from disagreeing to agreeing.
+//
+// Everything this writes is removed at the end. Run with the dev server up.
+import { chromium } from 'playwright'
+import pg from 'pg'
+
+const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
+const url = process.env.SUPABASE_DB_URL
+if (!url) {
+  console.error('Missing environment variable: SUPABASE_DB_URL')
+  process.exit(1)
+}
+
+let failures = 0
+function check(name, ok, detail = '') {
+  if (!ok) failures += 1
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name.padEnd(52)}${detail}`)
+}
+
+// A date far enough from anything real that this run cannot be mistaken for it.
+const AS_OF = '2019-09-30'
+const db = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } })
+await db.connect()
+
+let batchId = null
+const browser = await chromium.launch()
+
+try {
+  const { rows } = await db.query(
+    `INSERT INTO pc49.import_batch (source, file_name, note)
+     VALUES ('OPENING_INVENTORY', 'verify-import.xlsx', 'automated check') RETURNING id`)
+  batchId = rows[0].id
+
+  const staged = [
+    [1, { as_of: AS_OF, gold_type_code: 'PT', qty: '120' }],
+    [2, { as_of: AS_OF, gold_type_code: 'SG', qty: '80' }],
+    [3, { as_of: AS_OF, gold_type_code: 'SG', qty: '#REF!' }],
+    [4, { as_of: AS_OF, gold_type_code: 'NOTAGOLD', qty: '5' }],
+  ]
+  for (const [no, payload] of staged) {
+    await db.query('SELECT pc49.stage_import_row($1, $2, $3::jsonb)',
+      [batchId, no, JSON.stringify(payload)])
+  }
+
+  const counts = await db.query(
+    `SELECT valid_count, rejected_count FROM pc49.v_import_batch_summary WHERE batch_id = $1`,
+    [batchId])
+  check('the database judges the rows as they are staged',
+    Number(counts.rows[0].valid_count) === 2 && Number(counts.rows[0].rejected_count) === 2,
+    `${counts.rows[0].valid_count} good, ${counts.rows[0].rejected_count} turned back`)
+
+  // What the source says this date closed at. PT agrees with what is being
+  // loaded; SG deliberately does not, so a real difference has to show.
+  await db.query(
+    `INSERT INTO pc49.import_expected_figure (as_of, metric, metric_key, expected, source_note)
+     VALUES ($1, 'INVENTORY_GRAM', 'PT', 120, 'verify-import'),
+            ($1, 'INVENTORY_GRAM', 'SG', 95,  'verify-import')
+     ON CONFLICT (as_of, metric, metric_key) DO UPDATE SET expected = excluded.expected`,
+    [AS_OF])
+
+  const page = await browser.newPage()
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
+  await page.fill('input[autocomplete="email"]', 'kt@pc49.test')
+  await page.fill('input[autocomplete="current-password"]', 'pc49-test-KT-2026')
+  await page.click('button[type="submit"]')
+  await page.waitForURL(`${BASE}/`, { timeout: 20000 })
+
+  const menu = (await page.locator('header').first().textContent()) ?? ''
+  check('the accountant is offered the import screen', menu.includes('Nạp dữ liệu'))
+
+  await page.goto(`${BASE}/import?asOf=${AS_OF}&batch=${batchId}`, { waitUntil: 'networkidle' })
+  const before = (await page.locator('body').textContent()) ?? ''
+
+  check('the batch is listed with its file', before.includes('verify-import.xlsx'))
+  // The accountant reads these and goes back to the spreadsheet, so they have to
+  // arrive in the language the screen is in.
+  check('a broken formula is named, not swallowed',
+    before.includes('#REF!') && before.includes('bảng tính cũng không có đáp án'))
+  check('an unknown gold type is named',
+    before.includes('Không có loại vàng nào tên NOTAGOLD'))
+  check('the rejected rows are pointed at by sheet row',
+    before.includes('3') && before.includes('4'))
+  check('nothing is committed yet', before.includes('Chờ duyệt'))
+
+  // Before the load, the system knows nothing: both figures are short by the
+  // whole amount.
+  const gap = await db.query(
+    `SELECT metric_key, difference FROM pc49.import_reconciliation($1) ORDER BY metric_key`,
+    [AS_OF])
+  check('the reconciliation starts out disagreeing',
+    gap.rows.length === 2 && gap.rows.every((r) => Number(r.difference) !== 0),
+    gap.rows.map((r) => `${r.metric_key} ${r.difference}`).join(', '))
+
+  // Two rows cannot be fixed from here, so this is a deliberate partial load.
+  await page.locator('button', { hasText: 'Ghi phần nhận được' }).first().click()
+  await page.waitForTimeout(2500)
+
+  const after = (await page.locator('body').textContent()) ?? ''
+  check('the screen says what it wrote and what it left',
+    /2 rows written, 2 left behind/.test(after), after.includes('rows written') ? '' : 'no message')
+  check('the batch is marked as committed short', after.includes('Ghi thiếu dòng'))
+
+  const settled = await db.query(
+    `SELECT metric_key, actual, difference, agrees FROM pc49.import_reconciliation($1)
+      ORDER BY metric_key`, [AS_OF])
+  const pt = settled.rows.find((r) => r.metric_key === 'PT')
+  const sg = settled.rows.find((r) => r.metric_key === 'SG')
+  check('the figure that adds up now agrees', pt?.agrees === true,
+    `PT ${pt?.actual} vs 120`)
+  check('the figure that does not still shows the gap',
+    sg?.agrees === false && Number(sg?.difference).toFixed(2) === '-15.00',
+    `SG ${sg?.actual} vs 95, difference ${sg?.difference}`)
+
+  await page.goto(`${BASE}/import?asOf=${AS_OF}&batch=${batchId}`, { waitUntil: 'networkidle' })
+  const shown = (await page.locator('body').textContent()) ?? ''
+  check('the screen shows the difference the accountant has to explain',
+    shown.includes('-15.00'))
+
+  await page.screenshot({ path: 'import.png', fullPage: true })
+
+  // Withdrawing puts the rows back, which is what makes a load re-runnable.
+  const undone = await db.query('SELECT pc49.withdraw_import_batch($1) AS n', [batchId])
+  check('the batch can be withdrawn whole', Number(undone.rows[0].n) === 2)
+  const left = await db.query(
+    `SELECT count(*)::int AS n FROM pc49.inventory_movement WHERE move_date = $1`, [AS_OF])
+  check('withdrawing leaves nothing behind', left.rows[0].n === 0)
+} finally {
+  await browser.close()
+  // The client's database is not a scratch pad.
+  if (batchId) {
+    await db.query(
+      `DELETE FROM pc49.inventory_movement WHERE id IN (
+         SELECT committed_ref FROM pc49.import_row WHERE batch_id = $1 AND committed_ref IS NOT NULL)`,
+      [batchId])
+    await db.query('DELETE FROM pc49.import_batch WHERE id = $1', [batchId])
+  }
+  await db.query('DELETE FROM pc49.import_expected_figure WHERE as_of = $1', [AS_OF])
+  await db.query('DELETE FROM pc49.inventory_movement WHERE move_date = $1', [AS_OF])
+  const rest = await db.query(
+    `SELECT (SELECT count(*) FROM pc49.import_batch WHERE file_name = 'verify-import.xlsx') AS batches,
+            (SELECT count(*) FROM pc49.inventory_movement WHERE move_date = $1) AS movements`,
+    [AS_OF])
+  check('the check cleaned up after itself',
+    Number(rest.rows[0].batches) === 0 && Number(rest.rows[0].movements) === 0,
+    `${rest.rows[0].batches} batches, ${rest.rows[0].movements} movements left`)
+  await db.end()
+}
+
+console.log(failures === 0 ? '\nALL IMPORT CHECKS PASSED' : `\n${failures} CHECK(S) FAILED`)
+process.exit(failures === 0 ? 0 : 1)

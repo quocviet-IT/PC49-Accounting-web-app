@@ -34,6 +34,7 @@ const browser = await chromium.launch()
     ['/gold-transactions', 'Giao dịch vàng'],
     ['/bank-conversion', 'Quy đổi giao dịch ngân hàng ra vàng'],
     ['/reports', 'Báo cáo'],
+    ['/import', 'Nạp dữ liệu từ bảng tính'],
   ]) {
     const res = await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' })
     const ok = res?.status() === 200
@@ -58,6 +59,12 @@ const browser = await chromium.launch()
   const body = (await page.locator('body').textContent()) ?? ''
   check('OC is refused the entry grid', body.includes('không có quyền'),
     body.slice(0, 60).replace(/\s+/g, ' '))
+
+  // Loading history rewrites the books, so it is not an owner's screen.
+  await page.goto(`${BASE}/import`, { waitUntil: 'networkidle' })
+  const imp = (await page.locator('body').textContent()) ?? ''
+  check('OC is refused the data import', imp.includes('không có quyền'),
+    imp.slice(0, 60).replace(/\s+/g, ' '))
   await ctx.close()
 }
 

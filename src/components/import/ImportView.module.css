@@ -1,0 +1,126 @@
+/*
+ * The import screen borrows the ledger's rules and typography. What it adds is
+ * only what this screen needs and the others do not: a batch you can pick, a
+ * row that disagrees with the source, and two buttons whose weight matches how
+ * far each one goes.
+ */
+
+.pick {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+}
+
+.pick:hover { border-bottom-color: currentColor; }
+
+.pick:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.picked td {
+  background: color-mix(in srgb, currentColor 5%, transparent);
+}
+
+.picked td:first-child {
+  box-shadow: inset 2px 0 0 currentColor;
+}
+
+/* A file name or a raw payload can run long; the table must not widen because
+   of one of them. */
+.clip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A figure that does not match the source. The marker is on the row rather
+   than the number alone, because the reader is scanning for the row. */
+.differs td:first-child {
+  box-shadow: inset 2px 0 0 var(--out);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+}
+
+.button,
+.quiet {
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 12px;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Writing to the books is the heavier of the two, so it carries the heavier
+   border and weight. Filling it with a colour would be the third signal on a
+   screen that already uses two. */
+.button {
+  font-weight: 650;
+  color: inherit;
+  border: 1px solid currentColor;
+}
+
+.quiet {
+  font-weight: 400;
+  color: var(--muted);
+  border: 1px solid var(--rule-strong);
+}
+
+.button:hover:not(:disabled) {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.quiet:hover:not(:disabled) {
+  color: inherit;
+  border-color: currentColor;
+}
+
+.button:focus-visible,
+.quiet:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.button:disabled,
+.quiet:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.said,
+.failed {
+  font-size: 12px;
+}
+
+.said { color: var(--muted); }
+.failed { color: var(--out); max-width: 60ch; }
+
+.asOf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  padding-bottom: 4px;
+}
+
+.asOf input {
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 6px;
+  border: 1px solid var(--rule-strong);
+  background: transparent;
+  color: inherit;
+}
+
+.settled {
+  font-size: 12px;
+  color: var(--in);
+  margin: 4px 0 0;
+}
