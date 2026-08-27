@@ -11,7 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "migrate": "node --env-file=.env.local scripts/migrate.mjs",
-    "verify:live": "node --env-file=.env.local scripts/verify-live.mjs"
+    "verify:live": "node --env-file=.env.local scripts/verify-live.mjs",
+    "seed:users": "node --env-file=.env.local scripts/seed-test-users.mjs",
+    "verify:rls": "node --env-file=.env.local scripts/verify-rls.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",

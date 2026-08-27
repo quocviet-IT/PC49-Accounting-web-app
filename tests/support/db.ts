@@ -30,6 +30,12 @@ const SUPABASE_STUB = `
   DO $do$ BEGIN
     CREATE ROLE anon;
   EXCEPTION WHEN duplicate_object THEN NULL; END $do$;
+
+  -- PostgREST connects as this role and switches to anon or authenticated per
+  -- request. Migrations configure its exposed schemas, so it has to exist here.
+  DO $do$ BEGIN
+    CREATE ROLE authenticator;
+  EXCEPTION WHEN duplicate_object THEN NULL; END $do$;
 `
 
 export async function migrationFiles(): Promise<string[]> {
