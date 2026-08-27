@@ -154,3 +154,12 @@ describe('gold flow rules', () => {
     expect(Number(r.rows[0].n)).toBe(0)
   })
 })
+
+describe('owner capital', () => {
+  it('seeds owner capital so opening balances have a counterpart', async () => {
+    const r = await db.query<{ code: string; account_type: string }>(
+      `SELECT code, account_type::text AS account_type FROM pc49.account WHERE code = '4111'`,
+    )
+    expect(r.rows).toEqual([{ code: '4111', account_type: 'EQUITY' }])
+  })
+})
