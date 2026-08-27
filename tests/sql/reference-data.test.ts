@@ -119,3 +119,38 @@ describe('chart of accounts', () => {
     expect(byType.LIABILITY).toBe(3)  // 331, 333, 334
   })
 })
+
+describe('gold flow rules', () => {
+  it('lets Scrap Gold out only by internal sale or refining', async () => {
+    const r = await db.query<{ txn_type: string }>(
+      `SELECT txn_type FROM pc49.gold_flow_rule
+        WHERE gold_type_code = 'SG' AND direction = 'OUT' ORDER BY txn_type`,
+    )
+    expect(r.rows.map((x) => x.txn_type)).toEqual(['SALE', 'TRANSFER_OUT'])
+  })
+
+  it('lets Scrap Gold in only by purchase', async () => {
+    const r = await db.query<{ txn_type: string }>(
+      `SELECT txn_type FROM pc49.gold_flow_rule
+        WHERE gold_type_code = 'SG' AND direction = 'IN' ORDER BY txn_type`,
+    )
+    expect(r.rows.map((x) => x.txn_type)).toEqual(['PO', 'PO_VENDOR'])
+  })
+
+  it('lets seven gold types arrive by transfer from Grain', async () => {
+    const r = await db.query<{ code: string }>(
+      `SELECT gold_type_code AS code FROM pc49.gold_flow_rule
+        WHERE direction = 'IN' AND txn_type = 'TRANSFER_IN'
+          AND source_gold_type_code = 'GRAIN' ORDER BY gold_type_code`,
+    )
+    expect(r.rows.map((x) => x.code)).toEqual(['9999', 'AE', 'CS', 'ML', 'OTH', 'PT', 'RP'])
+  })
+
+  it('never lets Grain or Scrap Gold be sold to a walk-in customer as a deposit', async () => {
+    const r = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pc49.gold_flow_rule
+        WHERE gold_type_code IN ('GRAIN', 'SG') AND txn_type IN ('DEPOSIT', 'PICKUP')`,
+    )
+    expect(Number(r.rows[0].n)).toBe(0)
+  })
+})
