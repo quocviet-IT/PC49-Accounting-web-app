@@ -20,7 +20,7 @@ async function check(name, sql, expected) {
 }
 
 await check('migrations applied',
-  `SELECT count(*)::int AS n FROM pc49.schema_migrations`, 25)
+  `SELECT count(*)::int AS n FROM pc49.schema_migrations`, 26)
 await check('gold types seeded',
   `SELECT count(*)::int AS n FROM pc49.gold_type`, 9)
 await check('accounts seeded',
