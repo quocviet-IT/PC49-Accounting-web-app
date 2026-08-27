@@ -13,7 +13,8 @@
     "migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "verify:live": "node --env-file=.env.local scripts/verify-live.mjs",
     "seed:users": "node --env-file=.env.local scripts/seed-test-users.mjs",
-    "verify:rls": "node --env-file=.env.local scripts/verify-rls.mjs"
+    "verify:rls": "node --env-file=.env.local scripts/verify-rls.mjs",
+    "verify:signin": "node scripts/verify-signin.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",
@@ -36,6 +37,7 @@
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.3",
     "pg": "^8.23.0",
+    "playwright": "^1.62.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11"
   }

@@ -1,3 +1,6 @@
+/** Every application table lives in this schema, never in `public`. */
+export const DB_SCHEMA = 'pc49'
+
 export type AppEnv = {
   supabaseUrl: string
   supabaseAnonKey: string
