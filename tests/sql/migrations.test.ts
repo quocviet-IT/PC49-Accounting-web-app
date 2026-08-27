@@ -83,3 +83,28 @@ describe('effective_role', () => {
     expect(r.rows[0].role).toBeNull()
   })
 })
+
+describe('security invariants', () => {
+  it('enables row level security on every table in the pc49 schema', async () => {
+    const r = await db.query<{ table_name: string }>(
+      `SELECT c.relname AS table_name
+         FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'pc49' AND c.relkind = 'r' AND NOT c.relrowsecurity
+        ORDER BY c.relname`,
+    )
+    expect(r.rows.map((x) => x.table_name)).toEqual([])
+  })
+
+  it('gives every table with row level security at least one policy', async () => {
+    const r = await db.query<{ table_name: string }>(
+      `SELECT c.relname AS table_name
+         FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'pc49' AND c.relkind = 'r' AND c.relrowsecurity
+          AND NOT EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid)
+        ORDER BY c.relname`,
+    )
+    expect(r.rows.map((x) => x.table_name)).toEqual([])
+  })
+})

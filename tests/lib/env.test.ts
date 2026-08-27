@@ -13,8 +13,27 @@ describe('readEnv', () => {
     })
   })
 
-  it('names the missing variable in the error', () => {
+  it('accepts the newer publishable key name', () => {
+    const env = readEnv({
+      NEXT_PUBLIC_SUPABASE_URL: 'https://abc.supabase.co',
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_abc123',
+    })
+    expect(env.supabaseAnonKey).toBe('sb_publishable_abc123')
+  })
+
+  it('prefers the publishable key when both names are set', () => {
+    const env = readEnv({
+      NEXT_PUBLIC_SUPABASE_URL: 'https://abc.supabase.co',
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_new',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'legacy-anon',
+    })
+    expect(env.supabaseAnonKey).toBe('sb_publishable_new')
+  })
+
+  it('names both accepted key variables when neither is set', () => {
     expect(() => readEnv({ NEXT_PUBLIC_SUPABASE_URL: 'https://abc.supabase.co' }))
-      .toThrowError('Missing environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY')
+      .toThrowError(
+        'Missing environment variable: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY',
+      )
   })
 })

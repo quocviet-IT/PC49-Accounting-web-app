@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "migrate": "node --env-file=.env.local scripts/migrate.mjs"
+    "migrate": "node --env-file=.env.local scripts/migrate.mjs",
+    "verify:live": "node --env-file=.env.local scripts/verify-live.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",
