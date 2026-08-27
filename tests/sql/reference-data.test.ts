@@ -71,3 +71,51 @@ describe('gold types', () => {
     expect(Number(r.rows[0].n)).toBe(0)
   })
 })
+
+describe('chart of accounts', () => {
+  it('seeds every account referenced by a gold type', async () => {
+    const r = await db.query<{ code: string }>(
+      `SELECT g.code FROM pc49.gold_type g
+        WHERE NOT EXISTS (SELECT 1 FROM pc49.account a WHERE a.code = g.cogs_account)
+           OR NOT EXISTS (SELECT 1 FROM pc49.account a WHERE a.code = g.inventory_account)
+           OR NOT EXISTS (SELECT 1 FROM pc49.account a WHERE a.code = g.in_transit_account)`,
+    )
+    expect(r.rows).toEqual([])
+  })
+
+  it('marks the three clearing accounts', async () => {
+    const r = await db.query<{ code: string }>(
+      'SELECT code FROM pc49.account WHERE is_clearing ORDER BY code',
+    )
+    expect(r.rows.map((x) => x.code)).toEqual(['1121BW', '1121CK', '1121ZL'])
+  })
+
+  it('lets the clearing accounts go negative but not cash on hand', async () => {
+    const r = await db.query<{ code: string; allows_negative: boolean }>(
+      `SELECT code, allows_negative FROM pc49.account
+        WHERE code IN ('1121ZL', '1111') ORDER BY code`,
+    )
+    expect(r.rows).toEqual([
+      { code: '1111', allows_negative: false },
+      { code: '1121ZL', allows_negative: true },
+    ])
+  })
+
+  it('gives every account both names', async () => {
+    const r = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pc49.account
+        WHERE btrim(coalesce(name_vi, '')) = '' OR btrim(coalesce(name_en, '')) = ''`,
+    )
+    expect(Number(r.rows[0].n)).toBe(0)
+  })
+
+  it('classifies each account into an accounting type', async () => {
+    const r = await db.query<{ account_type: string; n: string }>(
+      'SELECT account_type, count(*)::text AS n FROM pc49.account GROUP BY 1 ORDER BY 1',
+    )
+    const byType = Object.fromEntries(r.rows.map((x) => [x.account_type, Number(x.n)]))
+    expect(byType.EXPENSE).toBe(12)   // nine 632* plus 635, 641, 642
+    expect(byType.REVENUE).toBe(3)    // 511, 515, 711
+    expect(byType.LIABILITY).toBe(3)  // 331, 333, 334
+  })
+})
