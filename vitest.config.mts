@@ -18,7 +18,7 @@ export default defineConfig({
      * to be worth knowing about.
      *
      * On a machine that is short of memory: `npm run test:low-memory`, which
-     * runs the files one process at a time.
+     * runs the files one at a time and completes where the parallel run cannot.
      */
   },
   resolve: {

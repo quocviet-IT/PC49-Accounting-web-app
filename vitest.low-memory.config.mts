@@ -1,5 +1,5 @@
-import { defineConfig, mergeConfig } from 'vitest/config'
-import base from './vitest.config.mts'
+import { defineConfig } from 'vitest/config'
+import path from 'node:path'
 
 /**
  * The same suite, one file at a time.
@@ -13,10 +13,21 @@ import base from './vitest.config.mts'
  *
  * Slower, and the right thing to reach for on a machine that is short of
  * memory. CI has the headroom and stays on the default.
+ *
+ * Written out rather than imported from vitest.config.mts: importing a .mts
+ * file by name needs allowImportingTsExtensions, which would be a change to the
+ * whole project's TypeScript settings for the sake of one config.
  */
-export default mergeConfig(base, defineConfig({
+export default defineConfig({
   test: {
-    pool: 'forks',
-    poolOptions: { forks: { singleFork: true } },
+    environment: 'node',
+    include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
+    // vitest 4 replaced poolOptions with this: one file at a time, each in its
+    // own process, so a finished file's PostgreSQL heap is returned before the
+    // next one asks for its own.
+    fileParallelism: false,
   },
-}))
+  resolve: {
+    alias: { '@': path.resolve(import.meta.dirname, 'src') },
+  },
+})
