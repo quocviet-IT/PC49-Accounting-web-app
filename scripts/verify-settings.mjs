@@ -221,6 +221,10 @@ try {
   await db.query(`DELETE FROM pc49.audit_log WHERE entity_type = 'journal_entry'
                    AND entity_id NOT IN (SELECT id::text FROM pc49.journal_entry)`)
   await db.query(`DELETE FROM pc49.accounting_period WHERE period = $1`, [PERIOD])
+  // Closing and reopening a month is audited, and that trail belongs to this
+  // run rather than to the client's history.
+  await db.query(`DELETE FROM pc49.audit_log
+                   WHERE entity_type = 'accounting_period' AND entity_id = $1`, [PERIOD])
   // Scoped to the days and the month this run touched: asserting on whole-table
   // counts makes the check fail whenever another suite has left something
   // behind, which is somebody else's bug reported in the wrong place.

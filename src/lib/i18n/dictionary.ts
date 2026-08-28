@@ -249,6 +249,7 @@ export const dictionary = {
     'theme.to.system': 'Theo cài đặt máy',
     'txn.void': 'Huỷ',
     'txn.voidWhy': 'Huỷ giao dịch này vì lý do gì? (bút toán sẽ được đảo, không xoá)',
+    'rep.export': 'Tải về (.csv)',
   },
   en: {
     'app.name': 'PC49',
@@ -500,5 +501,6 @@ export const dictionary = {
     'theme.to.system': 'Follow the system setting',
     'txn.void': 'Cancel',
     'txn.voidWhy': 'Why is this being cancelled? (the entry is reversed, never deleted)',
+    'rep.export': 'Download (.csv)',
   },
 } as const

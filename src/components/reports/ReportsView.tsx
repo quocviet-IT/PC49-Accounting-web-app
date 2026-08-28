@@ -36,7 +36,17 @@ export function ReportsView({
   const name = (l: PlLine) => (locale === 'vi' ? l.nameVi : l.nameEn)
 
   return (
-    <Page titleKey="rep.title">
+    <Page
+      titleKey="rep.title"
+      actions={
+        /* A plain link, not a button running a download in script: the browser
+           handles the file, so it works with the keyboard, with right-click
+           save-as, and on a phone. */
+        <a className="pc-download" href={`/reports/export?period=${period}`}>
+          {t('rep.export')}
+        </a>
+      }
+    >
       <p className={ledger.note}>{t('common.period')}: {period}</p>
 
       <Section titleKey="rep.pl">
