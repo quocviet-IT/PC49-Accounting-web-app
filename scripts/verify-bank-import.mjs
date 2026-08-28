@@ -97,6 +97,18 @@ try {
     Number(wire.rows[0]?.a) === 85562.85 && (wire.rows[0]?.d ?? '').includes('BNF:LOTUS STAR'),
     `${wire.rows[0]?.a}`)
 
+  // Importing and then not being able to see what came in is half a feature.
+  // The movements table reads one month, so it is opened at the month imported
+  // — the unplaced queue is not period-filtered, because a line nobody can
+  // place has no month yet.
+  await page.goto(`${BASE}/cash?period=${DAY.slice(0, 7)}`, { waitUntil: 'networkidle' })
+  const listed = (await page.locator('body').textContent()) ?? ''
+  check('the movements are listed, with direction carrying the sign',
+    listed.includes('Interest (Received)') && listed.includes('6.81')
+      && listed.includes('SERVICE CHARGES'))
+  check('the unplaced line is readable, not just counted',
+    listed.includes('no account mapped for 9999') && listed.includes('MYSTERY'))
+
   const held = await db.query(
     `SELECT raw_account_no AS no, reason FROM pc49.bank_import_row r
        JOIN pc49.bank_import_batch b ON b.id = r.batch_id

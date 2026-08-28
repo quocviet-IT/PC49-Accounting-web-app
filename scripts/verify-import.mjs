@@ -5,6 +5,8 @@
 // Everything this writes is removed at the end. Run with the dev server up.
 import { chromium } from 'playwright'
 import pg from 'pg'
+import { expect } from 'playwright/test'
+import { untilRowIs } from './support/until.mjs'
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const url = process.env.SUPABASE_DB_URL
@@ -74,11 +76,19 @@ try {
   // are stated several at a time, from one sheet.
   await page.locator('button', { hasText: 'Khai con số bảng tính' }).first().click()
   for (const [key, figure] of [['PT', '120'], ['SG', '95']]) {
-    await page.getByLabel('Mã', { exact: true }).fill(key)
+    const keyField = page.getByLabel('Mã', { exact: true })
+    // The panel clears itself after a save, so the next entry has to wait for
+    // that to have happened — typing into a field a pending refresh is about to
+    // blank means saving nothing.
+    await expect(keyField).toHaveValue('')
+    await keyField.fill(key)
     await page.getByLabel('Bảng tính', { exact: true }).fill(figure)
     await page.getByLabel('Lấy từ sheet nào', { exact: true }).fill('verify-import')
     await page.getByRole('button', { name: 'Lưu', exact: true }).click()
-    await page.waitForTimeout(1800)
+    await untilRowIs(db,
+      `SELECT expected::text AS e FROM pc49.import_expected_figure
+        WHERE as_of = $1 AND metric_key = $2`, [AS_OF, key],
+      (r) => Number(r.e) === Number(figure))
   }
   const stated = await db.query(
     `SELECT metric_key AS k, expected::text AS e FROM pc49.import_expected_figure
@@ -104,7 +114,11 @@ try {
   ].join('\n'), 'utf8')
   await page.selectOption('#stage-source', 'OPENING_INVENTORY')
   await page.locator('input[type="file"]').setInputFiles(stagedFile)
-  await page.waitForTimeout(3000)
+  // Wait for the outcome, not for a stopwatch. The pattern needs the count in
+  // front of it: "Số dòng" on its own is also a column heading that is always
+  // on the page, so waiting for that returns instantly and reads too early.
+  await page.getByText(/\d+ Số dòng · /).first()
+    .waitFor({ state: 'visible', timeout: 20000 })
   const stagedSaid = (await page.locator('body').textContent()) ?? ''
   check('a file can be staged from the screen, and is judged on the way in',
     /2 Số dòng/.test(stagedSaid) && /1 Nhận được/.test(stagedSaid) && /1 Bị loại/.test(stagedSaid),
@@ -142,7 +156,14 @@ try {
 
   // Two rows cannot be fixed from here, so this is a deliberate partial load.
   await page.locator('button', { hasText: 'Ghi phần nhận được' }).first().click()
-  await page.waitForTimeout(2500)
+  // Waiting on the database would return before React had drawn anything, and
+  // the next two checks read the screen.
+  await page.getByText(/rows written/).first()
+    .waitFor({ state: 'visible', timeout: 20000 })
+  // The status badge is server-rendered, so it lands after the message the
+  // action returned. Both are read below, so both are waited for.
+  await page.getByText('Ghi thiếu dòng').first()
+    .waitFor({ state: 'visible', timeout: 20000 })
 
   const after = (await page.locator('body').textContent()) ?? ''
   check('the screen says what it wrote and what it left',

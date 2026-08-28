@@ -4,6 +4,7 @@
 // Everything this writes is removed at the end. Run with the dev server up.
 import { chromium } from 'playwright'
 import pg from 'pg'
+import { untilGone, untilRowIs } from './support/until.mjs'
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const url = process.env.SUPABASE_DB_URL
@@ -63,26 +64,25 @@ try {
   const grain = page.getByLabel('Giá thị trường GRAIN', { exact: true })
   await grain.fill('139.20')
   await grain.blur()
-  await page.waitForTimeout(1800)
 
-  const stored = await db.query(
+  const stored = await untilRowIs(db,
     `SELECT market_price::text AS m FROM pc49.gold_price_daily
-      WHERE price_date = $1 AND gold_type_code = 'GRAIN'`, [DAY])
-  check('a typed price reaches the database', Number(stored.rows[0]?.m) === 139.2,
-    stored.rows[0]?.m ?? 'nothing stored')
+      WHERE price_date = $1 AND gold_type_code = 'GRAIN'`, [DAY],
+    (r) => Number(r.m) === 139.2)
+  check('a typed price reaches the database', stored !== null,
+    stored?.m ?? 'nothing stored')
 
   // The spot price is typed per ounce and read per gram, and the divisor is the
   // valuation figure 31.1 rather than the 31.105 that converts weight.
   const spot = page.getByLabel('USD / oz GOLD', { exact: true })
   await spot.fill('4890')
   await spot.blur()
-  await page.waitForTimeout(1800)
-  const perGram = await db.query(
+  const perGram = await untilRowIs(db,
     `SELECT spot_per_gram::text AS g FROM pc49.spot_price_daily
-      WHERE price_date = $1 AND metal = 'GOLD'`, [DAY])
-  check('spot per gram is derived, not typed',
-    Math.abs(Number(perGram.rows[0]?.g) - 4890 / 31.1) < 1e-6,
-    perGram.rows[0]?.g ?? 'nothing stored')
+      WHERE price_date = $1 AND metal = 'GOLD'`, [DAY],
+    (r) => Math.abs(Number(r.g) - 4890 / 31.1) < 1e-6)
+  check('spot per gram is derived, not typed', perGram !== null,
+    perGram?.g ?? 'nothing stored')
 
   // ---- Carrying prices forward --------------------------------------------
   await page.goto(`${BASE}/prices?date=${NEXT_DAY}`, { waitUntil: 'networkidle' })
@@ -105,7 +105,10 @@ try {
       WHERE price_date = $1 AND gold_type_code = 'GRAIN'`, [NEXT_DAY])
   await page.reload({ waitUntil: 'networkidle' })
   await page.locator('button', { hasText: 'Lấy giá hôm trước' }).first().click()
-  await page.waitForTimeout(2500)
+  // Nothing should change, so this waits for the screen to have answered and
+  // then reads: a corrected figure staying put is the whole assertion.
+  await page.getByText(/nothing to carry|đã được/).first()
+    .waitFor({ state: 'visible', timeout: 20000 }).catch(() => {})
   const kept = await db.query(
     `SELECT market_price::text AS m FROM pc49.gold_price_daily
       WHERE price_date = $1 AND gold_type_code = 'GRAIN'`, [NEXT_DAY])
@@ -117,12 +120,11 @@ try {
   const clearMe = page.getByLabel('Giá thị trường GRAIN', { exact: true })
   await clearMe.fill('')
   await clearMe.blur()
-  await page.waitForTimeout(1800)
-  const cleared = await db.query(
-    `SELECT count(*)::int AS n FROM pc49.gold_price_daily
+  const cleared = await untilGone(db,
+    `SELECT 1 FROM pc49.gold_price_daily
       WHERE price_date = $1 AND gold_type_code = 'GRAIN'`, [DAY])
   check('clearing a cell removes the price rather than storing zero',
-    cleared.rows[0].n === 0, `${cleared.rows[0].n} row(s) left`)
+    cleared === true, cleared ? '' : 'the row is still there')
 
   await page.screenshot({ path: 'prices.png', fullPage: true })
   await ctx.close()
@@ -147,8 +149,11 @@ try {
       && !hubText.includes('Dữ liệu nền') && !hubText.includes('Nạp dữ liệu'))
 
   await gs.goto(`${BASE}/settings/periods`, { waitUntil: 'networkidle' })
-  await gs.locator(`tr:has-text("${PERIOD}") button`).first().click()
-  await gs.waitForTimeout(2500)
+  const month = gs.locator(`tr:has-text("${PERIOD}")`)
+  await month.getByRole('button', { name: 'Đóng kỳ', exact: true }).click()
+  // Wait for the row to say what happened rather than for a stopwatch.
+  await month.getByRole('button', { name: 'Mở lại', exact: true })
+    .waitFor({ state: 'visible', timeout: 15000 })
   const closed = await db.query(
     `SELECT status::text, closed_by FROM pc49.accounting_period WHERE period = $1`, [PERIOD])
   check('closing a month records the decision and who made it',
@@ -166,8 +171,9 @@ try {
   } catch { refused = true }
   check('a closed month refuses a posting', refused)
 
-  await gs.locator(`tr:has-text("${PERIOD}") button`).first().click()
-  await gs.waitForTimeout(2500)
+  await month.getByRole('button', { name: 'Mở lại', exact: true }).click()
+  await month.getByRole('button', { name: 'Đóng kỳ', exact: true })
+    .waitFor({ state: 'visible', timeout: 15000 })
   const reopened = await db.query(
     `SELECT status::text, closed_at FROM pc49.accounting_period WHERE period = $1`, [PERIOD])
   check('reopening keeps the row and clears the closure',
