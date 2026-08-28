@@ -53,15 +53,15 @@ try {
   await page.click('button[type="submit"]')
   await page.waitForURL(`${BASE}/`, { timeout: 60000 })
 
-  await page.goto(`${BASE}/reports?period=${PERIOD}`, { waitUntil: 'networkidle' })
+  await page.goto(`${BASE}/reports?report=pnl&period=${PERIOD}`, { waitUntil: 'networkidle' })
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.locator('a', { hasText: 'Tải về' }).first().click(),
   ])
 
   check('the link downloads a file', !!download)
-  check('named after the report and the period',
-    download.suggestedFilename() === `PC49-bao-cao-${PERIOD}.csv`,
+  check('named after the report and the window it covers',
+    download.suggestedFilename() === `PC49-pnl-${PERIOD}.csv`,
     download.suggestedFilename())
 
   const bytes = readFileSync(await download.path())
@@ -72,16 +72,30 @@ try {
 
   const text = bytes.toString('utf8')
   check('Vietnamese survives the round trip',
-    text.includes('Lãi lỗ') && text.includes(PARTNER))
+    text.includes('Lãi lỗ') && text.includes('Doanh thu'))
   check('carries the figure unformatted, so Excel can sum it',
     text.includes(String(AMOUNT)) && !text.includes('791,130.81'))
-  check('holds all three reports',
-    ['Lãi lỗ', 'Công nợ', 'Tổng tài sản'].every((x) => text.includes(x)))
+  // The file is of the report on screen. It used to write the same three
+  // blocks whatever was open, so a download from the trial balance arrived
+  // holding a profit and loss.
+  check('holds the report it was taken from, and not the others',
+    text.includes('Lãi lỗ') && !text.includes('Bảng cân đối'))
+
+  await page.goto(`${BASE}/reports?report=apar&period=${PERIOD}`, { waitUntil: 'networkidle' })
+  const [apar] = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('a', { hasText: 'Tải về' }).first().click(),
+  ])
+  const aparText = readFileSync(await apar.path()).toString('utf8')
+  check('a different report downloads its own content',
+    apar.suggestedFilename() === `PC49-apar-${PERIOD}.csv`
+      && aparText.includes('Công nợ') && aparText.includes(PARTNER),
+    apar.suggestedFilename())
 
   // The owner may read reports, so may download them; nobody else gets in.
   const anon = await browser.newContext()
   const stranger = await openPage(anon)
-  const res = await stranger.goto(`${BASE}/reports/export?period=${PERIOD}`)
+  const res = await stranger.goto(`${BASE}/reports/export?report=pnl&period=${PERIOD}`)
   const landed = res?.url() ?? ''
   const body = await stranger.content()
   // Two things, and the second is the one that matters: it must not merely

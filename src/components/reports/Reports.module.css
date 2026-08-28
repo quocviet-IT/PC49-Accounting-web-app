@@ -1,0 +1,84 @@
+/*
+ * The report centre. Cards on the hub, one control bar on a report — the same
+ * hairlines and tabular figures as everywhere else, because a report that looks
+ * like a different product is a report people distrust.
+ */
+
+.group { margin-bottom: 26px; display: flex; flex-direction: column; gap: 10px; }
+
+.cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1px;
+  background: var(--pc-border-default);
+  border: 1px solid var(--pc-border-default);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  height: 100%;
+  padding: 14px 16px;
+  background: var(--pc-surface-card);
+  color: inherit;
+  text-decoration: none;
+}
+
+.card:hover { background: color-mix(in srgb, currentColor 5%, var(--pc-surface-card)); }
+
+.card:focus-visible {
+  outline: 2px solid var(--pc-intent-primary);
+  outline-offset: -2px;
+}
+
+.cardTitle { font-size: 14px; font-weight: 650; letter-spacing: -0.01em; }
+.cardAbout { font-size: 12px; color: var(--pc-text-secondary); line-height: 1.45; }
+
+/* One bar, carrying only the control the report actually reads. A month picker
+   on a report taken at a date is a control that does nothing, which is worse
+   than no control at all. */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--pc-text-secondary);
+  margin-bottom: 18px;
+}
+
+.controls input,
+.controls select,
+.controls button {
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 8px;
+  border: 1px solid var(--pc-border-strong);
+  border-radius: 5px;
+  background: var(--pc-surface-card);
+  color: inherit;
+}
+
+.controls select { max-width: 260px; }
+.controls button { cursor: pointer; }
+
+.controls button:hover {
+  color: var(--pc-intent-primary);
+  border-color: var(--pc-intent-primary);
+}
+
+.controls input:focus,
+.controls select:focus,
+.controls button:focus-visible {
+  outline: 2px solid var(--pc-intent-primary);
+  outline-offset: 1px;
+}
+
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }

@@ -34,11 +34,32 @@ export async function openPage(target) {
  * of the four lines and its own opinion about the timeout.
  */
 export async function signIn(page, base, email, password) {
-  await page.goto(`${base}/login`, { waitUntil: 'domcontentloaded' })
+  // networkidle, not domcontentloaded. The form is handled in the browser, so
+  // before React has hydrated the submit button does what a plain HTML form
+  // does — a GET back to /login with an empty query — and the sign-in never
+  // happens. The server log shows it as `GET /login?` and nothing else.
+  await page.goto(`${base}/login`, { waitUntil: 'networkidle' })
   await page.fill('input[autocomplete="email"]', email)
   await page.fill('input[autocomplete="current-password"]', password)
-  await page.click('button[type="submit"]')
-  await page.waitForURL(`${base}/`, { timeout: NAVIGATION_TIMEOUT })
+
+  // And retried, because networkidle is a good signal rather than a promise.
+  const deadline = Date.now() + NAVIGATION_TIMEOUT
+  for (;;) {
+    await page.click('button[type="submit"]')
+    try {
+      await page.waitForURL(`${base}/`, { timeout: 8000 })
+      return
+    } catch {
+      if (Date.now() >= deadline) {
+        throw new Error(`could not sign ${email} in; still at ${page.url()}`)
+      }
+      // A wrong password is a real answer, not something to retry at.
+      const said = (await page.locator('body').textContent()) ?? ''
+      if (/không đúng|Incorrect email/.test(said)) {
+        throw new Error(`${email} was refused: check the seeded test users`)
+      }
+    }
+  }
 }
 
 /**

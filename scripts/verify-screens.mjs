@@ -34,7 +34,7 @@ const browser = await chromium.launch()
     ['/journal', 'Sổ nhật ký'],
     ['/gold-transactions', 'Giao dịch vàng'],
     ['/bank-conversion', 'Quy đổi giao dịch ngân hàng ra vàng'],
-    ['/reports', 'Báo cáo'],
+    ['/reports', 'Trung tâm báo cáo'],
     ['/import', 'Nạp dữ liệu từ bảng tính'],
     ['/prices', 'Giá vàng theo ngày'],
   ]) {

@@ -2,16 +2,27 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { getCurrentUser } from '@/lib/auth/currentUser'
 import { can } from '@/lib/auth/roles'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { csvBytes, reportFileName, toCsv, type Sheet } from '@/lib/export/csv'
-import { t, type Locale } from '@/lib/i18n'
+import { csvBytes, reportFileName, toCsv } from '@/lib/export/csv'
+import { findReport } from '@/lib/domain/reports'
+import { reportSheets } from '@/lib/domain/report-data'
+import type { Locale } from '@/lib/i18n'
+
+/** The last day of a month, which is the date an as-at report is taken at. */
+function endOf(period: string): string {
+  const [y, m] = period.split('-').map(Number)
+  return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10)
+}
 
 /**
- * The month's reports as a file.
+ * One report as a file.
  *
- * One file with the three blocks the screen shows, in the order it shows them,
- * so what somebody opens in Excel is what they were looking at. The figures are
- * the same database functions the screen reads — a second calculation here
- * would be a second answer to the same question.
+ * It used to write the same three blocks whatever report was open, so a
+ * download taken from the trial balance arrived holding a profit and loss.
+ * That is worse than having no download: a file that says it is one thing and
+ * holds another is a file somebody acts on.
+ *
+ * The figures come from the same functions the screen reads, through the same
+ * module, so the file and the page cannot drift.
  */
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser()
@@ -19,63 +30,36 @@ export async function GET(request: NextRequest) {
     return new NextResponse('Not permitted', { status: 403 })
   }
   const locale: Locale = user?.locale ?? 'vi'
+  const q = request.nextUrl.searchParams
 
-  const asked = request.nextUrl.searchParams.get('period') ?? ''
-  const period = /^\d{4}-\d{2}$/.test(asked) ? asked : new Date().toISOString().slice(0, 7)
-  const [y, m] = period.split('-').map(Number)
-  const asOf = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10)
+  const report = findReport(q.get('report') ?? undefined)
+  if (!report) {
+    return new NextResponse('Name a report to download', { status: 400 })
+  }
+
+  const ok = (v: string | null, re: RegExp) => (v && re.test(v) ? v : null)
+  const period = ok(q.get('period'), /^\d{4}-\d{2}$/) ?? new Date().toISOString().slice(0, 7)
+  const window = {
+    period,
+    date: ok(q.get('date'), /^\d{4}-\d{2}-\d{2}$/) ?? endOf(period),
+    from: ok(q.get('from'), /^\d{4}-\d{2}-\d{2}$/) ?? `${period}-01`,
+    to: ok(q.get('to'), /^\d{4}-\d{2}-\d{2}$/) ?? endOf(period),
+    account: q.get('account') ?? undefined,
+  }
 
   const supabase = await createServerSupabase()
-  const [pl, apar, assets] = await Promise.all([
-    supabase.rpc('pl_report', { p_period: period }),
-    supabase.rpc('apar_report', { p_period: period }),
-    supabase.rpc('total_asset_report', { p_as_of: asOf }),
-  ])
+  const sheets = await reportSheets(supabase, report.id, window, locale)
 
-  const label = (key: Parameters<typeof t>[1]) => t(locale, key)
-  const a = Array.isArray(assets.data) ? assets.data[0] : assets.data
-
-  const sheets: Sheet[] = [
-    {
-      title: `${label('rep.pl')} — ${period}`,
-      header: [label('rep.line'), label('rep.amount')],
-      rows: (pl.data ?? []).map((r: Record<string, unknown>) => [
-        // The indent carries the report's structure; spaces keep it in a file
-        // that has no notion of one.
-        `${'    '.repeat(Number(r.indent ?? 0))}${locale === 'vi' ? r.name_vi : r.name_en}`,
-        Number(r.amount ?? 0),
-      ]),
-    },
-    {
-      title: `${label('rep.apar')} — ${period}`,
-      header: [label('rep.partner'), label('rep.account'),
-               label('rep.opening'), label('rep.closing')],
-      rows: (apar.data ?? []).map((r: Record<string, unknown>) => [
-        r.partner_code as string,
-        r.account_code as string,
-        Number(r.opening_value ?? 0),
-        Number(r.closing_value ?? 0),
-      ]),
-    },
-    {
-      title: `${label('rep.assets')} — ${asOf}`,
-      header: [label('rep.line'), label('rep.amount')],
-      rows: a ? [
-        [label('rep.inventoryValue'), Number(a.inventory_value ?? 0)],
-        [label('rep.receivable'), Number(a.receivable ?? 0)],
-        [label('rep.payable'), Number(a.payable ?? 0)],
-        [label('rep.cash'), Number(a.cash ?? 0)],
-        [label('rep.bank'), Number(a.bank ?? 0)],
-        [label('rep.cashFlowTotal'), Number(a.cash_flow_total ?? 0)],
-      ] : [],
-    },
-  ]
+  // Named after the report and the window it covers, so a folder of these is
+  // still readable in six months.
+  const stamp = report.range === 'day' ? window.date
+    : report.range === 'range' ? `${window.from}_${window.to}`
+      : period
 
   return new NextResponse(csvBytes(toCsv(sheets)) as BodyInit, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition':
-        `attachment; filename="${reportFileName('bao-cao', period)}"`,
+      'Content-Disposition': `attachment; filename="${reportFileName(report.id, stamp)}"`,
       // A report is a snapshot of a moment; a cached copy would quietly show
       // last week's figures under this week's date.
       'Cache-Control': 'no-store',
