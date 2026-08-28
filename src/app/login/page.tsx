@@ -64,9 +64,19 @@ export default function LoginPage() {
             <Form.Item
               name="email"
               label={t('auth.email')}
+              /*
+               * Trimmed before it is judged.
+               *
+               * An address pasted out of an email or a chat message arrives with
+               * a space on the end more often than not, and refusing it as "not
+               * an email" is both wrong and impossible to act on — the space is
+               * invisible. Normalising runs before validation, so the rule sees
+               * what the person meant.
+               */
+              normalize={(value?: string) => value?.trim()}
               rules={[{ required: true, type: 'email', message: t('auth.emailNeeded') }]}
             >
-              <Input autoComplete="email" autoFocus size="large" />
+              <Input autoComplete="email" autoFocus size="large" inputMode="email" />
             </Form.Item>
             <Form.Item
               name="password"
