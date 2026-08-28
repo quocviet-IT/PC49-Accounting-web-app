@@ -1,10 +1,13 @@
 'use client'
+
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Alert, Button, Card, Form, Input } from 'antd'
+import { Button, Form, Input } from 'antd'
 import { createBrowserSupabase } from '@/lib/supabase/client'
 import { useLocale } from '@/lib/i18n/provider'
 import { LocaleSwitch } from '@/components/LocaleSwitch'
+import { ThemeToggle } from '@/components/theme/ThemeToggle'
+import styles from './Login.module.css'
 
 export default function LoginPage() {
   const { t } = useLocale()
@@ -19,6 +22,8 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword(values)
     setLoading(false)
     if (error) {
+      // One message whether the email is unknown or the password is wrong:
+      // saying which would tell a stranger that an address is real.
       setError(t('auth.failed'))
       return
     }
@@ -27,21 +32,62 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ display: 'grid', placeItems: 'center', minHeight: '100dvh', padding: 24 }}>
-      <Card title={t('app.name')} extra={<LocaleSwitch />} style={{ width: 360 }}>
-        {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} />}
-        <Form layout="vertical" onFinish={onFinish}>
-          <Form.Item name="email" label={t('auth.email')} rules={[{ required: true, type: 'email' }]}>
-            <Input autoComplete="email" />
-          </Form.Item>
-          <Form.Item name="password" label={t('auth.password')} rules={[{ required: true }]}>
-            <Input.Password autoComplete="current-password" />
-          </Form.Item>
-          <Button type="primary" htmlType="submit" loading={loading} block>
-            {t('auth.signIn')}
-          </Button>
-        </Form>
-      </Card>
-    </div>
+    <main className={styles.page}>
+      <section className={styles.cover}>
+        <div className={styles.brand}>
+          <span className={styles.mark} aria-hidden="true">49</span>
+          <span>
+            <span className={styles.name}>{t('app.name')}</span>
+            <br />
+            <span className={styles.tagline}>{t('app.tagline')}</span>
+          </span>
+        </div>
+
+        <p className={styles.pitch}>{t('auth.pitch')}</p>
+
+      </section>
+
+      <section className={styles.side}>
+        <div className={styles.tools}>
+          <ThemeToggle />
+          <LocaleSwitch />
+        </div>
+
+        <div className={styles.form}>
+          <h1 className={styles.heading}>{t('auth.signIn')}</h1>
+          <p className={styles.lede}>{t('auth.lede')}</p>
+
+          {error && <span className={styles.error} role="alert">{error}</span>}
+
+          {/* Every field here is required, so Ant's asterisk marks nothing. */}
+          <Form layout="vertical" onFinish={onFinish} requiredMark={false}>
+            <Form.Item
+              name="email"
+              label={t('auth.email')}
+              rules={[{ required: true, type: 'email', message: t('auth.emailNeeded') }]}
+            >
+              <Input autoComplete="email" autoFocus size="large" />
+            </Form.Item>
+            <Form.Item
+              name="password"
+              label={t('auth.password')}
+              rules={[{ required: true, message: t('auth.passwordNeeded') }]}
+            >
+              <Input.Password autoComplete="current-password" size="large" />
+            </Form.Item>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={loading}
+              size="large"
+              block
+              className={styles.submit}
+            >
+              {t('auth.signIn')}
+            </Button>
+          </Form>
+        </div>
+      </section>
+    </main>
   )
 }

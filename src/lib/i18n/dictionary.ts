@@ -311,6 +311,10 @@ export const dictionary = {
     'cash.loans': 'Vay nội bộ (1388)',
     'cash.loansNote': 'Tiền cho các pháp nhân trong nhóm mượn, và tiền đã trả lại. Số dư suy từ danh sách chứ không lưu sẵn.',
     'cash.outstanding': 'Còn lại',
+    'auth.pitch': 'Sổ vàng và dòng tiền của Pacific Four Nine, ở một chỗ.',
+    'auth.lede': 'Đăng nhập bằng tài khoản công ty cấp cho anh chị.',
+    'auth.emailNeeded': 'Nhập email công ty',
+    'auth.passwordNeeded': 'Nhập mật khẩu',
   },
   en: {
     'app.name': 'PC49',
@@ -624,5 +628,9 @@ export const dictionary = {
     'cash.loans': 'Internal lending (1388)',
     'cash.loansNote': 'Money lent to the group\'s own entities, and money paid back. The balance is derived from the list rather than stored.',
     'cash.outstanding': 'Outstanding',
+    'auth.pitch': 'Pacific Four Nine\'s gold and its cash, in one place.',
+    'auth.lede': 'Sign in with the account the company gave you.',
+    'auth.emailNeeded': 'Enter your work email',
+    'auth.passwordNeeded': 'Enter your password',
   },
 } as const

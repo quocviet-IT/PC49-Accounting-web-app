@@ -1,0 +1,148 @@
+/*
+ * The cover of the ledger.
+ *
+ * The application is a ledger — hairline rules, dense rows, figures in tabular
+ * numerals — so the way in is the cover of that ledger rather than a card
+ * floating in the middle of an empty page. Same devices, same palette, no new
+ * typeface: a login that looks like a different product is a login that makes
+ * people check the address bar.
+ */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  min-height: 100dvh;
+  /* The card surface, not the page surface. In the dark theme the sider and
+     the page are the same colour on purpose — the navigation column is meant
+     to blend there — which left this layout as two identical halves with a
+     hairline between them. The card is a distinct surface in both themes, so
+     the split reads either way. */
+  background: var(--pc-surface-card);
+}
+
+/* --------------------------------------------------------------- the cover */
+
+.cover {
+  background: var(--pc-surface-sider);
+  color: var(--pc-chrome-text);
+  padding: 48px 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 28px;
+  border-right: 1px solid var(--pc-chrome-border);
+}
+
+.brand { display: flex; align-items: center; gap: 12px; }
+
+.mark {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  background: var(--pc-accent-strong);
+  color: var(--pc-text-onDark);
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.name { font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
+.tagline { font-size: 12px; color: var(--pc-chrome-textMuted); }
+
+.pitch {
+  font-size: 19px;
+  line-height: 1.45;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  max-width: 24ch;
+  margin: 0;
+  text-wrap: balance;
+}
+
+
+/* ---------------------------------------------------------------- the form */
+
+.side {
+  display: flex;
+  flex-direction: column;
+  padding: 24px 44px 48px;
+}
+
+.tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 40px;
+}
+
+.form {
+  margin: auto 0;
+  width: 100%;
+  max-width: 380px;
+  align-self: center;
+}
+
+.heading {
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--pc-text-heading);
+  margin: 0;
+}
+
+.lede {
+  margin: 8px 0 28px;
+  font-size: 13px;
+  color: var(--pc-text-secondary);
+  max-width: 42ch;
+}
+
+/* Ant draws a red asterisk before a required label. Every field here is
+   required, so the marker says nothing and only adds noise. */
+.form :global(.ant-form-item-label) > label {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--pc-text-faint);
+  font-weight: 600;
+}
+
+.form :global(.ant-input),
+.form :global(.ant-input-password) {
+  font-size: 14px;
+}
+
+.submit { margin-top: 4px; }
+
+/* An error belongs beside the field it is about, in the app's own colour, not
+   in a banner that pushes the form down the page. */
+.error {
+  display: block;
+  font-size: 12.5px;
+  color: var(--pc-money-negative);
+  border-left: 2px solid currentColor;
+  padding-left: 10px;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+
+  /* The cover becomes a band across the top, sized to what it holds rather
+     than stretched to half the screen. */
+  .cover {
+    padding: 22px 22px 24px;
+    gap: 14px;
+    justify-content: flex-start;
+    border-right: 0;
+    border-bottom: 1px solid var(--pc-chrome-border);
+  }
+  .pitch { font-size: 16px; max-width: none; }
+  .side { padding: 16px 22px 40px; }
+  .form { margin: 32px 0; max-width: none; }
+}
