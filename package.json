@@ -19,7 +19,8 @@
     "verify:screens": "node scripts/verify-screens.mjs",
     "verify:conversion": "node --env-file=.env.local scripts/verify-conversion.mjs",
     "verify:import": "node --env-file=.env.local scripts/verify-import.mjs",
-    "verify:settings": "node --env-file=.env.local scripts/verify-settings.mjs"
+    "verify:settings": "node --env-file=.env.local scripts/verify-settings.mjs",
+    "verify:void": "node --env-file=.env.local scripts/verify-void.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",

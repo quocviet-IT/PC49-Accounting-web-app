@@ -88,3 +88,39 @@ export async function saveTransaction(input: unknown): Promise<SaveResult> {
   revalidatePath('/gold-transactions')
   return { ok: true, id: txn.id }
 }
+
+const voidSchema = z.object({
+  id: z.string().uuid(),
+  reason: z.string().trim().min(3, 'say why in a few words'),
+  onDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+})
+
+export type VoidResult = { ok: true; reversed: boolean } | { ok: false; message: string }
+
+/**
+ * Cancels a transaction.
+ *
+ * The whole job is done inside `void_gold_txn`: the posting is reversed rather
+ * than deleted, the stock is given back as a movement rather than removed, and
+ * the reason is recorded. Doing any of that here would be a second place the
+ * books could be corrected from, and the two would drift.
+ */
+export async function voidTransaction(input: unknown): Promise<VoidResult> {
+  const parsed = voidSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Invalid request' }
+  }
+  const supabase = await createServerSupabase()
+  const { data, error } = await supabase.rpc('void_gold_txn', {
+    p_txn_id: parsed.data.id,
+    p_reason: parsed.data.reason,
+    p_on_date: parsed.data.onDate ?? null,
+  })
+  // The database's refusals name the month that is closed, or the pickup that
+  // has to go first. They are written for the accountant, so they are passed on
+  // as they are.
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/gold-transactions')
+  return { ok: true, reversed: data !== null }
+}

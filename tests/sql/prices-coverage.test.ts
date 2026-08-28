@@ -135,9 +135,9 @@ describe('a sale posted on a day with no price', () => {
       `SELECT count(*)::text AS n FROM pc49.v_sale_without_cost WHERE txn_id = $1`, [t])
     expect(Number(before.rows[0].n)).toBe(1)
 
-    await db.query(
-      `UPDATE pc49.gold_txn SET voided_at = now(), void_reason = 'test'
-        WHERE id = $1`, [t])
+    // Through the function, not the column: setting `voided_at` by hand is now
+    // refused, because a hand-written void leaves the posting standing.
+    await db.query(`SELECT pc49.void_gold_txn($1, 'test')`, [t])
     const after = await db.query<{ n: string }>(
       `SELECT count(*)::text AS n FROM pc49.v_sale_without_cost WHERE txn_id = $1`, [t])
     expect(Number(after.rows[0].n)).toBe(0)

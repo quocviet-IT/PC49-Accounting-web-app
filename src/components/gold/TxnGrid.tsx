@@ -1,9 +1,12 @@
 'use client'
 
 import { useMemo, useRef, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { useLocale } from '@/lib/i18n/provider'
 import { toGrams, type Uom } from '@/lib/domain/units'
-import { saveTransaction, type SaveResult } from '@/app/(app)/gold-transactions/actions'
+import {
+  saveTransaction, voidTransaction, type SaveResult,
+} from '@/app/(app)/gold-transactions/actions'
 import styles from './TxnGrid.module.css'
 
 export type GoldTypeOption = {
@@ -82,7 +85,10 @@ export function TxnGrid({
   existing: SavedRow[]
 }) {
   const { locale, t } = useLocale()
+  const router = useRouter()
   const [drafts, setDrafts] = useState<Draft[]>([blankDraft(0)])
+  const [voiding, setVoiding] = useState<string | null>(null)
+  const [voidError, setVoidError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [nextKey, setNextKey] = useState(1)
   // Enter commits the row, and so does leaving the last field. Without a guard
@@ -183,6 +189,23 @@ export function TxnGrid({
 
   const savedCount = existing.length + liveDrafts.filter((d) => d.savedId).length
 
+  /**
+   * Cancels a saved row.
+   *
+   * The reason is asked for because the database demands one, and because a
+   * cancellation nobody explained is the row somebody re-types next month.
+   */
+  async function cancelRow(id: string) {
+    const reason = window.prompt(t('txn.voidWhy'))
+    if (reason === null) return
+    setVoiding(id)
+    setVoidError(null)
+    const result = await voidTransaction({ id, reason })
+    setVoiding(null)
+    if (!result.ok) { setVoidError(result.message); return }
+    router.refresh()
+  }
+
   return (
     <div className={styles.wrap}>
       <div className={styles.head}>
@@ -231,7 +254,20 @@ export function TxnGrid({
                 </td>
                 <td className={styles.num}>{r.unit_price ? money.format(r.unit_price) : ''}</td>
                 <td className={styles.num}>{money.format(r.amount)}</td>
-                <td colSpan={3} />
+                <td colSpan={2} />
+                {/* A saved row is not editable — correcting it means cancelling
+                    it and typing the right one, which is what the ledger can
+                    actually represent. */}
+                <td>
+                  <button
+                    type="button"
+                    className={styles.voidButton}
+                    disabled={voiding === r.id}
+                    onClick={() => void cancelRow(r.id)}
+                  >
+                    {t('txn.void')}
+                  </button>
+                </td>
               </tr>
             ))}
 
@@ -363,6 +399,7 @@ export function TxnGrid({
           ))}
         </span>
         {pending && <span className={styles.totalLabel}>{t('txn.saving')}…</span>}
+        {voidError && <span className={styles.rowError}>{voidError}</span>}
       </div>
     </div>
   )

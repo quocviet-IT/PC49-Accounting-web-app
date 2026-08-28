@@ -225,3 +225,28 @@
 @media (prefers-reduced-motion: no-preference) {
   .saved td { transition: background 400ms ease-out; }
 }
+
+/* Cancelling a saved row. Quiet: it is the rarer action on this screen and the
+   destructive one, so it should not compete with typing the next row. */
+.voidButton {
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.voidButton:hover:not(:disabled) {
+  color: var(--out);
+  border-color: var(--out);
+}
+
+.voidButton:focus-visible {
+  outline: 2px solid var(--pc-intent-primary);
+  outline-offset: 1px;
+}
+
+.voidButton:disabled { opacity: 0.45; cursor: default; }

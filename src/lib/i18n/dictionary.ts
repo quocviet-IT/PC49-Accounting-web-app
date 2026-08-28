@@ -247,6 +247,8 @@ export const dictionary = {
     'theme.to.light': 'Chuyển sang nền sáng',
     'theme.to.dark': 'Chuyển sang nền tối',
     'theme.to.system': 'Theo cài đặt máy',
+    'txn.void': 'Huỷ',
+    'txn.voidWhy': 'Huỷ giao dịch này vì lý do gì? (bút toán sẽ được đảo, không xoá)',
   },
   en: {
     'app.name': 'PC49',
@@ -496,5 +498,7 @@ export const dictionary = {
     'theme.to.light': 'Switch to the light theme',
     'theme.to.dark': 'Switch to the dark theme',
     'theme.to.system': 'Follow the system setting',
+    'txn.void': 'Cancel',
+    'txn.voidWhy': 'Why is this being cancelled? (the entry is reversed, never deleted)',
   },
 } as const
