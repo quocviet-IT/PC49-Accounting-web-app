@@ -15,10 +15,11 @@
     "seed:users": "node --env-file=.env.local scripts/seed-test-users.mjs",
     "verify:rls": "node --env-file=.env.local scripts/verify-rls.mjs",
     "verify:signin": "node scripts/verify-signin.mjs",
-    "verify:grid": "node scripts/verify-grid.mjs",
+    "verify:grid": "node --env-file=.env.local scripts/verify-grid.mjs",
     "verify:screens": "node scripts/verify-screens.mjs",
     "verify:conversion": "node --env-file=.env.local scripts/verify-conversion.mjs",
-    "verify:import": "node --env-file=.env.local scripts/verify-import.mjs"
+    "verify:import": "node --env-file=.env.local scripts/verify-import.mjs",
+    "verify:settings": "node --env-file=.env.local scripts/verify-settings.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",

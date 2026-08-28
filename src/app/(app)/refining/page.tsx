@@ -1,15 +1,14 @@
-import { AppShell } from '@/components/AppShell'
 import { RefiningView, type LotRow, type ShareRow } from '@/components/refining/RefiningView'
+import { Forbidden } from '@/components/Forbidden'
 import { getCurrentUser } from '@/lib/auth/currentUser'
 import { can } from '@/lib/auth/roles'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { t } from '@/lib/i18n'
 
 export default async function RefiningPage() {
   const user = await getCurrentUser()
   const role = user?.role ?? null
   if (!can(role, 'refining.write') && !can(role, 'refining.approve')) {
-    return <AppShell role={role}><p>{t(user?.locale ?? 'vi', 'auth.forbidden')}</p></AppShell>
+    return <Forbidden locale={user?.locale} />
   }
 
   const supabase = await createServerSupabase()
@@ -41,5 +40,5 @@ export default async function RefiningPage() {
     receivedGram: Number(r.received_gram ?? 0),
   }))
 
-  return <AppShell role={role}><RefiningView lots={lots} shares={shares} /></AppShell>
+  return <RefiningView lots={lots} shares={shares} />
 }

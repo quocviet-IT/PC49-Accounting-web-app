@@ -35,6 +35,7 @@ const browser = await chromium.launch()
     ['/bank-conversion', 'Quy đổi giao dịch ngân hàng ra vàng'],
     ['/reports', 'Báo cáo'],
     ['/import', 'Nạp dữ liệu từ bảng tính'],
+    ['/prices', 'Giá vàng theo ngày'],
   ]) {
     const res = await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' })
     const ok = res?.status() === 200

@@ -1,9 +1,8 @@
-import { AppShell } from '@/components/AppShell'
 import { ImportView, type Batch, type RejectedRow, type ReconLine } from '@/components/import/ImportView'
+import { Forbidden } from '@/components/Forbidden'
 import { getCurrentUser } from '@/lib/auth/currentUser'
 import { can } from '@/lib/auth/roles'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { t } from '@/lib/i18n'
 
 export default async function ImportPage({
   searchParams,
@@ -11,7 +10,7 @@ export default async function ImportPage({
   const user = await getCurrentUser()
   const role = user?.role ?? null
   if (!can(role, 'dataImport.run')) {
-    return <AppShell role={role}><p>{t(user?.locale ?? 'vi', 'auth.forbidden')}</p></AppShell>
+    return <Forbidden locale={user?.locale} />
   }
 
   const params = await searchParams
@@ -70,14 +69,12 @@ export default async function ImportPage({
   }))
 
   return (
-    <AppShell role={role}>
-      <ImportView
+    <ImportView
         asOf={asOf}
         batches={batches}
         selected={selected}
         rejected={rejected}
         recon={recon}
       />
-    </AppShell>
   )
 }

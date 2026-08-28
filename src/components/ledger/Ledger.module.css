@@ -1,63 +1,76 @@
 /*
- * The shared look for every read-only screen, matching the entry grid.
+ * The shared look for every screen that reads like a ledger.
  *
- * Same reasoning: this is a ledger, not an app. Hairline rules, dense rows,
- * figures in tabular numerals so a column of digits can be scanned by eye. The
- * two signal colours mean the same thing everywhere - gold or money coming in
- * reads one way, going out reads the other - so a number never has to be read
- * twice to know its direction.
+ * This is a ledger, not an app: hairline rules, dense rows, figures in tabular
+ * numerals so a column of digits can be scanned by eye. The two signal colours
+ * mean the same thing everywhere — money or gold coming in reads one way, going
+ * out reads the other — so a number never has to be read twice to know its
+ * direction.
+ *
+ * The local variables below are the reason every other stylesheet in the app
+ * kept working when the palette changed: PriceGrid, TxnGrid, ImportView,
+ * ConversionView and Settings all resolve `--in`, `--out`, `--muted` and
+ * `--rule` from here. They are now aliases onto the design tokens rather than
+ * literals, so there is one place a colour is decided and one place to change
+ * it. Dark mode arrives through the same alias, because the token underneath
+ * already answers to `:root[data-theme="dark"]`.
  */
 
 .page {
-  --rule: color-mix(in srgb, currentColor 14%, transparent);
-  --rule-strong: color-mix(in srgb, currentColor 30%, transparent);
-  --muted: color-mix(in srgb, currentColor 55%, transparent);
-  --in: #0f7a4f;
-  --out: #a3372c;
+  --rule: var(--pc-border-subtle);
+  --rule-strong: var(--pc-border-default);
+  --muted: var(--pc-text-faint);
+  --in: var(--pc-money-positive);
+  --out: var(--pc-money-negative);
   display: flex;
   flex-direction: column;
-  gap: 20px;
 }
 
-@media (prefers-color-scheme: dark) {
-  .page { --in: #4bbd8a; --out: #e2705f; }
-}
-
-.head {
-  display: flex;
-  align-items: baseline;
-  gap: 20px;
-  flex-wrap: wrap;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--rule-strong);
-}
-
-.title {
-  font-size: 17px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  margin: 0;
-}
+/* Owned by PageHeader now. Kept so a screen that still renders its own heading
+   does not collapse, but nothing new should use it. */
+.head { display: none; }
+.title { display: none; }
 
 .note {
-  font-size: 12px;
-  color: var(--muted);
-  max-width: 70ch;
+  font-size: 12.5px;
+  color: var(--pc-text-secondary);
+  max-width: 80ch;
   margin: 0;
 }
 
+/* Sections are separated by the space above their heading, not by a rule. The
+   gap has to be bigger than the gap between a heading and its own table, or the
+   heading reads as belonging to the table above it — which is what happened
+   when every section had the same margin top and bottom. */
 .section {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
+.section + .section { margin-top: 26px; }
+.section:last-child { margin-bottom: 8px; }
+
 .sectionTitle {
   font-size: 11px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--muted);
+  font-weight: 600;
   margin: 0;
+}
+
+/* A toolbar or a note sitting directly above the first section needs the same
+   separation a section would have given it. */
+.page > *:not(.section) + .section { margin-top: 22px; }
+
+/* Tables sit on a card, the way every other surface in the app does. Wide
+   content scrolls inside this frame so the page body never scrolls sideways. */
+.frame {
+  border: 1px solid var(--pc-border-default);
+  border-radius: 10px;
+  background: var(--pc-surface-card);
+  overflow-x: auto;
 }
 
 .table {
@@ -70,28 +83,36 @@
 .table th {
   text-align: left;
   font-weight: 600;
-  font-size: 11px;
-  letter-spacing: 0.04em;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--muted);
-  padding: 6px 10px 6px 0;
+  background: var(--pc-surface-muted);
+  padding: 8px 12px;
   white-space: nowrap;
   border-bottom: 1px solid var(--rule-strong);
 }
 
+.table th:first-child { border-top-left-radius: 9px; }
+.table th:last-child { border-top-right-radius: 9px; }
+
 .table td {
-  padding: 6px 10px 6px 0;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--rule);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .table tbody tr:last-child td { border-bottom: 0; }
+.table tbody tr:hover td { background: var(--pc-surface-subtle); }
 
 .table tfoot td {
-  padding-top: 8px;
+  padding-top: 10px;
   border-top: 2px solid var(--rule-strong);
   border-bottom: 0;
   font-weight: 650;
+  background: var(--pc-surface-subtle);
 }
 
 .num {
@@ -104,56 +125,60 @@
 .out { color: var(--out); }
 .muted { color: var(--muted); }
 
-/* A row the reader should treat differently from the ones around it: a clearing
-   account among real bank accounts, a draft among posted entries. */
-.aside td {
-  color: var(--muted);
-}
+/* A row the reader should treat differently from the ones around it: a
+   clearing account among real bank accounts, a retired code among live ones. */
+.aside td { color: var(--muted); }
 
 .empty {
-  padding: 16px 0;
+  padding: 20px;
   color: var(--muted);
   font-size: 13px;
 }
 
 .stats {
-  display: flex;
-  gap: 40px;
-  flex-wrap: wrap;
-  padding-bottom: 4px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px;
+  background: var(--pc-border-default);
+  border: 1px solid var(--pc-border-default);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 20px;
 }
 
 .stat {
+  background: var(--pc-surface-card);
+  padding: 13px 16px;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
 .statLabel {
-  font-size: 11px;
-  letter-spacing: 0.04em;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
 .statValue {
-  font-size: 22px;
+  font-size: 21px;
   font-weight: 620;
   font-variant-numeric: tabular-nums;
   font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   letter-spacing: -0.02em;
+  color: var(--pc-text-heading);
 }
 
-.statNote {
-  font-size: 11px;
-  color: var(--muted);
-}
+.statNote { font-size: 11px; color: var(--muted); }
 
 .badge {
   display: inline-block;
   font-size: 11px;
-  letter-spacing: 0.03em;
-  padding: 1px 6px;
+  letter-spacing: 0.02em;
+  padding: 1px 8px;
+  border-radius: 999px;
   border: 1px solid var(--rule-strong);
   color: var(--muted);
+  background: var(--pc-surface-muted);
 }

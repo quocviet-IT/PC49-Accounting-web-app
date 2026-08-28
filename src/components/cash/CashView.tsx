@@ -1,7 +1,7 @@
 'use client'
 
 import { useLocale } from '@/lib/i18n/provider'
-import { Page, Section, Empty, Signed, money, ledger } from '@/components/ledger/Ledger'
+import { Page, Section, Empty, Signed, money, ledger, Frame } from '@/components/ledger/Ledger'
 
 export type AccountRow = {
   code: string
@@ -61,29 +61,33 @@ export function CashView({
       <Section>
         <p className={ledger.note}>{t('common.period')}: {period}</p>
         {rows.length === 0 ? <Empty /> : (
-          <table className={ledger.table}>
-            {columns}
-            {header}
-            <tbody>{body(real)}</tbody>
-            <tfoot>
-              <tr>
-                <td>{t('common.total')}</td>
-                <td colSpan={3} />
-                <td className={ledger.num}><Signed value={totalClosing} /></td>
-              </tr>
-            </tfoot>
-          </table>
+          <Frame>
+<table className={ledger.table}>
+              {columns}
+              {header}
+              <tbody>{body(real)}</tbody>
+              <tfoot>
+                <tr>
+                  <td>{t('common.total')}</td>
+                  <td colSpan={3} />
+                  <td className={ledger.num}><Signed value={totalClosing} /></td>
+                </tr>
+              </tfoot>
+            </table>
+          </Frame>
         )}
       </Section>
 
       {clearing.length > 0 && (
         <Section titleKey="cash.clearing">
           <p className={ledger.note}>{t('cash.clearingNote')}</p>
-          <table className={ledger.table}>
-            {columns}
-            {header}
-            <tbody>{body(clearing)}</tbody>
-          </table>
+          <Frame>
+<table className={ledger.table}>
+              {columns}
+              {header}
+              <tbody>{body(clearing)}</tbody>
+            </table>
+          </Frame>
         </Section>
       )}
 

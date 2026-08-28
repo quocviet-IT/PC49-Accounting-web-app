@@ -1,9 +1,8 @@
-import { AppShell } from '@/components/AppShell'
 import { JournalView, type EntryRow } from '@/components/journal/JournalView'
+import { Forbidden } from '@/components/Forbidden'
 import { getCurrentUser } from '@/lib/auth/currentUser'
 import { can } from '@/lib/auth/roles'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { t } from '@/lib/i18n'
 
 type LineRow = {
   entry_id: string; seq: number
@@ -17,7 +16,7 @@ export default async function JournalPage({
   const user = await getCurrentUser()
   const role = user?.role ?? null
   if (!can(role, 'journal.post') && !can(role, 'report.read')) {
-    return <AppShell role={role}><p>{t(user?.locale ?? 'vi', 'auth.forbidden')}</p></AppShell>
+    return <Forbidden locale={user?.locale} />
   }
 
   const params = await searchParams
@@ -63,5 +62,5 @@ export default async function JournalPage({
     })),
   }))
 
-  return <AppShell role={role}><JournalView period={period} entries={entries} /></AppShell>
+  return <JournalView period={period} entries={entries} />
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useLocale } from '@/lib/i18n/provider'
-import { Page, Section, Empty, Signed, money, weight, ledger } from '@/components/ledger/Ledger'
+import { Page, Section, Empty, Signed, money, weight, ledger, Frame } from '@/components/ledger/Ledger'
 
 export type PlLine = {
   code: string
@@ -41,94 +41,100 @@ export function ReportsView({
 
       <Section titleKey="rep.pl">
         {pl.length === 0 ? <Empty /> : (
-          <table className={ledger.table}>
-            <colgroup><col style={{ width: '70%' }} /><col style={{ width: '30%' }} /></colgroup>
-            <thead>
-              <tr>
-                <th>{t('rep.line')}</th>
-                <th className={ledger.num}>{t('rep.amount')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* Only the bottom line carries a direction. Colouring cost the
-                  same green as revenue would make the two signal colours mean
-                  something different here than everywhere else in the app. */}
-              {pl.map((l) => (
-                <tr key={l.code} className={l.kind === 'ACCOUNTS' ? ledger.aside : undefined}>
-                  <td style={{ paddingLeft: l.indent * 18 }}>{name(l)}</td>
-                  <td className={ledger.num}>
-                    {l.kind === 'DIFFERENCE'
-                      ? <strong><Signed value={l.amount} /></strong>
-                      : l.kind === 'SUBTOTAL'
-                        ? <strong>{money.format(l.amount)}</strong>
-                        : money.format(l.amount)}
-                  </td>
+          <Frame>
+<table className={ledger.table}>
+              <colgroup><col style={{ width: '70%' }} /><col style={{ width: '30%' }} /></colgroup>
+              <thead>
+                <tr>
+                  <th>{t('rep.line')}</th>
+                  <th className={ledger.num}>{t('rep.amount')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {/* Only the bottom line carries a direction. Colouring cost the
+                    same green as revenue would make the two signal colours mean
+                    something different here than everywhere else in the app. */}
+                {pl.map((l) => (
+                  <tr key={l.code} className={l.kind === 'ACCOUNTS' ? ledger.aside : undefined}>
+                    <td style={{ paddingLeft: l.indent * 18 }}>{name(l)}</td>
+                    <td className={ledger.num}>
+                      {l.kind === 'DIFFERENCE'
+                        ? <strong><Signed value={l.amount} /></strong>
+                        : l.kind === 'SUBTOTAL'
+                          ? <strong>{money.format(l.amount)}</strong>
+                          : money.format(l.amount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Frame>
         )}
       </Section>
 
       {assets && (
         <Section titleKey="rep.assets">
-          <table className={ledger.table}>
-            <colgroup><col style={{ width: '70%' }} /><col style={{ width: '30%' }} /></colgroup>
-            <tbody>
-              <tr>
-                <td>{t('rep.inventoryValue')} <span className={ledger.muted}>
-                  ({weight.format(assets.inventoryGram)} g)</span></td>
-                <td className={ledger.num}>{money.format(assets.inventoryValue)}</td>
-              </tr>
-              <tr>
-                <td>{t('rep.receivable')}</td>
-                <td className={ledger.num}>{money.format(assets.receivable)}</td>
-              </tr>
-              <tr>
-                <td>{t('rep.payable')}</td>
-                <td className={ledger.num}><Signed value={-assets.payable} /></td>
-              </tr>
-              <tr>
-                <td>{t('rep.cash')}</td>
-                <td className={ledger.num}>{money.format(assets.cash)}</td>
-              </tr>
-              <tr>
-                <td>{t('rep.bank')}</td>
-                <td className={ledger.num}>{money.format(assets.bank)}</td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr>
-                <td>{t('rep.cashFlowTotal')}</td>
-                <td className={ledger.num}><Signed value={assets.total} /></td>
-              </tr>
-            </tfoot>
-          </table>
+          <Frame>
+<table className={ledger.table}>
+              <colgroup><col style={{ width: '70%' }} /><col style={{ width: '30%' }} /></colgroup>
+              <tbody>
+                <tr>
+                  <td>{t('rep.inventoryValue')} <span className={ledger.muted}>
+                    ({weight.format(assets.inventoryGram)} g)</span></td>
+                  <td className={ledger.num}>{money.format(assets.inventoryValue)}</td>
+                </tr>
+                <tr>
+                  <td>{t('rep.receivable')}</td>
+                  <td className={ledger.num}>{money.format(assets.receivable)}</td>
+                </tr>
+                <tr>
+                  <td>{t('rep.payable')}</td>
+                  <td className={ledger.num}><Signed value={-assets.payable} /></td>
+                </tr>
+                <tr>
+                  <td>{t('rep.cash')}</td>
+                  <td className={ledger.num}>{money.format(assets.cash)}</td>
+                </tr>
+                <tr>
+                  <td>{t('rep.bank')}</td>
+                  <td className={ledger.num}>{money.format(assets.bank)}</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td>{t('rep.cashFlowTotal')}</td>
+                  <td className={ledger.num}><Signed value={assets.total} /></td>
+                </tr>
+              </tfoot>
+            </table>
+          </Frame>
         </Section>
       )}
 
       <Section titleKey="rep.apar">
         {apar.length === 0 ? <Empty /> : (
-          <table className={ledger.table}>
-            <thead>
-              <tr>
-                <th>{t('rep.partner')}</th>
-                <th>{t('rep.account')}</th>
-                <th className={ledger.num}>{t('rep.opening')}</th>
-                <th className={ledger.num}>{t('rep.closing')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {apar.map((r) => (
-                <tr key={`${r.partnerCode}-${r.accountCode}`}>
-                  <td>{r.partnerCode}</td>
-                  <td className={ledger.muted}>{r.accountCode}</td>
-                  <td className={ledger.num}>{money.format(r.opening)}</td>
-                  <td className={ledger.num}><Signed value={r.closing} /></td>
+          <Frame>
+<table className={ledger.table}>
+              <thead>
+                <tr>
+                  <th>{t('rep.partner')}</th>
+                  <th>{t('rep.account')}</th>
+                  <th className={ledger.num}>{t('rep.opening')}</th>
+                  <th className={ledger.num}>{t('rep.closing')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {apar.map((r) => (
+                  <tr key={`${r.partnerCode}-${r.accountCode}`}>
+                    <td>{r.partnerCode}</td>
+                    <td className={ledger.muted}>{r.accountCode}</td>
+                    <td className={ledger.num}>{money.format(r.opening)}</td>
+                    <td className={ledger.num}><Signed value={r.closing} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Frame>
         )}
       </Section>
     </Page>

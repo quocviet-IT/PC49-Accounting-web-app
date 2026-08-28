@@ -1,0 +1,374 @@
+/* Generated from src/lib/design/tokens.ts. Do not edit by hand — a unit test
+   asserts this block still matches cssVariableBlock() exactly, so changing a
+   colour means changing the token and copying the new block over. */
+:root {
+  --pc-money-positive: #15803d;
+  --pc-money-negative: #b91c1c;
+  --pc-money-zero: #475569;
+  --pc-intent-primary: #0f766e;
+  --pc-intent-primarySolid: #0f766e;
+  --pc-intent-success: #15803d;
+  --pc-intent-warning: #b45309;
+  --pc-intent-danger: #b91c1c;
+  --pc-text-heading: #0f172a;
+  --pc-text-body: #0f172a;
+  --pc-text-secondary: #475569;
+  --pc-text-faint: #64748b;
+  --pc-text-onDark: #ffffff;
+  --pc-surface-page: #f6f7f9;
+  --pc-surface-card: #ffffff;
+  --pc-surface-muted: #f1f5f9;
+  --pc-surface-subtle: #f8fafc;
+  --pc-surface-sider: #0f172a;
+  --pc-surface-siderActive: #134e4a;
+  --pc-border-default: #e2e8f0;
+  --pc-border-subtle: #f1f5f9;
+  --pc-border-strong: #cbd5e1;
+  --pc-chrome-text: #f8fafc;
+  --pc-chrome-menuItem: #e2e8f0;
+  --pc-chrome-menuHover: #1e293b;
+  --pc-chrome-textMuted: #94a3b8;
+  --pc-chrome-border: #1e293b;
+  --pc-accent-wash: #f0fdfa;
+  --pc-accent-tint: #ecfdf9;
+  --pc-accent-ring: #5eead4;
+  --pc-accent-strong: #115e59;
+  --pc-accent-onDark: #5eead4;
+}
+
+:root[data-theme="dark"] {
+  --pc-money-positive: #4ade80;
+  --pc-money-negative: #f87171;
+  --pc-money-zero: #94a3b8;
+  --pc-intent-primary: #2dd4bf;
+  --pc-intent-primarySolid: #0f766e;
+  --pc-intent-success: #4ade80;
+  --pc-intent-warning: #fbbf24;
+  --pc-intent-danger: #f87171;
+  --pc-text-heading: #f1f5f9;
+  --pc-text-body: #e2e8f0;
+  --pc-text-secondary: #94a3b8;
+  --pc-text-faint: #94a3b8;
+  --pc-text-onDark: #ffffff;
+  --pc-surface-page: #0b1220;
+  --pc-surface-card: #131c2e;
+  --pc-surface-muted: #1b2740;
+  --pc-surface-subtle: #1b2740;
+  --pc-surface-sider: #0b1220;
+  --pc-surface-siderActive: #134e4a;
+  --pc-border-default: #243044;
+  --pc-border-subtle: #1b2740;
+  --pc-border-strong: #334155;
+  --pc-chrome-text: #f8fafc;
+  --pc-chrome-menuItem: #cbd5e1;
+  --pc-chrome-menuHover: #1e293b;
+  --pc-chrome-textMuted: #94a3b8;
+  --pc-chrome-border: #1e293b;
+  --pc-accent-wash: #12312f;
+  --pc-accent-tint: #0f2b29;
+  --pc-accent-ring: #2dd4bf;
+  --pc-accent-strong: #5eead4;
+  --pc-accent-onDark: #5eead4;
+}
+
+/* ------------------------------------------------------------------ base */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--pc-surface-page);
+  color: var(--pc-text-body);
+}
+
+/* Figures line up in columns everywhere in this app, so digits are tabular by
+   default rather than by remembering to ask. */
+.pc-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  white-space: nowrap;
+}
+
+.pc-in { color: var(--pc-money-positive); }
+.pc-out { color: var(--pc-money-negative); }
+.pc-muted { color: var(--pc-text-faint); }
+
+.pc-skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 10px 16px;
+  background: var(--pc-surface-card);
+  color: var(--pc-text-body);
+  border: 1px solid var(--pc-border-default);
+}
+.pc-skip-link:focus { left: 8px; top: 8px; }
+
+/* ----------------------------------------------------------------- shell */
+
+.pc-shell { min-height: 100dvh; }
+
+.pc-shell__sider {
+  border-right: 1px solid var(--pc-chrome-border);
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.pc-shell__sidebar-frame {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.pc-shell__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--pc-chrome-border);
+  text-decoration: none;
+  min-height: 57px;
+}
+.pc-shell__brand--collapsed { justify-content: center; padding: 14px 0; }
+
+.pc-shell__brand-mark {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: var(--pc-accent-strong);
+  color: var(--pc-text-onDark);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.pc-shell__brand-copy { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.pc-shell__brand-name { color: var(--pc-chrome-text); font-size: 14px; font-weight: 600; }
+.pc-shell__brand-sub { color: var(--pc-chrome-textMuted); font-size: 11px; }
+
+.pc-shell__nav-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px 0; }
+.pc-shell__nav-scroll::-webkit-scrollbar { width: 8px; }
+.pc-shell__nav-scroll::-webkit-scrollbar-thumb {
+  background: var(--pc-chrome-menuHover);
+  border-radius: 4px;
+}
+
+.pc-shell__nav.ant-menu { border-inline-end: 0; background: transparent; }
+
+.pc-shell__sidebar-footer {
+  border-top: 1px solid var(--pc-chrome-border);
+  padding: 6px;
+}
+
+.pc-shell__collapse {
+  width: 100%;
+  justify-content: flex-start;
+  color: var(--pc-chrome-textMuted);
+}
+.pc-shell__collapse:hover { color: var(--pc-chrome-text) !important; }
+
+.pc-shell__workspace { min-width: 0; }
+
+.pc-shell__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  background: var(--pc-surface-card);
+  border-bottom: 1px solid var(--pc-border-default);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.pc-shell__header-title {
+  font-size: 13px;
+  color: var(--pc-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pc-shell__header-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pc-shell__account { display: flex; align-items: center; gap: 8px; height: 40px; }
+.pc-shell__account-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+}
+.pc-shell__account-email { font-size: 12.5px; color: var(--pc-text-body); }
+.pc-shell__account-role { font-size: 11px; color: var(--pc-text-faint); }
+
+.pc-shell__content { padding: 20px; }
+.pc-shell__content-inner { max-width: 1360px; margin: 0 auto; }
+
+/* ----------------------------------------------------------- page header */
+
+.pc-page-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.pc-page-header__content { flex: 1 1 320px; min-width: 0; }
+
+.pc-page-header__title.ant-typography {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--pc-text-heading);
+}
+
+.pc-page-header__description.ant-typography {
+  margin: 6px 0 0;
+  max-width: 78ch;
+  font-size: 13px;
+  color: var(--pc-text-secondary);
+}
+
+.pc-page-header__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ----------------------------------------------------------------- table */
+
+/* The ledger table. Dense rows, hairline rules, figures in tabular numerals so
+   a column of digits can be scanned down. It is a table of record, not a list
+   of cards, and it is read the way a printed ledger is read. */
+.pc-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+
+.pc-table th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--pc-text-faint);
+  background: var(--pc-surface-muted);
+  padding: 8px 12px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--pc-border-default);
+}
+
+.pc-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--pc-border-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pc-table tbody tr:last-child td { border-bottom: 0; }
+.pc-table tbody tr:hover td { background: var(--pc-surface-subtle); }
+
+.pc-table tfoot td {
+  padding-top: 10px;
+  border-top: 2px solid var(--pc-border-strong);
+  border-bottom: 0;
+  font-weight: 650;
+  background: var(--pc-surface-subtle);
+}
+
+/* A row the reader should treat differently from the ones around it: a
+   clearing account among real bank accounts, a retired code among live ones. */
+.pc-table tr.pc-aside td { color: var(--pc-text-faint); }
+
+/* Wide content scrolls inside its own frame, so the page body never does. */
+.pc-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--pc-border-default);
+  border-radius: 10px;
+  background: var(--pc-surface-card);
+}
+
+.pc-empty { padding: 20px; color: var(--pc-text-faint); font-size: 13px; }
+
+/* ------------------------------------------------------------------ bits */
+
+.pc-section { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+
+.pc-section__title {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--pc-text-faint);
+  margin: 0;
+  font-weight: 600;
+}
+
+.pc-note { font-size: 12.5px; color: var(--pc-text-secondary); margin: 0; max-width: 80ch; }
+
+.pc-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px;
+  background: var(--pc-border-default);
+  border: 1px solid var(--pc-border-default);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.pc-stat { background: var(--pc-surface-card); padding: 13px 16px; }
+.pc-stat__label {
+  display: block;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--pc-text-faint);
+}
+.pc-stat__value {
+  display: block;
+  margin-top: 3px;
+  font-size: 21px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+.pc-stat__note { display: block; margin-top: 2px; font-size: 11px; color: var(--pc-text-faint); }
+
+/* An editable figure inside a table. No border until it is being used, so a
+   grid of inputs still reads as a table of numbers. */
+.pc-cell {
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  width: 100%;
+  text-align: right;
+  padding: 2px 5px;
+  border: 1px solid var(--pc-border-default);
+  border-radius: 4px;
+  background: var(--pc-surface-card);
+  color: inherit;
+}
+.pc-cell:hover:not(:disabled) { border-color: var(--pc-intent-primary); }
+.pc-cell:focus {
+  outline: none;
+  border-color: var(--pc-intent-primary);
+  background: var(--pc-accent-wash);
+}
+.pc-cell:disabled { opacity: 0.5; }
+
+@media (max-width: 767px) {
+  .pc-shell__content { padding: 14px; }
+  .pc-shell__account-identity { display: none; }
+}

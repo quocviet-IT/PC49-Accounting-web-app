@@ -4,8 +4,8 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useLocale } from '@/lib/i18n/provider'
 import type { MessageKey } from '@/lib/i18n'
-import { Page, Section, Empty, money, weight, ledger } from '@/components/ledger/Ledger'
-import { commitBatch, withdrawBatch } from '@/app/import/actions'
+import { Page, Section, Empty, money, weight, ledger, Frame } from '@/components/ledger/Ledger'
+import { commitBatch, withdrawBatch } from '@/app/(app)/import/actions'
 import styles from './ImportView.module.css'
 
 export type Batch = {
@@ -85,50 +85,52 @@ export function ImportView({
     <Page titleKey="imp.title" noteKey="imp.note">
       <Section titleKey="imp.batches">
         {batches.length === 0 ? <Empty /> : (
-          <table className={ledger.table}>
-            <colgroup>
-              <col style={{ width: '18%' }} /><col style={{ width: '30%' }} />
-              <col style={{ width: '11%' }} /><col style={{ width: '11%' }} />
-              <col style={{ width: '11%' }} /><col style={{ width: '19%' }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>{t('imp.source')}</th>
-                <th>{t('imp.file')}</th>
-                <th className={ledger.num}>{t('imp.rows')}</th>
-                <th className={ledger.num}>{t('imp.valid')}</th>
-                <th className={ledger.num}>{t('imp.rejected')}</th>
-                <th>{t('imp.status')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {batches.map((b) => (
-                <tr
-                  key={b.id}
-                  className={b.id === selected?.id ? styles.picked : undefined}
-                >
-                  <td>
-                    <Link className={styles.pick} href={`/import?asOf=${asOf}&batch=${b.id}`}>
-                      {b.source}
-                    </Link>
-                  </td>
-                  <td className={styles.clip}>{b.fileName ?? '—'}</td>
-                  <td className={ledger.num}>{b.rowCount}</td>
-                  <td className={ledger.num}>{b.validCount + b.committedCount}</td>
-                  <td className={`${ledger.num} ${b.rejectedCount > 0 ? ledger.out : ledger.muted}`}>
-                    {b.rejectedCount}
-                  </td>
-                  <td>
-                    <span className={ledger.badge}>
-                      {b.committedAt
-                        ? t(b.rejectedCount > 0 ? 'imp.partial' : 'imp.done')
-                        : t('imp.pending')}
-                    </span>
-                  </td>
+          <Frame>
+<table className={ledger.table}>
+              <colgroup>
+                <col style={{ width: '18%' }} /><col style={{ width: '30%' }} />
+                <col style={{ width: '11%' }} /><col style={{ width: '11%' }} />
+                <col style={{ width: '11%' }} /><col style={{ width: '19%' }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>{t('imp.source')}</th>
+                  <th>{t('imp.file')}</th>
+                  <th className={ledger.num}>{t('imp.rows')}</th>
+                  <th className={ledger.num}>{t('imp.valid')}</th>
+                  <th className={ledger.num}>{t('imp.rejected')}</th>
+                  <th>{t('imp.status')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {batches.map((b) => (
+                  <tr
+                    key={b.id}
+                    className={b.id === selected?.id ? styles.picked : undefined}
+                  >
+                    <td>
+                      <Link className={styles.pick} href={`/import?asOf=${asOf}&batch=${b.id}`}>
+                        {b.source}
+                      </Link>
+                    </td>
+                    <td className={styles.clip}>{b.fileName ?? '—'}</td>
+                    <td className={ledger.num}>{b.rowCount}</td>
+                    <td className={ledger.num}>{b.validCount + b.committedCount}</td>
+                    <td className={`${ledger.num} ${b.rejectedCount > 0 ? ledger.out : ledger.muted}`}>
+                      {b.rejectedCount}
+                    </td>
+                    <td>
+                      <span className={ledger.badge}>
+                        {b.committedAt
+                          ? t(b.rejectedCount > 0 ? 'imp.partial' : 'imp.done')
+                          : t('imp.pending')}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Frame>
         )}
       </Section>
 
@@ -137,33 +139,35 @@ export function ImportView({
           {rejected.length === 0 ? (
             <p className={ledger.note}>{t('imp.noRejected')}</p>
           ) : (
-            <table className={ledger.table}>
-              <colgroup>
-                <col style={{ width: '10%' }} /><col style={{ width: '42%' }} />
-                <col style={{ width: '48%' }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th className={ledger.num}>{t('imp.row')}</th>
-                  <th>{t('imp.reason')}</th>
-                  <th>{t('imp.file')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rejected.map((r) => (
-                  <tr key={r.rowNo}>
-                    <td className={ledger.num}>{r.rowNo}</td>
-                    <td className={ledger.out}>{why(t, r)}</td>
-                    <td className={`${ledger.muted} ${styles.clip}`}>
-                      {Object.entries(r.payload)
-                        .filter(([, v]) => v !== null && v !== '')
-                        .map(([k, v]) => `${k}=${String(v)}`)
-                        .join('  ')}
-                    </td>
+            <Frame>
+<table className={ledger.table}>
+                <colgroup>
+                  <col style={{ width: '10%' }} /><col style={{ width: '42%' }} />
+                  <col style={{ width: '48%' }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th className={ledger.num}>{t('imp.row')}</th>
+                    <th>{t('imp.reason')}</th>
+                    <th>{t('imp.file')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {rejected.map((r) => (
+                    <tr key={r.rowNo}>
+                      <td className={ledger.num}>{r.rowNo}</td>
+                      <td className={ledger.out}>{why(t, r)}</td>
+                      <td className={`${ledger.muted} ${styles.clip}`}>
+                        {Object.entries(r.payload)
+                          .filter(([, v]) => v !== null && v !== '')
+                          .map(([k, v]) => `${k}=${String(v)}`)
+                          .join('  ')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Frame>
           )}
 
           <div className={styles.actions}>
@@ -219,40 +223,42 @@ export function ImportView({
           <p className={ledger.note}>{t('imp.noExpected')}</p>
         ) : (
           <>
-            <table className={ledger.table}>
-              <colgroup>
-                <col style={{ width: '26%' }} /><col style={{ width: '16%' }} />
-                <col style={{ width: '19%' }} /><col style={{ width: '19%' }} />
-                <col style={{ width: '20%' }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>{t('imp.metric')}</th>
-                  <th>{t('imp.key')}</th>
-                  <th className={ledger.num}>{t('imp.expected')}</th>
-                  <th className={ledger.num}>{t('imp.actual')}</th>
-                  <th className={ledger.num}>{t('imp.difference')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recon.map((r) => (
-                  <tr
-                    key={`${r.metric}:${r.metricKey}`}
-                    className={r.agrees ? undefined : styles.differs}
-                  >
-                    <td>{t(`imp.metric.${r.metric}` as MessageKey)}</td>
-                    <td>{r.metricKey}</td>
-                    <td className={ledger.num}>{figure(r.metric, r.expected)}</td>
-                    <td className={ledger.num}>{figure(r.metric, r.actual)}</td>
-                    {/* The whole load is read from this column, so it is the one
-                        thing on the screen allowed to shout. */}
-                    <td className={`${ledger.num} ${r.agrees ? ledger.muted : ledger.out}`}>
-                      {r.agrees ? '—' : figure(r.metric, r.difference)}
-                    </td>
+            <Frame>
+<table className={ledger.table}>
+                <colgroup>
+                  <col style={{ width: '26%' }} /><col style={{ width: '16%' }} />
+                  <col style={{ width: '19%' }} /><col style={{ width: '19%' }} />
+                  <col style={{ width: '20%' }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>{t('imp.metric')}</th>
+                    <th>{t('imp.key')}</th>
+                    <th className={ledger.num}>{t('imp.expected')}</th>
+                    <th className={ledger.num}>{t('imp.actual')}</th>
+                    <th className={ledger.num}>{t('imp.difference')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {recon.map((r) => (
+                    <tr
+                      key={`${r.metric}:${r.metricKey}`}
+                      className={r.agrees ? undefined : styles.differs}
+                    >
+                      <td>{t(`imp.metric.${r.metric}` as MessageKey)}</td>
+                      <td>{r.metricKey}</td>
+                      <td className={ledger.num}>{figure(r.metric, r.expected)}</td>
+                      <td className={ledger.num}>{figure(r.metric, r.actual)}</td>
+                      {/* The whole load is read from this column, so it is the one
+                          thing on the screen allowed to shout. */}
+                      <td className={`${ledger.num} ${r.agrees ? ledger.muted : ledger.out}`}>
+                        {r.agrees ? '—' : figure(r.metric, r.difference)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Frame>
             {disagreeing === 0 && (
               <p className={styles.settled}>{t('imp.allAgree')}</p>
             )}

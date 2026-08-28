@@ -1,15 +1,14 @@
-import { AppShell } from '@/components/AppShell'
 import { ConversionView, type BankTxn, type GoldOption } from '@/components/bank/ConversionView'
+import { Forbidden } from '@/components/Forbidden'
 import { getCurrentUser } from '@/lib/auth/currentUser'
 import { can } from '@/lib/auth/roles'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { t } from '@/lib/i18n'
 
 export default async function BankConversionPage() {
   const user = await getCurrentUser()
   const role = user?.role ?? null
   if (!can(role, 'goldTxn.write')) {
-    return <AppShell role={role}><p>{t(user?.locale ?? 'vi', 'auth.forbidden')}</p></AppShell>
+    return <Forbidden locale={user?.locale} />
   }
 
   const supabase = await createServerSupabase()
@@ -39,12 +38,10 @@ export default async function BankConversionPage() {
   }) => ({ code: g.code, nameVi: g.name_vi, nameEn: g.name_en, uom: g.native_uom }))
 
   return (
-    <AppShell role={role}>
-      <ConversionView
+    <ConversionView
         transactions={transactions}
         goldTypes={goldTypes}
         tolerance={Number(param.data?.value ?? 100)}
       />
-    </AppShell>
   )
 }

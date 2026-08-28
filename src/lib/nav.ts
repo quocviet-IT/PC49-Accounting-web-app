@@ -1,24 +1,100 @@
 import { can, type Capability, type Role } from '@/lib/auth/roles'
 import type { MessageKey } from '@/lib/i18n'
 
-export type NavItem = { key: string; labelKey: MessageKey; href: string }
+/**
+ * The navigation, as plain data.
+ *
+ * A page names every capability that opens it; holding any one is enough. A
+ * group is shown when at least one page inside it is, so a role never sees a
+ * heading that opens onto nothing.
+ *
+ * Icons are not here. They live in the shell, so this file stays data a unit
+ * test can check against the app's actual routes.
+ */
 
-const ALL: (NavItem & { requires: Capability | null })[] = [
-  { key: 'dashboard', labelKey: 'nav.dashboard', href: '/', requires: null },
-  { key: 'goldTxn', labelKey: 'nav.goldTxn', href: '/gold-transactions', requires: 'goldTxn.write' },
-  { key: 'inventory', labelKey: 'nav.inventory', href: '/inventory', requires: 'report.read' },
-  { key: 'refining', labelKey: 'nav.refining', href: '/refining', requires: 'refining.write' },
-  { key: 'cash', labelKey: 'nav.cash', href: '/cash', requires: 'bankImport.run' },
-  { key: 'bankGold', labelKey: 'nav.bankGold', href: '/bank-conversion', requires: 'goldTxn.write' },
-  { key: 'journal', labelKey: 'nav.journal', href: '/journal', requires: 'journal.post' },
-  { key: 'reports', labelKey: 'nav.reports', href: '/reports', requires: 'report.read' },
-  { key: 'import', labelKey: 'nav.import', href: '/import', requires: 'dataImport.run' },
-  { key: 'settings', labelKey: 'nav.settings', href: '/settings', requires: 'catalog.manage' },
+export type NavPage = {
+  key: string
+  labelKey: MessageKey
+  requires: Capability | Capability[] | null
+}
+
+export type NavGroup = {
+  key: string
+  labelKey: MessageKey
+  children: NavPage[]
+}
+
+export type NavItem = NavPage | NavGroup
+
+export function isNavGroup(item: NavItem): item is NavGroup {
+  return 'children' in item
+}
+
+const ALL: NavItem[] = [
+  { key: '/', labelKey: 'nav.dashboard', requires: null },
+  {
+    key: 'trading',
+    labelKey: 'nav.group.trading',
+    children: [
+      { key: '/gold-transactions', labelKey: 'nav.goldTxn', requires: 'goldTxn.write' },
+      { key: '/prices', labelKey: 'nav.prices', requires: 'goldTxn.write' },
+      { key: '/refining', labelKey: 'nav.refining', requires: 'refining.write' },
+      { key: '/inventory', labelKey: 'nav.inventory', requires: 'report.read' },
+    ],
+  },
+  {
+    key: 'money',
+    labelKey: 'nav.group.money',
+    children: [
+      { key: '/cash', labelKey: 'nav.cash', requires: 'bankImport.run' },
+      { key: '/bank-conversion', labelKey: 'nav.bankGold', requires: 'goldTxn.write' },
+    ],
+  },
+  {
+    key: 'books',
+    labelKey: 'nav.group.books',
+    children: [
+      { key: '/journal', labelKey: 'nav.journal', requires: 'journal.post' },
+      { key: '/reports', labelKey: 'nav.reports', requires: 'report.read' },
+    ],
+  },
+  {
+    key: '/settings',
+    labelKey: 'nav.settings',
+    requires: ['dataImport.run', 'period.close', 'catalog.manage'],
+  },
 ]
 
-export function navItemsFor(role: Role | null): NavItem[] {
+function allowed(role: Role, requires: NavPage['requires']): boolean {
+  if (requires === null) return true
+  const needed = Array.isArray(requires) ? requires : [requires]
+  return needed.some((c) => can(role, c))
+}
+
+export function navigationForRole(role: Role | null): NavItem[] {
   if (!role) return []
-  return ALL.filter((i) => i.requires === null || can(role, i.requires)).map(
-    ({ key, labelKey, href }) => ({ key, labelKey, href }),
-  )
+  return ALL.flatMap<NavItem>((item) => {
+    if (!isNavGroup(item)) return allowed(role, item.requires) ? [item] : []
+    const children = item.children.filter((child) => allowed(role, child.requires))
+    // An empty group is a heading that opens onto nothing.
+    return children.length > 0 ? [{ ...item, children }] : []
+  })
+}
+
+/** Every page a role may open, flattened — what a permission check reads. */
+export function pagesForRole(role: Role | null): NavPage[] {
+  return navigationForRole(role).flatMap((item) => (isNavGroup(item) ? item.children : [item]))
+}
+
+/** The page a path belongs to, longest match first so `/settings/periods` wins. */
+export function findActivePage(pathname: string): NavPage | undefined {
+  const pages = ALL.flatMap((item) => (isNavGroup(item) ? item.children : [item]))
+  return [...pages]
+    .sort((a, b) => b.key.length - a.key.length)
+    .find((page) => (page.key === '/' ? pathname === '/' : pathname.startsWith(page.key)))
+}
+
+/** The group a page sits in, so the sidebar can open it. */
+export function findActiveGroup(pageKey: string): string | undefined {
+  return ALL.find((item) => isNavGroup(item) && item.children.some((c) => c.key === pageKey))?.key
 }

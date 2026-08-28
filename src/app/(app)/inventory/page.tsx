@@ -1,9 +1,8 @@
-import { AppShell } from '@/components/AppShell'
 import { InventoryView, type StockRow } from '@/components/gold/InventoryView'
+import { Forbidden } from '@/components/Forbidden'
 import { getCurrentUser } from '@/lib/auth/currentUser'
 import { can } from '@/lib/auth/roles'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { t } from '@/lib/i18n'
 
 type Bucketed = { gold_type_code: string; qty_gram: number }
 
@@ -11,7 +10,7 @@ export default async function InventoryPage() {
   const user = await getCurrentUser()
   const role = user?.role ?? null
   if (!can(role, 'report.read')) {
-    return <AppShell role={role}><p>{t(user?.locale ?? 'vi', 'auth.forbidden')}</p></AppShell>
+    return <Forbidden locale={user?.locale} />
   }
 
   const supabase = await createServerSupabase()
@@ -38,5 +37,5 @@ export default async function InventoryPage() {
     total: a[g.code] ?? 0,
   }))
 
-  return <AppShell role={role}><InventoryView rows={rows} /></AppShell>
+  return <InventoryView rows={rows} />
 }

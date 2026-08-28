@@ -67,8 +67,12 @@ try {
   await page.click('button[type="submit"]')
   await page.waitForURL(`${BASE}/`, { timeout: 20000 })
 
-  const menu = (await page.locator('header').first().textContent()) ?? ''
-  check('the accountant is offered the import screen', menu.includes('Nạp dữ liệu'))
+  // Import is occasional work, so it sits behind Settings rather than on the
+  // bar, where it was being pushed off the end into an overflow menu.
+  await page.goto(`${BASE}/settings`, { waitUntil: 'networkidle' })
+  const hub = (await page.locator('body').textContent()) ?? ''
+  check('the accountant reaches the import screen from settings',
+    hub.includes('Nạp dữ liệu'))
 
   await page.goto(`${BASE}/import?asOf=${AS_OF}&batch=${batchId}`, { waitUntil: 'networkidle' })
   const before = (await page.locator('body').textContent()) ?? ''

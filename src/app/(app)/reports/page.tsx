@@ -1,9 +1,8 @@
-import { AppShell } from '@/components/AppShell'
 import { ReportsView, type PlLine, type AparLine, type Assets } from '@/components/reports/ReportsView'
+import { Forbidden } from '@/components/Forbidden'
 import { getCurrentUser } from '@/lib/auth/currentUser'
 import { can } from '@/lib/auth/roles'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { t } from '@/lib/i18n'
 
 export default async function ReportsPage({
   searchParams,
@@ -11,7 +10,7 @@ export default async function ReportsPage({
   const user = await getCurrentUser()
   const role = user?.role ?? null
   if (!can(role, 'report.read')) {
-    return <AppShell role={role}><p>{t(user?.locale ?? 'vi', 'auth.forbidden')}</p></AppShell>
+    return <Forbidden locale={user?.locale} />
   }
 
   const params = await searchParams
@@ -58,8 +57,6 @@ export default async function ReportsPage({
   } : null
 
   return (
-    <AppShell role={role}>
-      <ReportsView period={period} pl={pl} apar={apar} assets={assets} />
-    </AppShell>
+    <ReportsView period={period} pl={pl} apar={apar} assets={assets} />
   )
 }

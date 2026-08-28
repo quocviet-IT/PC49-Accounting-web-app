@@ -1,9 +1,8 @@
-import { AppShell } from '@/components/AppShell'
 import { TxnGrid, type GoldTypeOption, type SavedRow } from '@/components/gold/TxnGrid'
+import { Forbidden } from '@/components/Forbidden'
 import { getCurrentUser } from '@/lib/auth/currentUser'
 import { can } from '@/lib/auth/roles'
 import { createServerSupabase } from '@/lib/supabase/server'
-import { t } from '@/lib/i18n'
 
 export default async function GoldTransactionsPage({
   searchParams,
@@ -15,9 +14,7 @@ export default async function GoldTransactionsPage({
 
   if (!can(role, 'goldTxn.write')) {
     return (
-      <AppShell role={role}>
-        <p>{t(user?.locale ?? 'vi', 'auth.forbidden')}</p>
-      </AppShell>
+      <Forbidden locale={user?.locale} />
     )
   }
 
@@ -42,13 +39,11 @@ export default async function GoldTransactionsPage({
   ])
 
   return (
-    <AppShell role={role}>
-      <TxnGrid
+    <TxnGrid
         txnDate={txnDate}
         goldTypes={(goldTypesResult.data ?? []) as GoldTypeOption[]}
         salesPeople={(salesResult.data ?? []).map((s: { code: string }) => s.code)}
         existing={(existingResult.data ?? []) as SavedRow[]}
       />
-    </AppShell>
   )
 }

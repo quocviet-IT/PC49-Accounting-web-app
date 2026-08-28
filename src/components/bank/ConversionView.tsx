@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import { useLocale } from '@/lib/i18n/provider'
 import { Page, Stat, money, ledger } from '@/components/ledger/Ledger'
-import { saveAllocation, suggestAllocation } from '@/app/bank-conversion/actions'
+import { saveAllocation, suggestAllocation } from '@/app/(app)/bank-conversion/actions'
 import styles from './ConversionView.module.css'
 
 export type BankTxn = {

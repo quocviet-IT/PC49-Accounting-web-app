@@ -2,6 +2,7 @@
 // press Enter, and check it saved and the running totals moved.
 // Run with the dev server up: npm run verify:grid
 import { chromium } from 'playwright'
+import pg from 'pg'
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const DAY = process.env.PC49_GRID_DAY ?? '2026-03-16'   // a clean day per run
@@ -80,5 +81,40 @@ await page.screenshot({ path: 'grid.png', fullPage: true })
 console.log('\nscreenshot written to grid.png')
 
 await browser.close()
+
+// The client's database is not a scratch pad. Two runs in a row used to leave
+// two purchases behind and the second run then failed on its own leftovers.
+// The posting guard forces an unpost before anything can be removed, which is
+// the same road it forces on everyone else.
+const dbUrl = process.env.SUPABASE_DB_URL
+if (dbUrl) {
+  const db = new pg.Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } })
+  await db.connect()
+  const made = await db.query(
+    'SELECT id, journal_entry_id FROM pc49.gold_txn WHERE txn_date = $1', [DAY])
+  for (const row of made.rows) {
+    if (row.journal_entry_id) {
+      await db.query('UPDATE pc49.journal_entry SET posted_at = NULL WHERE id = $1',
+        [row.journal_entry_id])
+      await db.query('DELETE FROM pc49.journal_line WHERE entry_id = $1', [row.journal_entry_id])
+      await db.query('DELETE FROM pc49.audit_log WHERE entity_id = $1::text',
+        [row.journal_entry_id])
+    }
+    await db.query('DELETE FROM pc49.inventory_movement WHERE source_id = $1', [row.id])
+    await db.query('DELETE FROM pc49.gold_txn_payment WHERE txn_id = $1', [row.id])
+    await db.query('DELETE FROM pc49.gold_txn WHERE id = $1', [row.id])
+    if (row.journal_entry_id) {
+      await db.query('DELETE FROM pc49.journal_entry WHERE id = $1', [row.journal_entry_id])
+    }
+  }
+  const left = await db.query(
+    'SELECT count(*)::int AS n FROM pc49.gold_txn WHERE txn_date = $1', [DAY])
+  check('the check cleaned up after itself', left.rows[0].n === 0,
+    `${left.rows[0].n} transaction(s) left`)
+  await db.end()
+} else {
+  console.log('NOTE  SUPABASE_DB_URL is not set, so the typed rows were left in the database')
+}
+
 console.log(failures === 0 ? '\nALL GRID CHECKS PASSED' : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

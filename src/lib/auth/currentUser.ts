@@ -4,6 +4,8 @@ import type { Locale } from '@/lib/i18n'
 
 export type CurrentUser = {
   id: string
+  /** From the auth record rather than the profile: it is what people sign in as. */
+  email: string
   fullName: string
   role: Role
   locale: Locale
@@ -23,6 +25,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   if (!data) return null
   return {
     id: data.id as string,
+    email: user.email ?? '',
     fullName: data.full_name as string,
     role: data.role as Role,
     locale: data.locale as Locale,

@@ -3,32 +3,37 @@
  *
  * The accountant is replacing a spreadsheet they can type 240 rows a month
  * into. Anything that costs a keystroke or a moment of hesitation loses to
- * Excel, so: no cards, no rounded boxes, no shadows, no per-row dialog. Dense
- * rows, hairline rules, and figures that line up under each other.
+ * Excel, so: no per-row dialog, no card around each entry, no shadows. Dense
+ * rows, hairline rules, and figures that line up under each other. The card
+ * below is the frame the whole grid sits in, matching every other screen — the
+ * rows inside it stay as tight as they ever were.
  *
  * The two signal colours are not decoration. They encode the sign convention
  * the whole system rests on: gold entering the vault reads one way, gold
  * leaving reads the other, and a row that reads wrong is a row typed wrong.
+ *
+ * Those colours now come from the design tokens, and the theme is read from the
+ * attribute on <html> rather than from `prefers-color-scheme`. This file used to
+ * carry its own literals and its own media query, which meant a reader who chose
+ * the light theme while their machine was set to dark got a light application
+ * with a dark entry grid: a media query cannot be overridden by a click, and
+ * this is the one screen somebody sits in front of all day.
  */
-
 .wrap {
-  --rule: color-mix(in srgb, currentColor 14%, transparent);
-  --rule-strong: color-mix(in srgb, currentColor 30%, transparent);
-  --field: color-mix(in srgb, currentColor 4%, transparent);
-  --in: #0f7a4f;
-  --out: #a3372c;
-  --muted: color-mix(in srgb, currentColor 55%, transparent);
+  --rule: var(--pc-border-subtle);
+  --rule-strong: var(--pc-border-default);
+  --field: var(--pc-surface-card);
+  --in: var(--pc-money-positive);
+  --out: var(--pc-money-negative);
+  --muted: var(--pc-text-faint);
 
   display: flex;
   flex-direction: column;
-  height: calc(100dvh - 64px - 56px);
-}
-
-@media (prefers-color-scheme: dark) {
-  .wrap {
-    --in: #4bbd8a;
-    --out: #e2705f;
-  }
+  height: calc(100dvh - 56px - 40px);
+  border: 1px solid var(--pc-border-default);
+  border-radius: 10px;
+  background: var(--pc-surface-card);
+  overflow: hidden;
 }
 
 .head {
@@ -36,7 +41,7 @@
   align-items: baseline;
   gap: 24px;
   flex-wrap: wrap;
-  padding-bottom: 12px;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--rule-strong);
 }
 
@@ -78,7 +83,7 @@
   color: var(--muted);
   padding: 6px 8px;
   white-space: nowrap;
-  background: Canvas;
+  background: var(--pc-surface-muted);
   border-bottom: 1px solid var(--rule-strong);
 }
 
@@ -89,7 +94,7 @@
 }
 
 .grid tr:hover td {
-  background: color-mix(in srgb, currentColor 3%, transparent);
+  background: var(--pc-surface-subtle);
 }
 
 /* Figures line up under each other, which is how a typo is caught by eye. */
@@ -104,10 +109,15 @@
   width: 100%;
   border: 0;
   background: transparent;
-  padding: 6px 8px;
+  padding: 7px 8px;
   font: inherit;
   color: inherit;
   outline-offset: -2px;
+}
+
+.cell:hover:not(:disabled),
+.select:hover:not(:disabled) {
+  background: var(--pc-surface-subtle);
 }
 
 .cell.num {
@@ -116,8 +126,8 @@
 
 .cell:focus,
 .select:focus {
-  background: var(--field);
-  outline: 2px solid currentColor;
+  background: var(--pc-accent-wash);
+  outline: 2px solid var(--pc-intent-primary);
 }
 
 .select {
@@ -146,7 +156,7 @@
 }
 
 .saved td {
-  background: color-mix(in srgb, var(--in) 8%, transparent);
+  background: color-mix(in srgb, var(--in) 10%, var(--pc-surface-card));
 }
 
 .status {
@@ -164,8 +174,9 @@
   gap: 32px;
   flex-wrap: wrap;
   align-items: baseline;
-  padding: 12px 0 4px;
+  padding: 12px 14px;
   border-top: 2px solid var(--rule-strong);
+  background: var(--pc-surface-subtle);
   font-size: 13px;
 }
 

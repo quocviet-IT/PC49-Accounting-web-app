@@ -1,12 +1,12 @@
-import { AppShell } from '@/components/AppShell'
 import { Overview } from '@/components/home/Overview'
 import { getCurrentUser } from '@/lib/auth/currentUser'
 import { createServerSupabase } from '@/lib/supabase/server'
 
 export default async function HomePage() {
+  // The layout has already refused anyone who is not signed in; this guard is
+  // what keeps TypeScript from having to trust that.
   const user = await getCurrentUser()
-  const role = user?.role ?? null
-  if (!user) return <AppShell role={null}><span /></AppShell>
+  if (!user) return null
 
   const today = new Date().toISOString().slice(0, 10)
   const supabase = await createServerSupabase()
@@ -39,14 +39,12 @@ export default async function HomePage() {
     (s: number, r: { qty_gram: number }) => s + Number(r.qty_gram), 0)
 
   return (
-    <AppShell role={role}>
-      <Overview
+    <Overview
         inventoryValue={spotPerGram === null ? null : gram * spotPerGram}
         cashTotal={cashTotal}
         openDeposits={deposits.count ?? 0}
         atRefineryGram={atRefinery}
         spotMissing={spotPerGram === null}
       />
-    </AppShell>
   )
 }

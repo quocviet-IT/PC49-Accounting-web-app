@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import { useLocale } from '@/lib/i18n/provider'
 import type { MessageKey } from '@/lib/i18n'
+import { PageHeader } from '@/components/PageHeader'
 import styles from './Ledger.module.css'
 
 export const money = new Intl.NumberFormat('en-US', {
@@ -13,15 +14,16 @@ export const weight = new Intl.NumberFormat('en-US', {
 })
 
 export function Page({
-  titleKey, noteKey, children,
-}: { titleKey: MessageKey; noteKey?: MessageKey; children: ReactNode }) {
-  const { t } = useLocale()
+  titleKey, noteKey, actions, children,
+}: {
+  titleKey: MessageKey
+  noteKey?: MessageKey
+  actions?: ReactNode
+  children: ReactNode
+}) {
   return (
     <div className={styles.page}>
-      <div className={styles.head}>
-        <h1 className={styles.title}>{t(titleKey)}</h1>
-        {noteKey && <p className={styles.note}>{t(noteKey)}</p>}
-      </div>
+      <PageHeader titleKey={titleKey} descriptionKey={noteKey} actions={actions} />
       {children}
     </div>
   )
@@ -37,6 +39,17 @@ export function Section({
       {children}
     </section>
   )
+}
+
+/**
+ * The card a table sits on.
+ *
+ * Wide content scrolls inside this rather than the page body, which is the
+ * difference between a table you can read on a laptop and one that pushes the
+ * whole layout sideways.
+ */
+export function Frame({ children }: { children: ReactNode }) {
+  return <div className={styles.frame}>{children}</div>
 }
 
 export function Stat({

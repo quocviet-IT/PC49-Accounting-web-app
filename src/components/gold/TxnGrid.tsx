@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useTransition } from 'react'
 import { useLocale } from '@/lib/i18n/provider'
 import { toGrams, type Uom } from '@/lib/domain/units'
-import { saveTransaction, type SaveResult } from '@/app/gold-transactions/actions'
+import { saveTransaction, type SaveResult } from '@/app/(app)/gold-transactions/actions'
 import styles from './TxnGrid.module.css'
 
 export type GoldTypeOption = {
@@ -333,23 +333,31 @@ export function TxnGrid({
         </datalist>
       </div>
 
+      {/* Nothing has a direction. A zero painted red says money went out on a
+          day when nothing happened, which is the same lie as printing -0.00. */}
       <div className={styles.totals}>
         <span className={styles.totalItem}>
           <span className={styles.totalLabel}>{t('txn.total.purchases')}</span>
-          <span className={`${styles.totalValue} ${styles.out}`} data-testid="total-purchases">
+          <span
+            className={`${styles.totalValue} ${totals.purchases === 0 ? '' : styles.out}`}
+            data-testid="total-purchases"
+          >
             {money.format(totals.purchases)}
           </span>
         </span>
         <span className={styles.totalItem}>
           <span className={styles.totalLabel}>{t('txn.total.sales')}</span>
-          <span className={`${styles.totalValue} ${styles.in}`} data-testid="total-sales">
+          <span
+            className={`${styles.totalValue} ${totals.sales === 0 ? '' : styles.in}`}
+            data-testid="total-sales"
+          >
             {money.format(totals.sales)}
           </span>
         </span>
         <span className={styles.movement} data-testid="total-movement">
           <span className={styles.totalLabel}>{t('txn.total.movement')}</span>
           {totals.movement.map(([code, grams]) => (
-            <span key={code} className={grams > 0 ? styles.in : styles.out}>
+            <span key={code} className={grams === 0 ? '' : grams > 0 ? styles.in : styles.out}>
               {code} {grams > 0 ? '+' : ''}{weight.format(grams)} g
             </span>
           ))}
