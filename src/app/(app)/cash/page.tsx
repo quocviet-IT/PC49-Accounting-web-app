@@ -1,4 +1,6 @@
-import { CashView, type AccountRow, type CashTxnRow, type QueueRow } from '@/components/cash/CashView'
+import {
+  CashView, type AccountRow, type CashTxnRow, type LoanRow, type QueueRow, type ReconRow,
+} from '@/components/cash/CashView'
 import { Forbidden } from '@/components/Forbidden'
 import { getCurrentUser } from '@/lib/auth/currentUser'
 import { can } from '@/lib/auth/roles'
@@ -19,7 +21,7 @@ export default async function CashPage({
     : new Date().toISOString().slice(0, 7)
 
   const supabase = await createServerSupabase()
-  const [flow, queue, txns, held] = await Promise.all([
+  const [flow, queue, txns, held, recon, loans] = await Promise.all([
     supabase.rpc('cashflow_by_account', { p_period: period }),
     supabase.from('bank_import_row').select('id', { count: 'exact', head: true }).is('resolved_at', null),
     // The month's movements themselves. Importing a statement and then not
@@ -38,6 +40,15 @@ export default async function CashPage({
       .is('resolved_at', null)
       .order('txn_date', { ascending: false })
       .limit(100),
+    // Whether the books have been squared with the other side, for the close of
+    // this month.
+    supabase.from('cash_reconciliation')
+      .select('cash_account_code, rec_date, our_closing, us_closing, difference, status, reason')
+      .gte('rec_date', `${period}-01`)
+      .lt('rec_date', nextMonth(period)),
+    // Money lent between the group's own entities: the reason 1388 has an
+    // opening balance nobody could name a credit side for.
+    supabase.from('v_internal_loan_balance').select('counterparty, outstanding'),
   ])
 
   const rows: AccountRow[] = (flow.data ?? []).map((r: {
@@ -74,6 +85,25 @@ export default async function CashPage({
     reason: r.reason as string,
   }))
 
+  const reconciled: ReconRow[] = (recon.data ?? []).map((r: Record<string, unknown>) => ({
+    account: r.cash_account_code as string,
+    date: r.rec_date as string,
+    ours: Number(r.our_closing ?? 0),
+    theirs: Number(r.us_closing ?? 0),
+    difference: Number(r.difference ?? 0),
+    status: r.status as string,
+    reason: (r.reason as string) ?? null,
+  }))
+
+  const loanBalances: LoanRow[] = (loans.data ?? []).map((r: Record<string, unknown>) => ({
+    counterparty: r.counterparty as string,
+    outstanding: Number(r.outstanding ?? 0),
+  }))
+
+  // The last day of the month, which is the date a close is reconciled at.
+  const [y, m] = period.split('-').map(Number)
+  const monthEnd = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10)
+
   return (
     <CashView
       period={period}
@@ -81,6 +111,9 @@ export default async function CashPage({
       unmatched={queue.count ?? 0}
       movements={movements}
       unplaced={unplaced}
+      recon={reconciled}
+      loans={loanBalances}
+      monthEnd={monthEnd}
     />
   )
 }

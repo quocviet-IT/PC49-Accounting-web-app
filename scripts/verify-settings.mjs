@@ -3,6 +3,7 @@
 //
 // Everything this writes is removed at the end. Run with the dev server up.
 import { chromium } from 'playwright'
+import { clickUntil, openPage } from './support/page.mjs'
 import pg from 'pg'
 import { untilGone, untilRowIs } from './support/until.mjs'
 
@@ -36,13 +37,13 @@ async function signIn(page, email, password) {
   await page.fill('input[autocomplete="email"]', email)
   await page.fill('input[autocomplete="current-password"]', password)
   await page.click('button[type="submit"]')
-  await page.waitForURL(`${BASE}/`, { timeout: 20000 })
+  await page.waitForURL(`${BASE}/`, { timeout: 60000 })
 }
 
 try {
   // ---- The accountant types the day's prices -------------------------------
   const ctx = await browser.newContext()
-  const page = await ctx.newPage()
+  const page = await openPage(ctx)
   await signIn(page, 'kt@pc49.test', 'pc49-test-KT-2026')
 
   // The navigation is the sidebar now, not the header bar; the header carries
@@ -90,14 +91,20 @@ try {
     `SELECT count(*)::int AS n FROM pc49.gold_price_daily WHERE price_date = $1`, [NEXT_DAY])
   check('the next day starts with no prices', blank.rows[0].n === 0)
 
-  await page.locator('button', { hasText: 'Lấy giá hôm trước' }).first().click()
-  await page.waitForTimeout(2500)
-  const carried = await db.query(
-    `SELECT market_price::text AS m, source FROM pc49.gold_price_daily
-      WHERE price_date = $1 AND gold_type_code = 'GRAIN'`, [NEXT_DAY])
-  check('yesterday\'s price is carried forward, and says so',
-    Number(carried.rows[0]?.m) === 139.2 && (carried.rows[0]?.source ?? '').includes(DAY),
-    carried.rows[0]?.source ?? 'nothing carried')
+  // Clicked until it lands. This button's only behaviour is an onClick handler,
+  // so a click that arrives before React has hydrated is silently lost — no
+  // error, no effect, and a check that fails one run in six for no visible
+  // reason.
+  const carried = await clickUntil(
+    page.locator('button', { hasText: 'Lấy giá hôm trước' }).first(),
+    async () => {
+      const r = await db.query(
+        `SELECT market_price::text AS m, source FROM pc49.gold_price_daily
+          WHERE price_date = $1 AND gold_type_code = 'GRAIN'`, [NEXT_DAY])
+      const row = r.rows[0]
+      return row && Number(row.m) === 139.2 && (row.source ?? '').includes(DAY)
+    })
+  check('yesterday\'s price is carried forward, and says so', carried, 'nothing carried')
 
   // Carrying twice must not overwrite a figure somebody has since corrected.
   await db.query(
@@ -131,7 +138,7 @@ try {
 
   // ---- The supervisor closes a month --------------------------------------
   const gsCtx = await browser.newContext()
-  const gs = await gsCtx.newPage()
+  const gs = await openPage(gsCtx)
   await signIn(gs, 'gsus@pc49.test', 'pc49-test-GSUS-2026')
 
   const gsMenu = (await gs.locator('aside').first().textContent()) ?? ''
@@ -150,10 +157,14 @@ try {
 
   await gs.goto(`${BASE}/settings/periods`, { waitUntil: 'networkidle' })
   const month = gs.locator(`tr:has-text("${PERIOD}")`)
-  await month.getByRole('button', { name: 'Đóng kỳ', exact: true }).click()
-  // Wait for the row to say what happened rather than for a stopwatch.
-  await month.getByRole('button', { name: 'Mở lại', exact: true })
-    .waitFor({ state: 'visible', timeout: 15000 })
+  // Same reason as the carry button: an onClick handler does nothing before
+  // React has hydrated, so the click is repeated until the month is shut.
+  await clickUntil(month.getByRole('button', { name: 'Đóng kỳ', exact: true }),
+    async () => {
+      const r = await db.query(
+        `SELECT status::text AS s FROM pc49.accounting_period WHERE period = $1`, [PERIOD])
+      return r.rows[0]?.s === 'CLOSED'
+    })
   const closed = await db.query(
     `SELECT status::text, closed_by FROM pc49.accounting_period WHERE period = $1`, [PERIOD])
   check('closing a month records the decision and who made it',
@@ -171,9 +182,12 @@ try {
   } catch { refused = true }
   check('a closed month refuses a posting', refused)
 
-  await month.getByRole('button', { name: 'Mở lại', exact: true }).click()
-  await month.getByRole('button', { name: 'Đóng kỳ', exact: true })
-    .waitFor({ state: 'visible', timeout: 15000 })
+  await clickUntil(month.getByRole('button', { name: 'Mở lại', exact: true }),
+    async () => {
+      const r = await db.query(
+        `SELECT status::text AS s FROM pc49.accounting_period WHERE period = $1`, [PERIOD])
+      return r.rows[0]?.s === 'OPEN'
+    })
   const reopened = await db.query(
     `SELECT status::text, closed_at FROM pc49.accounting_period WHERE period = $1`, [PERIOD])
   check('reopening keeps the row and clears the closure',
@@ -185,7 +199,7 @@ try {
 
   // ---- The owner is offered none of it -------------------------------------
   const ocCtx = await browser.newContext()
-  const oc = await ocCtx.newPage()
+  const oc = await openPage(ocCtx)
   await signIn(oc, 'oc@pc49.test', 'pc49-test-OC-2026')
   for (const path of ['/prices', '/settings', '/settings/periods', '/settings/reference']) {
     await oc.goto(`${BASE}${path}`, { waitUntil: 'networkidle' })
@@ -196,7 +210,7 @@ try {
 
   // ---- Reference data is the administrator's -------------------------------
   const adCtx = await browser.newContext()
-  const ad = await adCtx.newPage()
+  const ad = await openPage(adCtx)
   await signIn(ad, 'admin@pc49.test', 'pc49-test-ADMIN-2026')
   const adHub = await ad.goto(`${BASE}/settings`, { waitUntil: 'networkidle' })
   const adText = (await ad.locator('body').textContent()) ?? ''

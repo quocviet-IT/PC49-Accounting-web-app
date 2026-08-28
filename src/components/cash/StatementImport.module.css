@@ -54,3 +54,23 @@
 .good { color: var(--pc-money-positive); }
 .warn { color: var(--pc-intent-warning); }
 .failed { color: var(--pc-money-negative); max-width: 70ch; }
+
+/* Shared by the reconciliation control on the same screen: one field style, so
+   two rows of inputs on one page do not read as two different apps. */
+.field {
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 8px;
+  border: 1px solid var(--pc-border-default);
+  border-radius: 5px;
+  background: var(--pc-surface-card);
+  color: inherit;
+  max-width: 220px;
+}
+
+.field:focus {
+  outline: none;
+  border-color: var(--pc-intent-primary);
+  box-shadow: 0 0 0 2px var(--pc-accent-wash);
+}

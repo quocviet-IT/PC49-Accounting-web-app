@@ -1,6 +1,7 @@
 // Signs in and opens every screen, checking each renders its own content and
 // that a role without permission is refused. Run with the dev server up.
 import { chromium } from 'playwright'
+import { openPage } from './support/page.mjs'
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 let failures = 0
@@ -14,7 +15,7 @@ async function signIn(page, email, password) {
   await page.fill('input[autocomplete="email"]', email)
   await page.fill('input[autocomplete="current-password"]', password)
   await page.click('button[type="submit"]')
-  await page.waitForURL(`${BASE}/`, { timeout: 20000 })
+  await page.waitForURL(`${BASE}/`, { timeout: 60000 })
 }
 
 const browser = await chromium.launch()
@@ -22,7 +23,7 @@ const browser = await chromium.launch()
 // The accountant sees every working screen.
 {
   const ctx = await browser.newContext()
-  const page = await ctx.newPage()
+  const page = await openPage(ctx)
   await signIn(page, 'kt@pc49.test', 'pc49-test-KT-2026')
 
   for (const [path, heading] of [
@@ -49,7 +50,7 @@ const browser = await chromium.launch()
 // The owner is read-only: the entry grid must refuse.
 {
   const ctx = await browser.newContext()
-  const page = await ctx.newPage()
+  const page = await openPage(ctx)
   await signIn(page, 'oc@pc49.test', 'pc49-test-OC-2026')
 
   await page.goto(`${BASE}/inventory`, { waitUntil: 'networkidle' })

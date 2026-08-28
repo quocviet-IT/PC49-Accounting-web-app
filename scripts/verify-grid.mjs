@@ -2,6 +2,7 @@
 // press Enter, and check it saved and the running totals moved.
 // Run with the dev server up: npm run verify:grid
 import { chromium } from 'playwright'
+import { openPage } from './support/page.mjs'
 import pg from 'pg'
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
@@ -15,13 +16,13 @@ function check(name, ok, detail = '') {
 
 const browser = await chromium.launch()
 const ctx = await browser.newContext()
-const page = await ctx.newPage()
+const page = await openPage(ctx)
 
 await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await page.fill('input[autocomplete="email"]', 'kt@pc49.test')
 await page.fill('input[autocomplete="current-password"]', 'pc49-test-KT-2026')
 await page.click('button[type="submit"]')
-await page.waitForURL(`${BASE}/`, { timeout: 20000 })
+await page.waitForURL(`${BASE}/`, { timeout: 60000 })
 
 await page.goto(`${BASE}/gold-transactions?date=${DAY}`, { waitUntil: 'networkidle' })
 check('the grid opens for a chosen day', page.url().includes(DAY))

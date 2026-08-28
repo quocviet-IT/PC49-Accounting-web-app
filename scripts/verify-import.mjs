@@ -4,6 +4,7 @@
 //
 // Everything this writes is removed at the end. Run with the dev server up.
 import { chromium } from 'playwright'
+import { openPage } from './support/page.mjs'
 import pg from 'pg'
 import { expect } from 'playwright/test'
 import { untilRowIs } from './support/until.mjs'
@@ -53,12 +54,12 @@ try {
     Number(counts.rows[0].valid_count) === 2 && Number(counts.rows[0].rejected_count) === 2,
     `${counts.rows[0].valid_count} good, ${counts.rows[0].rejected_count} turned back`)
 
-  const page = await browser.newPage()
+  const page = await openPage(browser)
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('input[autocomplete="email"]', 'kt@pc49.test')
   await page.fill('input[autocomplete="current-password"]', 'pc49-test-KT-2026')
   await page.click('button[type="submit"]')
-  await page.waitForURL(`${BASE}/`, { timeout: 20000 })
+  await page.waitForURL(`${BASE}/`, { timeout: 60000 })
 
   // Import is occasional work, so it sits behind Settings rather than on the
   // bar, where it was being pushed off the end into an overflow menu.

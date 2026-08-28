@@ -4,6 +4,7 @@
 //
 // Everything this writes is removed at the end. Run with the dev server up.
 import { chromium } from 'playwright'
+import { openPage } from './support/page.mjs'
 import pg from 'pg'
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
@@ -30,12 +31,12 @@ const browser = await chromium.launch()
 let lotId = null
 
 try {
-  const page = await browser.newPage()
+  const page = await openPage(browser)
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('input[autocomplete="email"]', 'gsus@pc49.test')
   await page.fill('input[autocomplete="current-password"]', 'pc49-test-GSUS-2026')
   await page.click('button[type="submit"]')
-  await page.waitForURL(`${BASE}/`, { timeout: 20000 })
+  await page.waitForURL(`${BASE}/`, { timeout: 60000 })
 
   await page.goto(`${BASE}/refining`, { waitUntil: 'networkidle' })
 

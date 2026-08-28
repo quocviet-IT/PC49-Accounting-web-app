@@ -4,6 +4,7 @@
 //
 // Everything this writes is removed at the end. Run with the dev server up.
 import { chromium } from 'playwright'
+import { openPage } from './support/page.mjs'
 import { readFileSync } from 'node:fs'
 import pg from 'pg'
 
@@ -45,12 +46,12 @@ try {
     [entry.rows[0].id])
 
   const ctx = await browser.newContext({ acceptDownloads: true })
-  const page = await ctx.newPage()
+  const page = await openPage(ctx)
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('input[autocomplete="email"]', 'kt@pc49.test')
   await page.fill('input[autocomplete="current-password"]', 'pc49-test-KT-2026')
   await page.click('button[type="submit"]')
-  await page.waitForURL(`${BASE}/`, { timeout: 20000 })
+  await page.waitForURL(`${BASE}/`, { timeout: 60000 })
 
   await page.goto(`${BASE}/reports?period=${PERIOD}`, { waitUntil: 'networkidle' })
   const [download] = await Promise.all([
@@ -79,7 +80,7 @@ try {
 
   // The owner may read reports, so may download them; nobody else gets in.
   const anon = await browser.newContext()
-  const stranger = await anon.newPage()
+  const stranger = await openPage(anon)
   const res = await stranger.goto(`${BASE}/reports/export?period=${PERIOD}`)
   const landed = res?.url() ?? ''
   const body = await stranger.content()

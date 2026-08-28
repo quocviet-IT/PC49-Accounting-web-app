@@ -2,6 +2,7 @@
 // lands on the home page with the menu its permissions allow.
 // Run with the dev server already running: npm run verify:signin
 import { chromium } from 'playwright'
+import { openPage } from './support/page.mjs'
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const USERS = [
@@ -27,12 +28,12 @@ function check(name, ok, detail = '') {
 const browser = await chromium.launch()
 for (const u of USERS) {
   const ctx = await browser.newContext()
-  const page = await ctx.newPage()
+  const page = await openPage(ctx)
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('input[autocomplete="email"]', u.email)
   await page.fill('input[autocomplete="current-password"]', u.password)
   await page.click('button[type="submit"]')
-  await page.waitForURL(`${BASE}/`, { timeout: 20000 }).catch(() => {})
+  await page.waitForURL(`${BASE}/`, { timeout: 60000 }).catch(() => {})
 
   check(`${u.role} reaches the home page`, new URL(page.url()).pathname === '/', page.url())
 

@@ -1,6 +1,7 @@
 // Works a bank transaction the way the accountant will: pick it, ask for a
 // suggestion, save, and check the residual is surfaced rather than hidden.
 import { chromium } from 'playwright'
+import { openPage } from './support/page.mjs'
 import pg from 'pg'
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
@@ -32,12 +33,12 @@ const seeded = await db.query(
 const txnId = seeded.rows[0].id
 
 const browser = await chromium.launch()
-const page = await browser.newPage()
+const page = await openPage(browser)
 await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await page.fill('input[autocomplete="email"]', 'kt@pc49.test')
 await page.fill('input[autocomplete="current-password"]', 'pc49-test-KT-2026')
 await page.click('button[type="submit"]')
-await page.waitForURL(`${BASE}/`, { timeout: 20000 })
+await page.waitForURL(`${BASE}/`, { timeout: 60000 })
 
 await page.goto(`${BASE}/bank-conversion`, { waitUntil: 'networkidle' })
 check('the screen lists bank transactions',

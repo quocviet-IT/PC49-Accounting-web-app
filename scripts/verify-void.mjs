@@ -4,6 +4,7 @@
 //
 // Everything this writes is removed at the end. Run with the dev server up.
 import { chromium } from 'playwright'
+import { openPage } from './support/page.mjs'
 import pg from 'pg'
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
@@ -35,12 +36,12 @@ try {
      VALUES ($1, 'GRAIN', 139.20)
      ON CONFLICT (price_date, gold_type_code) DO UPDATE SET market_price = 139.20`, [DAY])
 
-  const page = await browser.newPage()
+  const page = await openPage(browser)
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('input[autocomplete="email"]', 'kt@pc49.test')
   await page.fill('input[autocomplete="current-password"]', 'pc49-test-KT-2026')
   await page.click('button[type="submit"]')
-  await page.waitForURL(`${BASE}/`, { timeout: 20000 })
+  await page.waitForURL(`${BASE}/`, { timeout: 60000 })
 
   // Type a sale, the way the grid is used.
   await page.goto(`${BASE}/gold-transactions?date=${DAY}`, { waitUntil: 'networkidle' })

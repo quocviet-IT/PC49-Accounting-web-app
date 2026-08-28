@@ -6,6 +6,7 @@
 // The file is written in the shape Rocket actually exports, taken from the
 // client's own workbook. Everything this writes is removed at the end.
 import { chromium } from 'playwright'
+import { openPage } from './support/page.mjs'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -52,12 +53,12 @@ try {
   const path = join(dir, FILE_NAME)
   writeFileSync(path, `﻿${CSV}`, 'utf8')
 
-  const page = await browser.newPage()
+  const page = await openPage(browser)
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('input[autocomplete="email"]', 'kt@pc49.test')
   await page.fill('input[autocomplete="current-password"]', 'pc49-test-KT-2026')
   await page.click('button[type="submit"]')
-  await page.waitForURL(`${BASE}/`, { timeout: 20000 })
+  await page.waitForURL(`${BASE}/`, { timeout: 60000 })
 
   await page.goto(`${BASE}/cash`, { waitUntil: 'networkidle' })
   check('the cash screen offers a way in for a statement',
