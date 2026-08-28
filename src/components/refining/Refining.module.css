@@ -1,0 +1,69 @@
+/*
+ * Recording what came back from the refinery, inline in the owner table. A
+ * dialog for a two-field entry would cost more attention than the entry does.
+ */
+
+.receive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.field {
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 7px;
+  border: 1px solid var(--pc-border-default);
+  border-radius: 5px;
+  background: var(--pc-surface-card);
+  color: inherit;
+}
+
+.field:focus {
+  outline: none;
+  border-color: var(--pc-intent-primary);
+  box-shadow: 0 0 0 2px var(--pc-accent-wash);
+}
+
+/* Wide enough for a four-figure weight with two decimals. */
+.qty {
+  width: 96px;
+  text-align: right;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+
+.quiet {
+  font: inherit;
+  font-size: 11.5px;
+  padding: 3px 9px;
+  border: 1px solid var(--pc-border-strong);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--pc-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.quiet:hover:not(:disabled) {
+  color: var(--pc-intent-primary);
+  border-color: var(--pc-intent-primary);
+}
+
+.quiet:focus-visible {
+  outline: 2px solid var(--pc-intent-primary);
+  outline-offset: 1px;
+}
+
+.quiet:disabled { opacity: 0.45; cursor: default; }
+
+.failed {
+  font-size: 11.5px;
+  color: var(--pc-money-negative);
+  max-width: 46ch;
+}
+
+/* What an owner is still owed. The lot cannot close while this is not zero, so
+   it is the figure the whole screen is read for. */
+.owed { color: var(--pc-intent-warning); }

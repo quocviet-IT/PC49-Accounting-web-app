@@ -2,6 +2,7 @@
 
 import { useLocale } from '@/lib/i18n/provider'
 import { Page, Section, Empty, Signed, money, ledger, Frame } from '@/components/ledger/Ledger'
+import { StatementImport } from './StatementImport'
 
 export type AccountRow = {
   code: string
@@ -58,6 +59,7 @@ export function CashView({
 
   return (
     <Page titleKey="cash.title">
+      <StatementImport />
       <Section>
         <p className={ledger.note}>{t('common.period')}: {period}</p>
         {rows.length === 0 ? <Empty /> : (

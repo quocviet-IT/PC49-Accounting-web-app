@@ -6,6 +6,7 @@ import { useLocale } from '@/lib/i18n/provider'
 import type { MessageKey } from '@/lib/i18n'
 import { Page, Section, Empty, money, weight, ledger, Frame } from '@/components/ledger/Ledger'
 import { commitBatch, withdrawBatch } from '@/app/(app)/import/actions'
+import { StageFile } from './StageFile'
 import styles from './ImportView.module.css'
 
 export type Batch = {
@@ -83,6 +84,7 @@ export function ImportView({
 
   return (
     <Page titleKey="imp.title" noteKey="imp.note">
+      <StageFile />
       <Section titleKey="imp.batches">
         {batches.length === 0 ? <Empty /> : (
           <Frame>

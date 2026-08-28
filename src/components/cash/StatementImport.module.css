@@ -1,0 +1,56 @@
+/*
+ * Loading the month's statement. One control and the answer beside it: the
+ * accountant does this twelve times a year and should not have to go looking
+ * for what happened.
+ */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  margin-bottom: 16px;
+}
+
+/* A label wrapping a hidden file input: the native control cannot be styled and
+   its own text cannot be translated. */
+.button {
+  font-size: 12.5px;
+  padding: 5px 12px;
+  border: 1px solid var(--pc-border-strong);
+  border-radius: 6px;
+  color: var(--pc-text-secondary);
+  background: var(--pc-surface-card);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.button:hover {
+  color: var(--pc-intent-primary);
+  border-color: var(--pc-intent-primary);
+}
+
+/* Off screen rather than display:none, so the keyboard can still reach it and
+   the label's focus ring follows. */
+.file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.button:has(.file:focus-visible) {
+  outline: 2px solid var(--pc-intent-primary);
+  outline-offset: 2px;
+}
+
+.hint { color: var(--pc-text-faint); }
+
+/* Three numbers, not one. "412 imported" hides the two the accountant has to
+   do something about. */
+.outcome { display: flex; gap: 14px; flex-wrap: wrap; }
+.good { color: var(--pc-money-positive); }
+.warn { color: var(--pc-intent-warning); }
+.failed { color: var(--pc-money-negative); max-width: 70ch; }

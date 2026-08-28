@@ -74,6 +74,35 @@ try {
   check('the accountant reaches the import screen from settings',
     hub.includes('Nạp dữ liệu'))
 
+  // The loader takes a file now, rather than only SQL. Staging one here proves
+  // the front door works and that a bad row is judged on the way in.
+  await page.goto(`${BASE}/import`, { waitUntil: 'networkidle' })
+  const { mkdtempSync, writeFileSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const stagedFile = join(mkdtempSync(join(tmpdir(), 'pc49-')), 'opening.csv')
+  // Two rows: one the loader can take, one naming a gold type that does not
+  // exist, so the judgement on the way in is visible.
+  writeFileSync(stagedFile, [
+    'as_of,gold_type_code,qty',
+    `${AS_OF},ML,4`,
+    `${AS_OF},NOTAGOLD,9`,
+  ].join('\n'), 'utf8')
+  await page.selectOption('#stage-source', 'OPENING_INVENTORY')
+  await page.locator('input[type="file"]').setInputFiles(stagedFile)
+  await page.waitForTimeout(3000)
+  const stagedSaid = (await page.locator('body').textContent()) ?? ''
+  check('a file can be staged from the screen, and is judged on the way in',
+    /2 Số dòng/.test(stagedSaid) && /1 Nhận được/.test(stagedSaid) && /1 Bị loại/.test(stagedSaid),
+    stagedSaid.match(/\d+ (Số dòng|Nhận được|Bị loại)/g)?.join(' · ') ?? '(nothing said)')
+
+  const fromFile = await db.query(
+    `SELECT count(*)::int AS n FROM pc49.import_row r
+       JOIN pc49.import_batch b ON b.id = r.batch_id
+      WHERE b.file_name = 'opening.csv' AND r.row_no IN (2, 3)`)
+  check('the sheet line number is what gets recorded', fromFile.rows[0].n === 2,
+    `${fromFile.rows[0].n} rows`)
+
   await page.goto(`${BASE}/import?asOf=${AS_OF}&batch=${batchId}`, { waitUntil: 'networkidle' })
   const before = (await page.locator('body').textContent()) ?? ''
 
@@ -139,6 +168,9 @@ try {
          SELECT committed_ref FROM pc49.import_row WHERE batch_id = $1 AND committed_ref IS NOT NULL)`,
       [batchId])
     await db.query('DELETE FROM pc49.import_batch WHERE id = $1', [batchId])
+  }
+  {
+    await db.query(`DELETE FROM pc49.import_batch WHERE file_name = 'opening.csv'`)
   }
   await db.query('DELETE FROM pc49.import_expected_figure WHERE as_of = $1', [AS_OF])
   await db.query('DELETE FROM pc49.inventory_movement WHERE move_date = $1', [AS_OF])

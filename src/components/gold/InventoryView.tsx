@@ -1,7 +1,20 @@
 'use client'
 
 import { useLocale } from '@/lib/i18n/provider'
-import { Page, Section, Empty, Grams, ledger, Frame } from '@/components/ledger/Ledger'
+import { Page, Section, Empty, Grams, money, weight, ledger, Frame } from '@/components/ledger/Ledger'
+
+/** Opening, in, out and closing for one gold type over one month. */
+export type MovementRow = {
+  code: string
+  opening: number
+  receipt: number
+  issue: number
+  closing: number
+  openingValue: number
+  closingValue: number
+  /** The correction the source makes when a provisional issue value is settled. */
+  adjustment: number
+}
 
 export type StockRow = {
   code: string
@@ -13,10 +26,19 @@ export type StockRow = {
   total: number
 }
 
-export function InventoryView({ rows }: { rows: StockRow[] }) {
+export function InventoryView({
+  rows, period, movements,
+}: { rows: StockRow[]; period: string; movements: MovementRow[] }) {
   const { locale, t } = useLocale()
   const shown = rows.filter((r) => r.book !== 0 || r.physical !== 0 || r.total !== 0)
   const sum = (k: 'book' | 'physical' | 'total') => shown.reduce((s, r) => s + r[k], 0)
+  const nameOf = (code: string) => {
+    const g = rows.find((r) => r.code === code)
+    return g ? (locale === 'vi' ? g.nameVi : g.nameEn) : code
+  }
+  // A gold type that neither moved nor was held is noise on a monthly report.
+  const moved = movements.filter(
+    (m) => m.opening !== 0 || m.receipt !== 0 || m.issue !== 0 || m.closing !== 0)
 
   return (
     <Page titleKey="inv.title" noteKey="inv.explain">
@@ -52,6 +74,53 @@ export function InventoryView({ rows }: { rows: StockRow[] }) {
                   <td className={ledger.num}><Grams value={sum('total')} /></td>
                 </tr>
               </tfoot>
+            </table>
+          </Frame>
+        )}
+      </Section>
+      <Section titleKey="inv.movement">
+        <form className="pc-month" method="get" action="/inventory">
+          <label htmlFor="period">{t('common.period')}</label>
+          <input id="period" name="period" type="month" defaultValue={period} />
+          <button type="submit">{t('inv.show')}</button>
+        </form>
+        <p className={ledger.note}>{t('inv.movementNote')}</p>
+        {moved.length === 0 ? <Empty /> : (
+          <Frame>
+            <table className={ledger.table}>
+              <colgroup>
+                <col style={{ width: '22%' }} /><col style={{ width: '15%' }} />
+                <col style={{ width: '15%' }} /><col style={{ width: '15%' }} />
+                <col style={{ width: '15%' }} /><col style={{ width: '18%' }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>{t('inv.goldType')}</th>
+                  <th className={ledger.num}>{t('inv.opening')}</th>
+                  <th className={ledger.num}>{t('inv.receipt')}</th>
+                  <th className={ledger.num}>{t('inv.issue')}</th>
+                  <th className={ledger.num}>{t('inv.closing')}</th>
+                  <th className={ledger.num}>{t('inv.adjustment')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {moved.map((m) => (
+                  <tr key={m.code}>
+                    <td>{nameOf(m.code)} <span className={ledger.muted}>{m.code}</span></td>
+                    <td className={ledger.num}>{weight.format(m.opening)}</td>
+                    <td className={ledger.num}><Grams value={m.receipt} /></td>
+                    <td className={ledger.num}><Grams value={-Math.abs(m.issue)} /></td>
+                    <td className={ledger.num}>{weight.format(m.closing)}</td>
+                    {/* The source values an issue provisionally and corrects it
+                        later. That correction is its own column here rather
+                        than folded into cost, because in January 2026 it was
+                        70,125.12 against a gross profit of 31,008.27. */}
+                    <td className={`${ledger.num} ${m.adjustment === 0 ? ledger.muted : ''}`}>
+                      {m.adjustment === 0 ? '—' : money.format(m.adjustment)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </Frame>
         )}

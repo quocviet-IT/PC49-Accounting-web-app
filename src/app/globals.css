@@ -396,3 +396,38 @@ html, body {
   outline: 2px solid var(--pc-intent-primary);
   outline-offset: 2px;
 }
+
+/* A month picker above a report. Small, quiet, and out of the way of the
+   figures it governs. */
+.pc-month {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--pc-text-secondary);
+}
+
+.pc-month input,
+.pc-month button {
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 8px;
+  border: 1px solid var(--pc-border-strong);
+  border-radius: 5px;
+  background: var(--pc-surface-card);
+  color: inherit;
+}
+
+.pc-month button { cursor: pointer; }
+
+.pc-month button:hover {
+  color: var(--pc-intent-primary);
+  border-color: var(--pc-intent-primary);
+}
+
+.pc-month input:focus,
+.pc-month button:focus-visible {
+  outline: 2px solid var(--pc-intent-primary);
+  outline-offset: 1px;
+}

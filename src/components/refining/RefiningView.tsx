@@ -2,6 +2,8 @@
 
 import { useLocale } from '@/lib/i18n/provider'
 import { Page, Section, Empty, Signed, weight, ledger, Frame } from '@/components/ledger/Ledger'
+import { ReceiveRow } from './ReceiveRow'
+import styles from './Refining.module.css'
 
 export type LotRow = {
   lotId: string
@@ -21,6 +23,20 @@ export type ShareRow = {
   assayWeightGram: number
   sharePct: number
   receivedGram: number
+}
+
+/** What an owner put in, less what has come back. */
+function owedBy(s: ShareRow): number {
+  return Math.max(0, Math.round((s.assayWeightGram - s.receivedGram) * 10000) / 10000)
+}
+
+/**
+ * Gold can only be received once the refinery has weighed the lot, and a closed
+ * lot is closed. The database refuses the rest; this only avoids offering a
+ * control that would be refused.
+ */
+function canReceive(status: string): boolean {
+  return status === 'ASSAYED' || status === 'RECEIVED'
 }
 
 export function RefiningView({ lots, shares }: { lots: LotRow[]; shares: ShareRow[] }) {
@@ -72,6 +88,8 @@ export function RefiningView({ lots, shares }: { lots: LotRow[]; shares: ShareRo
                     <th className={ledger.num}>{t('refining.weight')}</th>
                     <th className={ledger.num}>{t('refining.share')}</th>
                     <th className={ledger.num}>{t('refining.received')}</th>
+                    <th className={ledger.num}>{t('refining.owed')}</th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
@@ -81,6 +99,21 @@ export function RefiningView({ lots, shares }: { lots: LotRow[]; shares: ShareRo
                       <td className={ledger.num}>{weight.format(s.assayWeightGram)}</td>
                       <td className={ledger.num}>{s.sharePct.toFixed(1)}%</td>
                       <td className={ledger.num}>{weight.format(s.receivedGram)}</td>
+                      {/* What is still out. A lot cannot close while any owner
+                          is owed metal, so this is the figure the screen is
+                          read for. */}
+                      <td className={`${ledger.num} ${owedBy(s) > 0 ? styles.owed : ledger.muted}`}>
+                        {owedBy(s) > 0 ? weight.format(owedBy(s)) : '—'}
+                      </td>
+                      <td>
+                        {canReceive(l.status) && (
+                          <ReceiveRow
+                            lotId={l.lotId}
+                            ownerCode={s.ownerCode}
+                            owed={owedBy(s)}
+                          />
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
