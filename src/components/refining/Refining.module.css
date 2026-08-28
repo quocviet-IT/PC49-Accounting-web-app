@@ -67,3 +67,14 @@
 /* What an owner is still owed. The lot cannot close while this is not zero, so
    it is the figure the whole screen is read for. */
 .owed { color: var(--pc-intent-warning); }
+
+.owner { width: 84px; }
+
+/* The lot list gains a column of controls, so it needs room to breathe. */
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}

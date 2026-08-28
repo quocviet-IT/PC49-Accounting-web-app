@@ -124,3 +124,61 @@ export async function stageFile(input: unknown): Promise<StageResult> {
   revalidatePath('/import')
   return { ok: true, batchId: batch.id, total: rows.length, valid, rejected }
 }
+
+const expectedSchema = z.object({
+  asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'a figure belongs to a date'),
+  metric: z.enum(['INVENTORY_GRAM', 'CASH_BALANCE', 'LEDGER_DEBIT', 'LEDGER_CREDIT']),
+  metricKey: z.string().trim().min(1, 'which gold type or which account?'),
+  expected: z.number().refine(Number.isFinite, 'that is not a number'),
+  sourceNote: z.string().trim().max(200).nullable().optional(),
+})
+
+export type ExpectedResult = { ok: true } | { ok: false; message: string }
+
+/**
+ * States what the spreadsheet says a figure closed at.
+ *
+ * This is the half of the reconciliation the loader cannot work out for itself,
+ * and until now it could only be written in SQL — so the comparison existed and
+ * nobody could set it up. Recorded before the detail is loaded, which is the
+ * whole point: the system is then asked whether the detail adds up to it,
+ * rather than being trusted to have got there.
+ */
+export async function setExpectedFigure(input: unknown): Promise<ExpectedResult> {
+  const parsed = expectedSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Invalid figure' }
+  }
+  const supabase = await createServerSupabase()
+  const { error } = await supabase.from('import_expected_figure').upsert({
+    as_of: parsed.data.asOf,
+    metric: parsed.data.metric,
+    metric_key: parsed.data.metricKey,
+    expected: parsed.data.expected,
+    source_note: parsed.data.sourceNote ?? null,
+  }, { onConflict: 'as_of,metric,metric_key' })
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/import')
+  return { ok: true }
+}
+
+/** Removes a figure somebody stated by mistake. */
+export async function clearExpectedFigure(input: unknown): Promise<ExpectedResult> {
+  const parsed = z.object({
+    asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    metric: z.string().min(1),
+    metricKey: z.string().min(1),
+  }).safeParse(input)
+  if (!parsed.success) return { ok: false, message: 'Which figure?' }
+
+  const supabase = await createServerSupabase()
+  const { error } = await supabase.from('import_expected_figure').delete()
+    .eq('as_of', parsed.data.asOf)
+    .eq('metric', parsed.data.metric)
+    .eq('metric_key', parsed.data.metricKey)
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/import')
+  return { ok: true }
+}

@@ -1,4 +1,5 @@
 import { RefiningView, type LotRow, type ShareRow } from '@/components/refining/RefiningView'
+import type { GoldOption } from '@/components/refining/LotLifecycle'
 import { Forbidden } from '@/components/Forbidden'
 import { getCurrentUser } from '@/lib/auth/currentUser'
 import { can } from '@/lib/auth/roles'
@@ -12,12 +13,14 @@ export default async function RefiningPage() {
   }
 
   const supabase = await createServerSupabase()
-  const [summary, share] = await Promise.all([
+  const [summary, share, types] = await Promise.all([
     supabase.from('v_refining_lot_summary')
       .select('lot_id, lot_code, status, sent_date, assay_date, received_date, total_assay_gram, spot_variance_per_gram, spot_variance_value')
       .order('sent_date', { ascending: false }),
     supabase.from('v_refining_owner_share')
       .select('lot_id, owner_code, assay_weight_gram, share_pct, received_gram'),
+    supabase.from('gold_type').select('code, name_vi, name_en')
+      .eq('is_active', true).order('sort_order'),
   ])
 
   const lots: LotRow[] = (summary.data ?? []).map((r: Record<string, unknown>) => ({
@@ -40,5 +43,10 @@ export default async function RefiningPage() {
     receivedGram: Number(r.received_gram ?? 0),
   }))
 
-  return <RefiningView lots={lots} shares={shares} />
+  const goldTypes: GoldOption[] = (types.data ?? []).map(
+    (g: { code: string; name_vi: string; name_en: string }) => ({
+      code: g.code, nameVi: g.name_vi, nameEn: g.name_en,
+    }))
+
+  return <RefiningView lots={lots} shares={shares} goldTypes={goldTypes} />
 }

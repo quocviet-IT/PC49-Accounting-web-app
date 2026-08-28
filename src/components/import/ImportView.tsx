@@ -7,6 +7,7 @@ import type { MessageKey } from '@/lib/i18n'
 import { Page, Section, Empty, money, weight, ledger, Frame } from '@/components/ledger/Ledger'
 import { commitBatch, withdrawBatch } from '@/app/(app)/import/actions'
 import { StageFile } from './StageFile'
+import { StateFigure } from './StateFigure'
 import styles from './ImportView.module.css'
 
 export type Batch = {
@@ -219,6 +220,7 @@ export function ImportView({
           <input id="asOf" name="asOf" type="date" defaultValue={asOf} />
           {selected && <input type="hidden" name="batch" value={selected.id} />}
           <button type="submit" className={styles.quiet}>{t('imp.apply')}</button>
+          <StateFigure asOf={asOf} />
         </form>
 
         {recon.length === 0 ? (

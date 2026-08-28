@@ -30,25 +30,6 @@ const browser = await chromium.launch()
 let lotId = null
 
 try {
-  // A lot shared with a partner, already assayed: two owners, so the check can
-  // see that a receipt for one does not settle the other.
-  const lot = await db.query(
-    `INSERT INTO pc49.refining_lot
-       (lot_code, status, refinery_name, sent_date, assay_date,
-        spot_gold_per_oz_sent, spot_gold_per_oz_assay, fee_pct_gold)
-     VALUES ($1, 'ASSAYED', 'Verify Refinery', $2, $3, 4800, 4890, 0.5)
-     RETURNING id`, [LOT, SENT, ASSAYED])
-  lotId = lot.rows[0].id
-
-  await db.query(
-    // pure_weight_gram is generated from the gross weight and the purity, so it
-    // is not written here.
-    `INSERT INTO pc49.refining_lot_line
-       (lot_id, seq, owner_code, gold_type_code, gross_weight_gram, gold_pct,
-        assay_weight_gram)
-     VALUES ($1, 1, 'PC49', 'SG', 600, 0.75, 600),
-            ($1, 2, 'MH',   'SG', 400, 0.75, 400)`, [lotId])
-
   const page = await browser.newPage()
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('input[autocomplete="email"]', 'gsus@pc49.test')
@@ -57,6 +38,42 @@ try {
   await page.waitForURL(`${BASE}/`, { timeout: 20000 })
 
   await page.goto(`${BASE}/refining`, { waitUntil: 'networkidle' })
+
+  // Open the lot from the screen. Until this existed, no lot could be started
+  // at all and the rest of the module had nothing to act on.
+  await page.locator('button', { hasText: 'Mở lô mới' }).first().click()
+  await page.getByLabel('Mã lô', { exact: true }).fill(LOT)
+  await page.getByLabel('Nhà máy', { exact: true }).fill('Verify Refinery')
+  await page.locator('button', { hasText: 'Lưu' }).first().click()
+  await page.waitForTimeout(2500)
+
+  const made = await db.query(
+    `SELECT id, status::text AS s FROM pc49.refining_lot WHERE lot_code = $1`, [LOT])
+  check('a lot can be opened from the screen', made.rows[0]?.s === 'DRAFT',
+    made.rows[0]?.s ?? '(no lot)')
+  lotId = made.rows[0]?.id
+
+  // Two owners on one shipment: PC49's metal and a partner's travel together.
+  await db.query(
+    // pure_weight_gram is generated from the gross weight and the purity.
+    `INSERT INTO pc49.refining_lot_line
+       (lot_id, seq, owner_code, gold_type_code, gross_weight_gram, gold_pct,
+        assay_weight_gram)
+     VALUES ($1, 1, 'PC49', 'SG', 600, 0.75, 600),
+            ($1, 2, 'MH',   'SG', 400, 0.75, 400)`, [lotId])
+
+  // Send it, then record the assay — one stage at a time, which the database
+  // enforces and the screen only offers.
+  await db.query(
+    `UPDATE pc49.refining_lot
+        SET status = 'SENT', sent_date = $2, spot_gold_per_oz_sent = 4800
+      WHERE id = $1`, [lotId, SENT])
+  await db.query(
+    `UPDATE pc49.refining_lot
+        SET status = 'ASSAYED', assay_date = $2, spot_gold_per_oz_assay = 4890
+      WHERE id = $1`, [lotId, ASSAYED])
+
+  await page.reload({ waitUntil: 'networkidle' })
   const body = (await page.locator('body').textContent()) ?? ''
   check('the lot is listed with its owners', body.includes(LOT) && body.includes('MH'))
   check('and says what each owner is still owed',
@@ -110,6 +127,24 @@ try {
       [draft.rows[0].id])
   } catch (e) { tooEarly = /has not been assayed/.test(String(e.message)) }
   check('a receipt before the assay is refused', tooEarly)
+
+  let skipped = false
+  try {
+    const draft2 = await db.query(
+      `INSERT INTO pc49.refining_lot (lot_code, status) VALUES ($1, 'DRAFT') RETURNING id`,
+      [`${LOT}.C`])
+    await db.query(`UPDATE pc49.refining_lot SET status = 'ASSAYED' WHERE id = $1`,
+      [draft2.rows[0].id])
+  } catch (e) { skipped = /one stage at a time/.test(String(e.message)) }
+  check('a lot cannot skip a stage', skipped)
+
+  // Closing while a partner is still owed metal is what turns "closed" into a
+  // claim somebody can check.
+  let owing = false
+  try {
+    await db.query(`UPDATE pc49.refining_lot SET status = 'CLOSED' WHERE id = $1`, [lotId])
+  } catch (e) { owing = /still owes metal to MH/.test(String(e.message)) }
+  check('a lot will not close while a partner is still owed', owing)
 } finally {
   await browser.close()
   // The client's database is not a scratch pad.

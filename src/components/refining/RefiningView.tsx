@@ -3,6 +3,7 @@
 import { useLocale } from '@/lib/i18n/provider'
 import { Page, Section, Empty, Signed, weight, ledger, Frame } from '@/components/ledger/Ledger'
 import { ReceiveRow } from './ReceiveRow'
+import { AddLine, AdvanceLot, NewLot, type GoldOption } from './LotLifecycle'
 import styles from './Refining.module.css'
 
 export type LotRow = {
@@ -39,12 +40,26 @@ function canReceive(status: string): boolean {
   return status === 'ASSAYED' || status === 'RECEIVED'
 }
 
-export function RefiningView({ lots, shares }: { lots: LotRow[]; shares: ShareRow[] }) {
+export function RefiningView({
+  lots, shares, goldTypes,
+}: { lots: LotRow[]; shares: ShareRow[]; goldTypes: GoldOption[] }) {
   const { t } = useLocale()
-  if (lots.length === 0) return <Page titleKey="refining.title"><Empty /></Page>
+
+  // An empty screen still has to offer the way in. This used to return early
+  // with nothing but "no data", which meant a system with no lots yet could
+  // never open its first one.
+  if (lots.length === 0) {
+    return (
+      <Page titleKey="refining.title">
+        <div className={styles.actions}><NewLot /></div>
+        <Empty />
+      </Page>
+    )
+  }
 
   return (
     <Page titleKey="refining.title">
+      <div className={styles.actions}><NewLot /></div>
       <Section>
         <Frame>
 <table className={ledger.table}>
@@ -80,6 +95,10 @@ export function RefiningView({ lots, shares }: { lots: LotRow[]; shares: ShareRo
         return (
           <Section key={`${l.lotId}-owners`}>
             <h2 className={ledger.sectionTitle}>{l.lotCode} · {t('refining.owner')}</h2>
+            <div className={styles.actions}>
+              <AdvanceLot lotId={l.lotId} status={l.status} />
+              {l.status === 'DRAFT' && <AddLine lotId={l.lotId} goldTypes={goldTypes} />}
+            </div>
             <Frame>
 <table className={ledger.table}>
                 <thead>

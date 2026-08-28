@@ -51,15 +51,6 @@ try {
     Number(counts.rows[0].valid_count) === 2 && Number(counts.rows[0].rejected_count) === 2,
     `${counts.rows[0].valid_count} good, ${counts.rows[0].rejected_count} turned back`)
 
-  // What the source says this date closed at. PT agrees with what is being
-  // loaded; SG deliberately does not, so a real difference has to show.
-  await db.query(
-    `INSERT INTO pc49.import_expected_figure (as_of, metric, metric_key, expected, source_note)
-     VALUES ($1, 'INVENTORY_GRAM', 'PT', 120, 'verify-import'),
-            ($1, 'INVENTORY_GRAM', 'SG', 95,  'verify-import')
-     ON CONFLICT (as_of, metric, metric_key) DO UPDATE SET expected = excluded.expected`,
-    [AS_OF])
-
   const page = await browser.newPage()
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
   await page.fill('input[autocomplete="email"]', 'kt@pc49.test')
@@ -73,6 +64,29 @@ try {
   const hub = (await page.locator('body').textContent()) ?? ''
   check('the accountant reaches the import screen from settings',
     hub.includes('Nạp dữ liệu'))
+
+  // What the source says this date closed at, stated from the screen. PT agrees
+  // with what is being loaded; SG deliberately does not, so a real difference
+  // has to show. Until this control existed the comparison could only be set up
+  // in SQL — the reconciliation was testable and unusable.
+  await page.goto(`${BASE}/import?asOf=${AS_OF}`, { waitUntil: 'networkidle' })
+  // Opened once: the panel stays open after a save, which is right — figures
+  // are stated several at a time, from one sheet.
+  await page.locator('button', { hasText: 'Khai con số bảng tính' }).first().click()
+  for (const [key, figure] of [['PT', '120'], ['SG', '95']]) {
+    await page.getByLabel('Mã', { exact: true }).fill(key)
+    await page.getByLabel('Bảng tính', { exact: true }).fill(figure)
+    await page.getByLabel('Lấy từ sheet nào', { exact: true }).fill('verify-import')
+    await page.getByRole('button', { name: 'Lưu', exact: true }).click()
+    await page.waitForTimeout(1800)
+  }
+  const stated = await db.query(
+    `SELECT metric_key AS k, expected::text AS e FROM pc49.import_expected_figure
+      WHERE as_of = $1 ORDER BY metric_key`, [AS_OF])
+  check('the expected figures can be stated from the screen',
+    stated.rows.length === 2 && Number(stated.rows[0].e) === 120
+      && Number(stated.rows[1].e) === 95,
+    stated.rows.map((r) => `${r.k}=${r.e}`).join(' '))
 
   // The loader takes a file now, rather than only SQL. Staging one here proves
   // the front door works and that a bad row is judged on the way in.

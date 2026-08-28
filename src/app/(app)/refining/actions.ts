@@ -46,3 +46,138 @@ export async function recordReceipt(input: unknown): Promise<ReceiptResult> {
   revalidatePath('/refining')
   return { ok: true }
 }
+
+const lotSchema = z.object({
+  lotCode: z.string().trim().min(1, 'a lot needs a code').max(40),
+  refineryName: z.string().trim().max(120).nullable().optional(),
+  note: z.string().trim().max(500).nullable().optional(),
+})
+
+export type LotResult = { ok: true; lotId: string } | { ok: false; message: string }
+
+/**
+ * Opens a lot.
+ *
+ * It starts as a draft with nothing in it: what went into a shipment is
+ * assembled line by line, one owner and one description at a time, exactly as
+ * the source's own sheet does it. Nothing is frozen until the lot is sent.
+ */
+export async function createLot(input: unknown): Promise<LotResult> {
+  const parsed = lotSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Invalid lot' }
+  }
+  const supabase = await createServerSupabase()
+  const { data, error } = await supabase
+    .from('refining_lot')
+    .insert({
+      lot_code: parsed.data.lotCode,
+      refinery_name: parsed.data.refineryName ?? null,
+      note: parsed.data.note ?? null,
+    })
+    .select('id')
+    .single()
+  if (error) {
+    // A duplicate code is the usual mistake and the message from Postgres is
+    // not one the accountant can act on.
+    if (error.code === '23505') {
+      return { ok: false, message: `lot ${parsed.data.lotCode} already exists` }
+    }
+    return { ok: false, message: error.message }
+  }
+  revalidatePath('/refining')
+  return { ok: true, lotId: data.id }
+}
+
+const lineSchema = z.object({
+  lotId: z.string().uuid(),
+  ownerCode: z.string().trim().min(1, 'every line belongs to somebody'),
+  goldTypeCode: z.string().trim().min(1),
+  sourceDesc: z.string().trim().max(200).nullable().optional(),
+  grossWeightGram: z.number().positive('a line with no weight is not a line'),
+  goldPct: z.number().positive().max(1, 'purity is a fraction, so 0.75 rather than 75'),
+  assayWeightGram: z.number().positive().nullable().optional(),
+})
+
+export type LineResult = { ok: true } | { ok: false; message: string }
+
+/**
+ * Adds one line to a lot.
+ *
+ * The owner sits on the line rather than on the lot, because a shipment is
+ * pooled: PC49's metal and a partner's travel together and come back
+ * separately. Purity is entered as a fraction because that is what the
+ * generated pure weight multiplies by, and 75 where 0.75 was meant would be a
+ * hundredfold error nothing downstream would question.
+ */
+export async function addLotLine(input: unknown): Promise<LineResult> {
+  const parsed = lineSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Invalid line' }
+  }
+  const supabase = await createServerSupabase()
+
+  const { data: existing } = await supabase
+    .from('refining_lot_line').select('seq').eq('lot_id', parsed.data.lotId)
+  const seq = Math.max(0, ...(existing ?? []).map((r: { seq: number }) => r.seq)) + 1
+
+  const { error } = await supabase.from('refining_lot_line').insert({
+    lot_id: parsed.data.lotId,
+    seq,
+    owner_code: parsed.data.ownerCode,
+    gold_type_code: parsed.data.goldTypeCode,
+    source_desc: parsed.data.sourceDesc ?? null,
+    gross_weight_gram: parsed.data.grossWeightGram,
+    gold_pct: parsed.data.goldPct,
+    assay_weight_gram: parsed.data.assayWeightGram ?? null,
+  })
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/refining')
+  return { ok: true }
+}
+
+const advanceSchema = z.object({
+  lotId: z.string().uuid(),
+  to: z.enum(['SENT', 'ASSAYED', 'CLOSED']),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  spotGoldPerOz: z.number().positive().nullable().optional(),
+  spotPtPerOz: z.number().positive().nullable().optional(),
+})
+
+/**
+ * Moves a lot on one stage.
+ *
+ * The rules belong to the database and stay there: one stage at a time, a send
+ * date and a spot price before it can be sent, an assay date before it can be
+ * assayed, and no closing while any owner is still owed metal. RECEIVED is not
+ * offered here because it is not a decision — recording the first receipt is
+ * what moves a lot into it.
+ */
+export async function advanceLot(input: unknown): Promise<LineResult> {
+  const parsed = advanceSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Invalid request' }
+  }
+  const { lotId, to, date, spotGoldPerOz, spotPtPerOz } = parsed.data
+  const supabase = await createServerSupabase()
+
+  const change: Record<string, unknown> = { status: to }
+  if (to === 'SENT') {
+    change.sent_date = date
+    change.spot_gold_per_oz_sent = spotGoldPerOz ?? null
+    change.spot_pt_per_oz_sent = spotPtPerOz ?? null
+  }
+  if (to === 'ASSAYED') {
+    change.assay_date = date
+    change.spot_gold_per_oz_assay = spotGoldPerOz ?? null
+  }
+
+  const { error } = await supabase.from('refining_lot').update(change).eq('id', lotId)
+  // The database's refusals name the lot and say what is missing, so they are
+  // passed on as they are.
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/refining')
+  return { ok: true }
+}
