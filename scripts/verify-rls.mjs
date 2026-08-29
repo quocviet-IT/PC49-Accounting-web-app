@@ -4,16 +4,26 @@
 // Run: npm run verify:rls
 import { createClient } from '@supabase/supabase-js'
 import pg from 'pg'
+import { passwordFor } from './support/accounts.mjs'
+
+/** Resolved before anything is launched, so a missing password is
+ *  reported as a missing password rather than as a failed sign-in. */
+const PASSWORD = {
+  ADMIN: passwordFor('ADMIN'),
+  GS_US: passwordFor('GS_US'),
+  KT: passwordFor('KT'),
+  OC: passwordFor('OC'),
+}
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const pub = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const secret = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 const USERS = [
-  { email: 'kt@pc49.test',    password: 'pc49-test-KT-2026',    role: 'KT' },
-  { email: 'gsus@pc49.test',  password: 'pc49-test-GSUS-2026',  role: 'GS_US' },
-  { email: 'oc@pc49.test',    password: 'pc49-test-OC-2026',    role: 'OC' },
-  { email: 'admin@pc49.test', password: 'pc49-test-ADMIN-2026', role: 'ADMIN' },
+  { email: 'kt@pc49.test',    password: PASSWORD.KT,    role: 'KT' },
+  { email: 'gsus@pc49.test',  password: PASSWORD.GS_US,  role: 'GS_US' },
+  { email: 'oc@pc49.test',    password: PASSWORD.OC,    role: 'OC' },
+  { email: 'admin@pc49.test', password: PASSWORD.ADMIN, role: 'ADMIN' },
 ]
 
 let failures = 0
@@ -96,7 +106,7 @@ await admin49.end()
   await db.query('UPDATE pc49.app_user SET suspended_at = now() WHERE id = $1', [kt.id])
 
   const sb = createClient(url, pub, { auth: { persistSession: false } })
-  await sb.auth.signInWithPassword({ email: 'kt@pc49.test', password: 'pc49-test-KT-2026' })
+  await sb.auth.signInWithPassword({ email: 'kt@pc49.test', password: PASSWORD.KT })
   const gold = await sb.schema('pc49').from('gold_type').select('code')
   check('a suspended user loses access to reference data',
     !gold.error && (gold.data?.length ?? 0) === 0,

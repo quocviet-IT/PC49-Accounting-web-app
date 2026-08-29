@@ -4,6 +4,13 @@
 import { chromium } from 'playwright'
 import { openPage } from './support/page.mjs'
 import pg from 'pg'
+import { passwordFor } from './support/accounts.mjs'
+
+/** Resolved before anything is launched, so a missing password is
+ *  reported as a missing password rather than as a failed sign-in. */
+const PASSWORD = {
+  KT: passwordFor('KT'),
+}
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const DAY = process.env.PC49_GRID_DAY ?? '2026-03-16'   // a clean day per run
@@ -20,7 +27,7 @@ const page = await openPage(ctx)
 
 await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await page.fill('input[autocomplete="email"]', 'kt@pc49.test')
-await page.fill('input[autocomplete="current-password"]', 'pc49-test-KT-2026')
+await page.fill('input[autocomplete="current-password"]', PASSWORD.KT)
 await page.click('button[type="submit"]')
 await page.waitForURL(`${BASE}/`, { timeout: 60000 })
 

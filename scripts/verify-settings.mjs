@@ -6,6 +6,16 @@ import { chromium } from 'playwright'
 import { clickUntil, openPage } from './support/page.mjs'
 import pg from 'pg'
 import { untilGone, untilRowIs } from './support/until.mjs'
+import { passwordFor } from './support/accounts.mjs'
+
+/** Resolved before anything is launched, so a missing password is
+ *  reported as a missing password rather than as a failed sign-in. */
+const PASSWORD = {
+  ADMIN: passwordFor('ADMIN'),
+  GS_US: passwordFor('GS_US'),
+  KT: passwordFor('KT'),
+  OC: passwordFor('OC'),
+}
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const url = process.env.SUPABASE_DB_URL
@@ -53,7 +63,7 @@ try {
   // ---- The accountant types the day's prices -------------------------------
   const ctx = await browser.newContext()
   const page = await openPage(ctx)
-  await signIn(page, 'kt@pc49.test', 'pc49-test-KT-2026')
+  await signIn(page, 'kt@pc49.test', PASSWORD.KT)
 
   // The navigation is the sidebar now, not the header bar; the header carries
   // only the name of the page you are on. A group is closed until it is opened
@@ -148,7 +158,7 @@ try {
   // ---- The supervisor closes a month --------------------------------------
   const gsCtx = await browser.newContext()
   const gs = await openPage(gsCtx)
-  await signIn(gs, 'gsus@pc49.test', 'pc49-test-GSUS-2026')
+  await signIn(gs, 'gsus@pc49.test', PASSWORD.GS_US)
 
   const gsMenu = (await gs.locator('aside').first().textContent()) ?? ''
   check('the supervisor is offered settings', gsMenu.includes('Cấu hình'))
@@ -209,7 +219,7 @@ try {
   // ---- The owner is offered none of it -------------------------------------
   const ocCtx = await browser.newContext()
   const oc = await openPage(ocCtx)
-  await signIn(oc, 'oc@pc49.test', 'pc49-test-OC-2026')
+  await signIn(oc, 'oc@pc49.test', PASSWORD.OC)
   for (const path of ['/prices', '/settings', '/settings/periods', '/settings/reference']) {
     await oc.goto(`${BASE}${path}`, { waitUntil: 'networkidle' })
     const body = (await oc.locator('body').textContent()) ?? ''
@@ -220,7 +230,7 @@ try {
   // ---- Reference data is the administrator's -------------------------------
   const adCtx = await browser.newContext()
   const ad = await openPage(adCtx)
-  await signIn(ad, 'admin@pc49.test', 'pc49-test-ADMIN-2026')
+  await signIn(ad, 'admin@pc49.test', PASSWORD.ADMIN)
   const adHub = await ad.goto(`${BASE}/settings`, { waitUntil: 'networkidle' })
   const adText = (await ad.locator('body').textContent()) ?? ''
   check('the administrator is offered all three cards',

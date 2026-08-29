@@ -6,6 +6,13 @@
 import { chromium } from 'playwright'
 import pg from 'pg'
 import { openPage, signIn } from './support/page.mjs'
+import { passwordFor } from './support/accounts.mjs'
+
+/** Resolved before anything is launched, so a missing password is
+ *  reported as a missing password rather than as a failed sign-in. */
+const PASSWORD = {
+  KT: passwordFor('KT'),
+}
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const url = process.env.SUPABASE_DB_URL
@@ -48,7 +55,7 @@ try {
   await post('2019-02-20', '642', '1111', 250, 'verify-reports fee')
 
   const page = await openPage(browser)
-  await signIn(page, BASE, 'kt@pc49.test', 'pc49-test-KT-2026')
+  await signIn(page, BASE, 'kt@pc49.test', PASSWORD.KT)
 
   // ---- The catalogue -------------------------------------------------------
   await page.goto(`${BASE}/reports`, { waitUntil: 'networkidle' })

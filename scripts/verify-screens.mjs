@@ -2,6 +2,14 @@
 // that a role without permission is refused. Run with the dev server up.
 import { chromium } from 'playwright'
 import { openPage } from './support/page.mjs'
+import { passwordFor } from './support/accounts.mjs'
+
+/** Resolved before anything is launched, so a missing password is
+ *  reported as a missing password rather than as a failed sign-in. */
+const PASSWORD = {
+  KT: passwordFor('KT'),
+  OC: passwordFor('OC'),
+}
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 let failures = 0
@@ -24,7 +32,7 @@ const browser = await chromium.launch()
 {
   const ctx = await browser.newContext()
   const page = await openPage(ctx)
-  await signIn(page, 'kt@pc49.test', 'pc49-test-KT-2026')
+  await signIn(page, 'kt@pc49.test', PASSWORD.KT)
 
   for (const [path, heading] of [
     ['/', 'Tổng quan'],
@@ -51,7 +59,7 @@ const browser = await chromium.launch()
 {
   const ctx = await browser.newContext()
   const page = await openPage(ctx)
-  await signIn(page, 'oc@pc49.test', 'pc49-test-OC-2026')
+  await signIn(page, 'oc@pc49.test', PASSWORD.OC)
 
   await page.goto(`${BASE}/inventory`, { waitUntil: 'networkidle' })
   const invOk = ((await page.locator('h1').first().textContent()) ?? '').includes('Tồn kho')

@@ -8,6 +8,14 @@ import pg from 'pg'
 import { createClient } from '@supabase/supabase-js'
 import { openPage, signIn } from './support/page.mjs'
 import { until, untilRowIs } from './support/until.mjs'
+import { passwordFor } from './support/accounts.mjs'
+
+/** Resolved before anything is launched, so a missing password is
+ *  reported as a missing password rather than as a failed sign-in. */
+const PASSWORD = {
+  ADMIN: passwordFor('ADMIN'),
+  KT: passwordFor('KT'),
+}
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const url = process.env.SUPABASE_DB_URL
@@ -42,7 +50,7 @@ try {
   // ---- The accountant hits something and says so ---------------------------
   const ktCtx = await browser.newContext()
   const kt = await openPage(ktCtx)
-  await signIn(kt, BASE, 'kt@pc49.test', 'pc49-test-KT-2026')
+  await signIn(kt, BASE, 'kt@pc49.test', PASSWORD.KT)
 
   // From a real screen, with a real query string on it — that is the part that
   // makes a report reproducible.
@@ -153,7 +161,7 @@ try {
   // ---- The administrator triages -------------------------------------------
   const adCtx = await browser.newContext()
   const ad = await openPage(adCtx)
-  await signIn(ad, BASE, 'admin@pc49.test', 'pc49-test-ADMIN-2026')
+  await signIn(ad, BASE, 'admin@pc49.test', PASSWORD.ADMIN)
   await ad.goto(`${BASE}/feedback`, { waitUntil: 'networkidle' })
 
   const queue = (await ad.locator('body').textContent()) ?? ''

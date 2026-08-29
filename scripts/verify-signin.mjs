@@ -3,20 +3,30 @@
 // Run with the dev server already running: npm run verify:signin
 import { chromium } from 'playwright'
 import { openPage } from './support/page.mjs'
+import { passwordFor } from './support/accounts.mjs'
+
+/** Resolved before anything is launched, so a missing password is
+ *  reported as a missing password rather than as a failed sign-in. */
+const PASSWORD = {
+  ADMIN: passwordFor('ADMIN'),
+  GS_US: passwordFor('GS_US'),
+  KT: passwordFor('KT'),
+  OC: passwordFor('OC'),
+}
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const USERS = [
-  { email: 'kt@pc49.test',    password: 'pc49-test-KT-2026',    role: 'KT',
+  { email: 'kt@pc49.test',    password: PASSWORD.KT,    role: 'KT',
     expect: ['Tổng quan', 'Vàng', 'Dòng tiền', 'Sổ sách', 'Báo lỗi', 'Cấu hình'] },
-  { email: 'gsus@pc49.test',  password: 'pc49-test-GSUS-2026',  role: 'GS_US',
+  { email: 'gsus@pc49.test',  password: PASSWORD.GS_US,  role: 'GS_US',
     // No money group: the supervisor reads reports and closes periods, and
     // neither the cash book nor the conversion screen is theirs.
     expect: ['Tổng quan', 'Vàng', 'Sổ sách', 'Báo lỗi', 'Cấu hình'] },
-  { email: 'oc@pc49.test',    password: 'pc49-test-OC-2026',    role: 'OC',
+  { email: 'oc@pc49.test',    password: PASSWORD.OC,    role: 'OC',
     // Two groups, each holding the one read-only screen the owner may open —
     // and reporting a problem, which every role gets.
     expect: ['Tổng quan', 'Vàng', 'Sổ sách', 'Báo lỗi'] },
-  { email: 'admin@pc49.test', password: 'pc49-test-ADMIN-2026', role: 'ADMIN',
+  { email: 'admin@pc49.test', password: PASSWORD.ADMIN, role: 'ADMIN',
     expect: ['Tổng quan', 'Vàng', 'Dòng tiền', 'Sổ sách', 'Báo lỗi', 'Cấu hình'] },
 ]
 

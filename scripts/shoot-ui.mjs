@@ -12,6 +12,13 @@ import { chromium } from 'playwright'
 import pg from 'pg'
 import { mkdirSync, readdirSync } from 'node:fs'
 import { openPage, signIn } from './support/page.mjs'
+import { passwordFor } from './support/accounts.mjs'
+
+/** Resolved before anything is launched, so a missing password is
+ *  reported as a missing password rather than as a failed sign-in. */
+const PASSWORD = {
+  ADMIN: passwordFor('ADMIN'),
+}
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const OUT = 'ui-shots'
@@ -83,7 +90,7 @@ for (const theme of ['light', 'dark']) {
     await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
     await page.screenshot({ path: `${OUT}/${prefix}${theme}-login.png` })
 
-    await signIn(page, BASE, 'admin@pc49.test', 'pc49-test-ADMIN-2026')
+    await signIn(page, BASE, 'admin@pc49.test', PASSWORD.ADMIN)
 
     for (const [name, path] of PAGES) {
       await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' })

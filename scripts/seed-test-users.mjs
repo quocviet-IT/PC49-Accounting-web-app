@@ -2,6 +2,7 @@
 // Run: npm run seed:users
 import { createClient } from '@supabase/supabase-js'
 import pg from 'pg'
+import { TEST_ACCOUNTS, passwordFor } from './support/accounts.mjs'
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const secret = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -11,12 +12,11 @@ if (!url || !secret || !dbUrl) {
   process.exit(1)
 }
 
-const USERS = [
-  { email: 'kt@pc49.test',    password: 'pc49-test-KT-2026',    full_name: 'Ke toan VN',    role: 'KT' },
-  { email: 'gsus@pc49.test',  password: 'pc49-test-GSUS-2026',  full_name: 'US Supervisor', role: 'GS_US' },
-  { email: 'oc@pc49.test',    password: 'pc49-test-OC-2026',    full_name: 'Owner',         role: 'OC' },
-  { email: 'admin@pc49.test', password: 'pc49-test-ADMIN-2026', full_name: 'Administrator', role: 'ADMIN' },
-]
+// Read before anything is created, so a missing variable stops the run rather
+// than creating half the accounts.
+const USERS = TEST_ACCOUNTS.map((a) => ({
+  email: a.email, password: passwordFor(a.role), full_name: a.fullName, role: a.role,
+}))
 
 const admin = createClient(url, secret, { auth: { autoRefreshToken: false, persistSession: false } })
 const db = new pg.Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } })
@@ -28,7 +28,13 @@ const byEmail = new Map((existing?.users ?? []).map((u) => [u.email, u]))
 for (const u of USERS) {
   let user = byEmail.get(u.email)
   if (user) {
-    console.log(`exists  ${u.email}`)
+    // The password is set every time, not only on creation. That is what makes
+    // this the way to rotate one: change .env.local, run this, done. Skipping
+    // existing users meant there was no way to change a password at all short
+    // of the Supabase dashboard.
+    const { error } = await admin.auth.admin.updateUserById(user.id, { password: u.password })
+    if (error) { console.error(`FAILED  ${u.email}: ${error.message}`); process.exit(1) }
+    console.log(`updated ${u.email}`)
   } else {
     const { data, error } = await admin.auth.admin.createUser({
       email: u.email, password: u.password, email_confirm: true,
