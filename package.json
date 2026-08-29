@@ -27,7 +27,8 @@
     "verify:refining": "node --env-file=.env.local scripts/verify-refining.mjs",
     "verify:reconcile": "node --env-file=.env.local scripts/verify-reconcile.mjs",
     "verify:reports": "node --env-file=.env.local scripts/verify-reports.mjs",
-    "verify:feedback": "node --env-file=.env.local scripts/verify-feedback.mjs"
+    "verify:feedback": "node --env-file=.env.local scripts/verify-feedback.mjs",
+    "shots": "node --env-file=.env.local scripts/shoot-ui.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",
