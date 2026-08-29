@@ -64,3 +64,6 @@ ui-shots/
 void.png
 report-trial.png
 feedback.png
+
+# vercel CLI output
+vercel-deploy.log
