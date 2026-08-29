@@ -19,6 +19,8 @@ export type ReportRow = {
   reporterRole: string | null
   triageNote: string | null
   createdAt: string
+  /** A link that expires, or null when no picture was sent or it has gone. */
+  screenshotUrl: string | null
   /** Whether this reader filed it, which is what makes the list personal. */
   mine: boolean
 }
@@ -108,6 +110,17 @@ export function FeedbackQueue({
                           report wants is to be looking at what the reporter
                           was looking at. */}
                       <Link href={r.pageUrl}>{r.pageTitle ?? r.pageUrl}</Link>
+                      {r.screenshotUrl && (
+                        <>
+                          <br />
+                          {/* And the page as it was, which the address alone
+                              cannot show: which row was selected, what the
+                              figure read, what was greyed out. */}
+                          <a href={r.screenshotUrl} target="_blank" rel="noreferrer">
+                            {t('fb.shotOnReport')}
+                          </a>
+                        </>
+                      )}
                     </td>
                     <td>
                       {canTriage

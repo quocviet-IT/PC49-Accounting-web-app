@@ -5,6 +5,7 @@
 // Everything this writes is removed at the end. Run with the dev server up.
 import { chromium } from 'playwright'
 import pg from 'pg'
+import { createClient } from '@supabase/supabase-js'
 import { openPage, signIn } from './support/page.mjs'
 import { until, untilRowIs } from './support/until.mjs'
 
@@ -27,6 +28,14 @@ const FILED_FROM = '/prices?date=2019-04-11'
 
 const db = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } })
 await db.connect()
+
+// Files come out through the Storage API, never with SQL: the live database
+// refuses a direct DELETE from storage.objects, and rightly — the row and the
+// object it stands for would go out of step.
+const storage = process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY,
+                 { auth: { persistSession: false } }).storage
+  : null
 const browser = await chromium.launch()
 
 try {
@@ -49,13 +58,31 @@ try {
   const shown = (await kt.locator('.ant-modal').textContent()) ?? ''
   check('the dialog shows which page it will send', shown.includes('Giá vàng'), shown.slice(-40))
 
+  // The picture, before it is sent. Nobody should be attaching something to a
+  // report read by somebody else without seeing what it is.
+  const preview = kt.locator('.ant-modal img')
+  const captured = await until(async () => (await preview.count()) > 0, { timeout: 30000 })
+  check('it takes a picture of the screen and shows it', captured === true)
+  const src = captured ? await preview.getAttribute('src') : ''
+  check('and the picture is a real PNG, not an empty one',
+    (src ?? '').startsWith('data:image/png;base64,') && (src ?? '').length > 5000,
+    `${Math.round((src ?? '').length / 1024)} KB`)
+
+  // The warning has to be readable before Send, not after.
+  check('and says the picture carries customer names and amounts',
+    ((await kt.locator('.ant-modal').textContent()) ?? '').includes('tên khách và số tiền'))
+
   await kt.getByRole('button', { name: 'Gửi', exact: true }).click()
 
   const filed = await untilRowIs(db,
     `SELECT kind::text AS kind, impact::text AS impact, status::text AS status,
-            page_url AS url, page_title AS title, reporter_role::text AS role
+            page_url AS url, page_title AS title, reporter_role::text AS role,
+            screenshot_path AS shot
        FROM pc49.feedback_report WHERE description = $1`, [SAID],
-    (r) => r.status === 'NEW')
+    // Waited for the picture too, not just the row. The report lands first and
+    // the screenshot is linked a moment later, so a poll that stops at the row
+    // reads a null path and reports a picture that is on its way as missing.
+    (r) => r.status === 'NEW' && r.shot !== null)
   check('the report reaches the queue', filed !== null, filed?.status ?? '(nothing filed)')
   check('with the kind and how badly it bites',
     filed?.kind === 'WRONG_NUMBER' && filed?.impact === 'BLOCKING',
@@ -71,20 +98,44 @@ try {
 
   // Waited for, not read once: the row lands when the server action commits,
   // and the browser repaints a moment after that.
+  // `<report id>/<uuid>.png` is the only shape the storage policy accepts, and
+  // the first segment being the report is what stops one person writing into
+  // another's.
+  check('the picture is stored under the report it belongs to',
+    /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.png$/.test(filed?.shot ?? ''),
+    filed?.shot ?? '(no picture)')
+
   check('the reporter is told it went somewhere',
     await until(async () =>
       ((await kt.locator('.ant-modal').textContent()) ?? '').includes('Đã gửi rồi')))
 
+  const inBucket = await db.query(
+    `SELECT count(*)::int n FROM storage.objects
+      WHERE bucket_id = 'feedback-screenshots' AND name = $1`, [filed?.shot ?? ''])
+  check('and the file is actually in the bucket, not just referenced',
+    inBucket.rows[0].n === 1, `${inBucket.rows[0].n} object(s)`)
+
+  // The rule that stops a filed report being redressed afterwards.
+  let sealed = false
+  try {
+    await db.query(
+      `UPDATE pc49.feedback_report SET screenshot_path = $2 WHERE description = $1`,
+      [SAID, '00000000-0000-0000-0000-000000000000/11111111-1111-4111-8111-111111111111.png'])
+  } catch (e) { sealed = /cannot be replaced or removed/.test(String(e.message)) }
+  check('and cannot be swapped for a different picture afterwards', sealed)
+
   // ---- The reporter can see what happened to it ----------------------------
   // Through the menu, the way somebody following the dialog's advice would.
-  // Scoped to the body: Ant's own corner X carries the same name.
-  await kt.locator('.ant-modal-body').getByRole('button', { name: 'Đóng' }).click()
+  // Scoped to the footer, where the actions live now: Ant's own corner X
+  // carries the same name and would be found first otherwise.
+  await kt.locator('.ant-modal-footer').getByRole('button', { name: 'Đóng' }).click()
   await kt.locator('.ant-modal-wrap').waitFor({ state: 'hidden' })
   await kt.getByRole('link', { name: 'Báo lỗi', exact: true }).click()
   await kt.waitForURL(`${BASE}/feedback`)
   const mine = (await kt.locator('body').textContent()) ?? ''
   check('and can see it afterwards, without being an administrator',
     mine.includes(SAID) && mine.includes('Mới'))
+  check('with a link to the picture they sent', mine.includes('Ảnh màn hình'))
 
   // ---- Somebody else's report is not theirs to read ------------------------
   const other = await db.query(
@@ -175,6 +226,12 @@ try {
     `DELETE FROM pc49.audit_log WHERE entity_type = 'feedback_report'
        AND entity_id IN (SELECT id::text FROM pc49.feedback_report
                           WHERE description LIKE 'verify-feedback:%')`)
+  const files = await db.query(
+    `SELECT screenshot_path AS p FROM pc49.feedback_report
+      WHERE description LIKE 'verify-feedback:%' AND screenshot_path IS NOT NULL`)
+  if (storage && files.rows.length > 0) {
+    await storage.from('feedback-screenshots').remove(files.rows.map((r) => r.p))
+  }
   await db.query(`DELETE FROM pc49.feedback_report WHERE description LIKE 'verify-feedback:%'`)
 
   // Scoped to this run's own rows. A demo dataset or a real report filed by
@@ -184,10 +241,15 @@ try {
               WHERE description LIKE 'verify-feedback:%') AS reports,
             (SELECT count(*)::int FROM pc49.audit_log
               WHERE entity_type = 'feedback_report'
-                AND entity_id NOT IN (SELECT id::text FROM pc49.feedback_report)) AS audits`)
+                AND entity_id NOT IN (SELECT id::text FROM pc49.feedback_report)) AS audits,
+            (SELECT count(*)::int FROM storage.objects
+              WHERE bucket_id = 'feedback-screenshots'
+                AND name NOT IN (SELECT screenshot_path FROM pc49.feedback_report
+                                  WHERE screenshot_path IS NOT NULL)) AS orphans`)
   check('the check cleaned up after itself',
-    left.rows[0].reports === 0 && left.rows[0].audits === 0,
-    `${left.rows[0].reports} reports, ${left.rows[0].audits} audit rows`)
+    left.rows[0].reports === 0 && left.rows[0].audits === 0 && left.rows[0].orphans === 0,
+    `${left.rows[0].reports} reports, ${left.rows[0].audits} audit rows, `
+      + `${left.rows[0].orphans} stray files`)
   await db.end()
 }
 

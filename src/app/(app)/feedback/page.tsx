@@ -22,12 +22,29 @@ export default async function FeedbackPage({
   const supabase = await createServerSupabase()
   let query = supabase
     .from('feedback_report')
-    .select('id, kind, impact, description, status, page_url, page_route, page_title, reporter_role, triage_note, triaged_at, created_at, reporter_id')
+    .select('id, kind, impact, description, status, page_url, page_route, page_title, reporter_role, triage_note, triaged_at, created_at, reporter_id, screenshot_path')
     .order('created_at', { ascending: false })
     .limit(300)
   if (status) query = query.eq('status', status)
 
   const { data } = await query
+
+  // The bucket is private, so a screenshot is reached through a link that
+  // expires rather than by its path. Signed as this reader: the storage policy
+  // refuses one for a report that is not theirs, which is the same answer the
+  // row itself would give.
+  const paths = (data ?? [])
+    .map((r: Record<string, unknown>) => r.screenshot_path as string | null)
+    .filter((p): p is string => Boolean(p))
+  const links = new Map<string, string>()
+  if (paths.length > 0) {
+    const { data: signed } = await supabase.storage
+      .from('feedback-screenshots')
+      .createSignedUrls(paths, 60 * 10)
+    for (const s of signed ?? []) {
+      if (s.signedUrl && s.path) links.set(s.path, s.signedUrl)
+    }
+  }
 
   const rows: ReportRow[] = (data ?? []).map((r: Record<string, unknown>) => ({
     id: r.id as string,
@@ -40,6 +57,7 @@ export default async function FeedbackPage({
     reporterRole: (r.reporter_role as string) ?? null,
     triageNote: (r.triage_note as string) ?? null,
     createdAt: r.created_at as string,
+    screenshotUrl: links.get(r.screenshot_path as string) ?? null,
     mine: r.reporter_id === user.id,
   }))
 

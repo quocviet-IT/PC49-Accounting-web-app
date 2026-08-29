@@ -36,6 +36,33 @@ const SUPABASE_STUB = `
   DO $do$ BEGIN
     CREATE ROLE authenticator;
   EXCEPTION WHEN duplicate_object THEN NULL; END $do$;
+
+  -- Supabase Storage is a service, not part of PostgreSQL, but the two tables
+  -- its policies are written against are ordinary ones. Stubbed to the columns
+  -- the migrations touch, so a bucket definition and a storage policy are
+  -- executed here rather than merely read — a policy referring to a column that
+  -- does not exist, or calling a function that does not, fails the suite
+  -- instead of the deployment.
+  CREATE SCHEMA IF NOT EXISTS storage;
+
+  CREATE TABLE IF NOT EXISTS storage.buckets (
+    id                 text PRIMARY KEY,
+    name               text NOT NULL,
+    public             boolean NOT NULL DEFAULT false,
+    file_size_limit    bigint,
+    allowed_mime_types text[]
+  );
+
+  CREATE TABLE IF NOT EXISTS storage.objects (
+    id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    bucket_id text REFERENCES storage.buckets (id),
+    name      text NOT NULL,
+    owner     uuid,
+    metadata  jsonb
+  );
+  ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+  GRANT USAGE ON SCHEMA storage TO authenticated, anon;
+  GRANT SELECT, INSERT ON storage.objects TO authenticated;
 `
 
 export async function migrationFiles(): Promise<string[]> {
