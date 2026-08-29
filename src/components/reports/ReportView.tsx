@@ -27,6 +27,8 @@ export type StockRow = {
 export type DepositRow = {
   date: string; partner: string | null; gold: string; qty: number; gram: number
   amount: number; settledBy: string | null; settledDate: string | null
+  /** Null when no price was agreed, which is a question rather than a zero. */
+  orderAmount: number | null; paid: number; remaining: number | null
 }
 export type AparRow = {
   partner: string; account: string
@@ -344,9 +346,10 @@ export function ReportView({
             <Frame>
               <table className={ledger.table}>
                 <colgroup>
-                  <col style={{ width: '12%' }} /><col style={{ width: '18%' }} />
-                  <col style={{ width: '12%' }} /><col style={{ width: '14%' }} />
-                  <col style={{ width: '16%' }} /><col style={{ width: '28%' }} />
+                  <col style={{ width: '10%' }} /><col style={{ width: '15%' }} />
+                  <col style={{ width: '8%' }} /><col style={{ width: '9%' }} />
+                  <col style={{ width: '12%' }} /><col style={{ width: '11%' }} />
+                  <col style={{ width: '12%' }} /><col style={{ width: '23%' }} />
                 </colgroup>
                 <thead>
                   <tr>
@@ -354,7 +357,9 @@ export function ReportView({
                     <th>{t('rep.partner')}</th>
                     <th>{t('inv.goldType')}</th>
                     <th className={ledger.num}>{t('inv.gram')}</th>
-                    <th className={ledger.num}>{t('rep.amount')}</th>
+                    <th className={ledger.num}>{t('rep.orderAmount')}</th>
+                    <th className={ledger.num}>{t('rep.paid')}</th>
+                    <th className={ledger.num}>{t('rep.remaining')}</th>
                     <th>{t('rep.settled')}</th>
                   </tr>
                 </thead>
@@ -365,7 +370,20 @@ export function ReportView({
                       <td>{r.partner ?? '—'}</td>
                       <td>{r.gold}</td>
                       <td className={ledger.num}>{weight.format(Math.abs(r.gram))}</td>
-                      <td className={ledger.num}>{money.format(r.amount)}</td>
+                      {/* A dash where no price was agreed. A zero in a money
+                          column is a figure somebody reads out to a customer. */}
+                      <td className={ledger.num}>
+                        {r.orderAmount === null ? '—' : money.format(r.orderAmount)}
+                      </td>
+                      <td className={ledger.num}>{money.format(r.paid)}</td>
+                      {/* What is still owed is the reason anybody opens this
+                          report with a customer at the counter. */}
+                      <td className={ledger.num}>
+                        {r.remaining === null ? '—'
+                          : r.remaining > 0
+                            ? <span className={ledger.out}>{money.format(r.remaining)}</span>
+                            : money.format(r.remaining)}
+                      </td>
                       {/* Outstanding is the state worth seeing, so a deposit
                           nobody has collected against reads loud and a settled
                           one reads quiet. */}

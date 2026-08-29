@@ -28,6 +28,8 @@ export type SavedRow = {
   unit_price: number | null
   amount: number
   remarks: string | null
+  /** How it was settled, in the order it was entered. */
+  payments: { seq: number; amount: number; method: string }[]
 }
 
 type Draft = {
@@ -206,6 +208,51 @@ export function TxnGrid({
     router.refresh()
   }
 
+  /**
+   * Correct a row: cancel it and open a fresh one holding its values.
+   *
+   * There is no other honest shape for this. The row has posted to the ledger
+   * and moved stock, so the figures cannot be edited where they sit — the
+   * ledger's answer to a wrong entry is a reversing one. What was missing was
+   * not the ability to change the books, it was being spared retyping eleven
+   * fields to fix one of them.
+   *
+   * The draft is opened first and the cancellation only committed if that
+   * worked, so a failure leaves the original standing rather than deleting a
+   * transaction and losing what it said.
+   */
+  async function correctRow(r: SavedRow) {
+    const reason = window.prompt(t('txn.correctWhy'), t('txn.correctReason'))
+    if (reason === null) return
+
+    setVoiding(r.id)
+    setVoidError(null)
+    const result = await voidTransaction({ id: r.id, reason })
+    setVoiding(null)
+    if (!result.ok) { setVoidError(result.message); return }
+
+    // Everything the old row said, including how it was settled, waiting to be
+    // corrected rather than retyped.
+    setDrafts((rows) => [...rows, {
+      key: nextKey,
+      txnType: r.txn_type,
+      salesPersonCode: r.sales_person_code ?? '',
+      partnerCode: r.partner_code ?? '',
+      goldTypeCode: r.gold_type_code,
+      scrapDetail: r.scrap_detail ?? '',
+      uom: r.uom,
+      qty: String(r.qty),
+      unitPrice: r.unit_price === null ? '' : String(r.unit_price),
+      pay1: r.payments[0] ? String(r.payments[0].amount) : '',
+      method1: r.payments[0]?.method ?? 'CASH',
+      pay2: r.payments[1] ? String(r.payments[1].amount) : '',
+      method2: r.payments[1]?.method ?? '',
+      remarks: r.remarks ?? '',
+    }])
+    setNextKey((k) => k + 1)
+    router.refresh()
+  }
+
   return (
     <div className={styles.wrap}>
       <div className={styles.head}>
@@ -254,11 +301,37 @@ export function TxnGrid({
                 </td>
                 <td className={styles.num}>{r.unit_price ? money.format(r.unit_price) : ''}</td>
                 <td className={styles.num}>{money.format(r.amount)}</td>
-                <td colSpan={2} />
+                {/* What was recorded, not two blank cells. These were drawn
+                    empty, so somebody who had just typed "4,300 CASH" watched it
+                    disappear on save with no way to tell whether it had been
+                    stored — it had. */}
+                <td className={styles.num}>
+                  {r.payments.map((p) => (
+                    <div key={p.seq}>{money.format(p.amount)}</div>
+                  ))}
+                </td>
+                <td>
+                  {r.payments.map((p) => (
+                    <div key={p.seq}>{p.method}</div>
+                  ))}
+                </td>
                 {/* A saved row is not editable — correcting it means cancelling
                     it and typing the right one, which is what the ledger can
                     actually represent. */}
                 <td>
+                  {/* Correcting comes first: it is what somebody who spotted a
+                      typo actually wants, and cancelling outright is the rarer
+                      thing. Both leave the original row in the ledger with a
+                      reversing entry against it. */}
+                  <button
+                    type="button"
+                    className={styles.select}
+                    style={{ width: 'auto', marginRight: 6 }}
+                    disabled={voiding === r.id}
+                    onClick={() => void correctRow(r)}
+                  >
+                    {t('txn.correct')}
+                  </button>
                   <button
                     type="button"
                     className={styles.voidButton}
@@ -332,10 +405,23 @@ export function TxnGrid({
                   <td className={`${styles.num}`} style={{ padding: '6px 8px' }}>
                     {amount !== null ? money.format(amount) : ''}
                   </td>
+                  {/* A second line appears once the first has a figure in it.
+                      Half in cash and half by transfer is an ordinary morning
+                      at the counter, and the books have always been able to
+                      record it — `gold_txn_payment` is keyed by sequence and
+                      the posting function loops over every row it finds. Only
+                      the screen could not say it, so the accountant had to
+                      choose one method and write the truth in the remarks. */}
                   <td className={styles.num}>
                     <input className={`${styles.cell} ${styles.num}`} inputMode="decimal"
                            value={row.pay1} disabled={!!row.savedId} aria-label={t('txn.col.pay1')}
                            onChange={(e) => patch(row.key, { pay1: e.target.value })} />
+                    {Number(row.pay1) > 0 && !row.savedId && (
+                      <input className={`${styles.cell} ${styles.num}`} inputMode="decimal"
+                             value={row.pay2} aria-label={t('txn.col.pay2')}
+                             placeholder={t('txn.col.pay2')}
+                             onChange={(e) => patch(row.key, { pay2: e.target.value })} />
+                    )}
                   </td>
                   <td>
                     <select className={styles.select} value={row.method1} disabled={!!row.savedId}
@@ -343,6 +429,17 @@ export function TxnGrid({
                             onChange={(e) => patch(row.key, { method1: e.target.value })}>
                       {METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
                     </select>
+                    {Number(row.pay1) > 0 && !row.savedId && (
+                      <select className={styles.select} value={row.method2}
+                              aria-label={t('txn.col.method2')}
+                              onChange={(e) => patch(row.key, { method2: e.target.value })}>
+                        {/* Blank by default: a second method is offered, not
+                            assumed, and an empty one means there is no second
+                            payment rather than a payment of nothing. */}
+                        <option value="" />
+                        {METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    )}
                   </td>
                   <td>
                     <input className={styles.cell} value={row.remarks} disabled={!!row.savedId}

@@ -135,17 +135,24 @@ export async function reportSheets(
 
   if (report === 'deposits') {
     const { data } = await supabase.from('v_deposit_status')
-      .select('txn_date, partner_code, gold_type_code, qty_gram, deposit_amount, settled_by, settled_date')
+      .select('txn_date, partner_code, gold_type_code, qty_gram, deposit_amount, '
+            + 'order_amount, paid_amount, remaining_amount, settled_by, settled_date')
       .order('txn_date', { ascending: false }).limit(1000)
     return [{
       title: label('rep.deposits'),
       header: [label('journal.date'), label('rep.partner'), label('inv.goldType'),
-               label('inv.gram'), label('rep.amount'), label('rep.settled')],
+               label('inv.gram'), label('rep.orderAmount'), label('rep.paid'),
+               label('rep.remaining'), label('rep.settled')],
       rows: rows(data).map((r): Cell[] => [
         r.txn_date as string,
         (r.partner_code as string) ?? '',
         r.gold_type_code as string,
-        Math.abs(num(r.qty_gram)), num(r.deposit_amount),
+        Math.abs(num(r.qty_gram)),
+        // Blank rather than zero where no price was agreed. A zero in a money
+        // column is a figure somebody may act on; a blank is a question.
+        r.order_amount === null ? '' : num(r.order_amount),
+        num(r.paid_amount),
+        r.remaining_amount === null ? '' : num(r.remaining_amount),
         (r.settled_by as string) ?? label('rep.outstanding'),
       ]),
     } as Sheet]

@@ -27,8 +27,8 @@ export type StockRow = {
 }
 
 export function InventoryView({
-  rows, period, movements,
-}: { rows: StockRow[]; period: string; movements: MovementRow[] }) {
+  rows, period, asOf, movements,
+}: { rows: StockRow[]; period: string; asOf: string; movements: MovementRow[] }) {
   const { locale, t } = useLocale()
   const shown = rows.filter((r) => r.book !== 0 || r.physical !== 0 || r.total !== 0)
   const sum = (k: 'book' | 'physical' | 'total') => shown.reduce((s, r) => s + r[k], 0)
@@ -43,6 +43,14 @@ export function InventoryView({
   return (
     <Page titleKey="inv.title" noteKey="inv.explain">
       <Section>
+        {/* The date the figures below are as at. Kept beside them rather than
+            in a corner: a stock figure without a date is not an answer. */}
+        <form className="pc-month" method="get" action="/inventory">
+          <label htmlFor="asOf">{t('inv.asOf')}</label>
+          <input id="asOf" name="asOf" type="date" defaultValue={asOf} />
+          <input type="hidden" name="period" value={period} />
+          <button type="submit">{t('inv.show')}</button>
+        </form>
         {shown.length === 0 ? <Empty /> : (
           <Frame>
 <table className={ledger.table}>

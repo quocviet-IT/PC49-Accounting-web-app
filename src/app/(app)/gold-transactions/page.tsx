@@ -25,7 +25,7 @@ export default async function GoldTransactionsPage({
 
   const supabase = await createServerSupabase()
 
-  const [goldTypesResult, salesResult, existingResult] = await Promise.all([
+  const [goldTypesResult, salesResult, existingResult, paymentsResult] = await Promise.all([
     supabase.from('gold_type')
       .select('code, name_vi, name_en, native_uom')
       .eq('is_active', true)
@@ -36,14 +36,29 @@ export default async function GoldTransactionsPage({
       .eq('txn_date', txnDate)
       .is('voided_at', null)
       .order('created_at'),
+    // How each one was settled. Without this the payment columns on a saved row
+    // were drawn empty, so an accountant who had just typed "4,300 CASH" saw it
+    // vanish on save and had no way to tell whether it had been recorded.
+    supabase.from('gold_txn_payment')
+      .select('txn_id, seq, amount, method')
+      .order('seq'),
   ])
+
+  const paidByTxn = new Map<string, { seq: number; amount: number; method: string }[]>()
+  for (const p of (paymentsResult.data ?? []) as
+       { txn_id: string; seq: number; amount: number; method: string }[]) {
+    const list = paidByTxn.get(p.txn_id) ?? []
+    list.push({ seq: p.seq, amount: Number(p.amount), method: p.method })
+    paidByTxn.set(p.txn_id, list)
+  }
 
   return (
     <TxnGrid
         txnDate={txnDate}
         goldTypes={(goldTypesResult.data ?? []) as GoldTypeOption[]}
         salesPeople={(salesResult.data ?? []).map((s: { code: string }) => s.code)}
-        existing={(existingResult.data ?? []) as SavedRow[]}
+        existing={((existingResult.data ?? []) as Omit<SavedRow, 'payments'>[])
+          .map((r) => ({ ...r, payments: paidByTxn.get(r.id) ?? [] }))}
       />
   )
 }

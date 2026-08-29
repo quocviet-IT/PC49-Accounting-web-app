@@ -30,7 +30,9 @@
     "verify:feedback": "node --env-file=.env.local scripts/verify-feedback.mjs",
     "shots": "node --env-file=.env.local scripts/shoot-ui.mjs",
     "demo": "node --env-file=.env.local scripts/demo-data.mjs",
-    "demo:clear": "node --env-file=.env.local scripts/demo-data.mjs --clear"
+    "demo:clear": "node --env-file=.env.local scripts/demo-data.mjs --clear",
+    "verify:payments": "node --env-file=.env.local scripts/verify-payments.mjs",
+    "verify:correct": "node --env-file=.env.local scripts/verify-correct.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",

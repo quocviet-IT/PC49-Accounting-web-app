@@ -4,11 +4,9 @@ import { getCurrentUser } from '@/lib/auth/currentUser'
 import { can } from '@/lib/auth/roles'
 import { createServerSupabase } from '@/lib/supabase/server'
 
-type Bucketed = { gold_type_code: string; qty_gram: number }
-
 export default async function InventoryPage({
   searchParams,
-}: { searchParams: Promise<{ period?: string }> }) {
+}: { searchParams: Promise<{ period?: string; asOf?: string }> }) {
   const user = await getCurrentUser()
   const role = user?.role ?? null
   if (!can(role, 'report.read')) {
@@ -19,32 +17,42 @@ export default async function InventoryPage({
   const period = /^\d{4}-\d{2}$/.test(params.period ?? '')
     ? (params.period as string)
     : new Date().toISOString().slice(0, 7)
+  // The stock table used to answer only "what do we hold right now". Every
+  // other question anybody asks of a stock report is about a date: the closing
+  // figure when a period was signed off, what was held the day before a count.
+  const asOf = /^\d{4}-\d{2}-\d{2}$/.test(params.asOf ?? '')
+    ? (params.asOf as string)
+    : new Date().toISOString().slice(0, 10)
 
   const supabase = await createServerSupabase()
-  const [types, book, physical, total, movement] = await Promise.all([
+  const [types, stock, movement] = await Promise.all([
     supabase.from('gold_type').select('code, name_vi, name_en, native_uom').eq('is_active', true).order('sort_order'),
-    supabase.from('v_inventory_book').select('gold_type_code, qty_gram').eq('owner_code', 'PC49'),
-    supabase.from('v_inventory_physical').select('gold_type_code, qty_gram').eq('owner_code', 'PC49'),
-    supabase.from('v_inventory_total_asset').select('gold_type_code, qty_gram').eq('owner_code', 'PC49'),
+    // All three figures with one cut-off, in one round trip. The three views
+    // this replaces sum every movement ever recorded and cannot take a date —
+    // a view has no arguments.
+    supabase.rpc('inventory_as_of', { p_as_of: asOf, p_owner: 'PC49' }),
     // Opening, in, out, closing for the month — the shape the source's NXT
     // sheet has, and the one the accountant reconciles against.
     supabase.rpc('stock_movement_report', { p_period: period, p_owner: 'PC49' }),
   ])
 
-  const by = (rows: Bucketed[] | null) =>
-    Object.fromEntries((rows ?? []).map((r) => [r.gold_type_code, Number(r.qty_gram)]))
-  const b = by(book.data as Bucketed[] | null)
-  const p = by(physical.data as Bucketed[] | null)
-  const a = by(total.data as Bucketed[] | null)
+  const held = new Map<string, { book: number; physical: number; total: number }>()
+  for (const r of (stock.data ?? []) as {
+    gold_type_code: string; book_gram: number; physical_gram: number; total_gram: number
+  }[]) {
+    held.set(r.gold_type_code, {
+      book: Number(r.book_gram), physical: Number(r.physical_gram), total: Number(r.total_gram),
+    })
+  }
 
   const rows: StockRow[] = (types.data ?? []).map((g: { code: string; name_vi: string; name_en: string; native_uom: string }) => ({
     code: g.code,
     nameVi: g.name_vi,
     nameEn: g.name_en,
     uom: g.native_uom,
-    book: b[g.code] ?? 0,
-    physical: p[g.code] ?? 0,
-    total: a[g.code] ?? 0,
+    book: held.get(g.code)?.book ?? 0,
+    physical: held.get(g.code)?.physical ?? 0,
+    total: held.get(g.code)?.total ?? 0,
   }))
 
   const movements: MovementRow[] = (movement.data ?? []).map((r: Record<string, unknown>) => ({
@@ -58,5 +66,5 @@ export default async function InventoryPage({
     adjustment: Number(r.adjustment ?? 0),
   }))
 
-  return <InventoryView rows={rows} period={period} movements={movements} />
+  return <InventoryView rows={rows} period={period} asOf={asOf} movements={movements} />
 }

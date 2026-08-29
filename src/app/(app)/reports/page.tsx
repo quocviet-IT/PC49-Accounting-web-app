@@ -139,7 +139,7 @@ export default async function ReportsPage({
 
   if (report.id === 'deposits') {
     const { data: rows } = await supabase.from('v_deposit_status')
-      .select('txn_date, partner_code, gold_type_code, uom, qty, qty_gram, deposit_amount, settled_by, settled_date')
+      .select('txn_date, partner_code, gold_type_code, uom, qty, qty_gram, deposit_amount, order_amount, paid_amount, remaining_amount, settled_by, settled_date')
       .order('txn_date', { ascending: false }).limit(300)
     data = {
       kind: 'deposits',
@@ -150,6 +150,9 @@ export default async function ReportsPage({
         qty: num(r.qty),
         gram: num(r.qty_gram),
         amount: num(r.deposit_amount),
+        orderAmount: r.order_amount === null ? null : num(r.order_amount),
+        paid: num(r.paid_amount),
+        remaining: r.remaining_amount === null ? null : num(r.remaining_amount),
         settledBy: (r.settled_by as string) ?? null,
         settledDate: (r.settled_date as string) ?? null,
       })),

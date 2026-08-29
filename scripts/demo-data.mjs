@@ -248,12 +248,17 @@ async function seedGold() {
     // A customer orders a coin and leaves a deposit. Some come back for it.
     if (i % 4 === 2) {
       const paid = round(400 + (i % 3) * 150)
+      // The agreed price for the whole order, which is what makes "still owed"
+      // an exact figure rather than a guess at today's gold price. The entry
+      // screen will not save a deposit without one.
+      const agreed = round(await priceOn(day, 'RP') * 1.025)
       const r = await db.query(
         `INSERT INTO pc49.gold_txn (txn_date, doc_no, txn_type, partner_code, sales_person_code,
-           gold_type_code, uom, qty, amount, remarks)
-         VALUES ($1, $2, 'DEPOSIT', $3, $4, 'RP', 'LUONG', -1, $5, 'dat coc 1 luong Rong Phung')
+           gold_type_code, uom, qty, unit_price, amount, remarks)
+         VALUES ($1, $2, 'DEPOSIT', $3, $4, 'RP', 'LUONG', -1, $5, $6,
+                 'dat coc 1 luong Rong Phung')
          RETURNING id`,
-        [day, next(), pick(CUSTOMERS, i + 2), pick(SELLERS, i), paid])
+        [day, next(), pick(CUSTOMERS, i + 2), pick(SELLERS, i), agreed, paid])
       deposits.push({ id: r.rows[0].id, paid, day, dayIndex: i })
     }
   }
