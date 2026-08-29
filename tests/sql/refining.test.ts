@@ -233,3 +233,118 @@ describe('receiving the refined gold', () => {
     expect(s.rows[0].status).toBe('CLOSED')
   })
 })
+
+describe('purity on a refining line', () => {
+  // `pure_weight_gram` is generated as `gross_weight_gram * gold_pct`, so the
+  // fraction is the only reading that yields a weight. Fourteen-carat gold is
+  // 0.583; written as 58.3 — the way it is said aloud and the way it appears in
+  // every scrap book — a 739 gram lot becomes 45 kilos of pure gold, valued
+  // against spot, on the dashboard and in the report, with nothing objecting.
+  async function line(pct: number) {
+    const lot = await db.query<{ id: string }>(
+      `INSERT INTO pc49.refining_lot (lot_code, refinery_name)
+       VALUES ('PURITY-' || $1::text, 'Metalor US') RETURNING id`, [pct])
+    return db.query(
+      `INSERT INTO pc49.refining_lot_line
+         (lot_id, seq, owner_code, source_desc, gross_weight_gram, gold_pct)
+       VALUES ($1, 1, 'PC49', 'vang cu 14K', 428.60, $2)`, [lot.rows[0].id, pct])
+  }
+
+  it('is a fraction, not the number people say out loud', async () => {
+    await expect(line(58.3)).rejects.toThrow(/purity_is_a_fraction/)
+  })
+
+  it('takes the fraction', async () => {
+    await expect(line(0.583)).resolves.toBeTruthy()
+    const r = await db.query<{ pure: string }>(
+      `SELECT round(pure_weight_gram, 2)::text AS pure FROM pc49.refining_lot_line
+        WHERE gold_pct = 0.583`)
+    expect(r.rows[0].pure).toBe('249.87')
+  })
+
+  it('refuses a line with no gold in it', async () => {
+    await expect(line(0)).rejects.toThrow(/purity_is_a_fraction/)
+  })
+
+  it('holds the assay to the same terms', async () => {
+    const lot = await db.query<{ id: string }>(
+      `INSERT INTO pc49.refining_lot (lot_code, refinery_name)
+       VALUES ('PURITY-ASSAY', 'Metalor US') RETURNING id`)
+    await expect(
+      db.query(
+        `INSERT INTO pc49.refining_lot_line
+           (lot_id, seq, owner_code, gross_weight_gram, gold_pct, assay_pct)
+         VALUES ($1, 1, 'PC49', 100, 0.583, 59.1)`, [lot.rows[0].id]),
+    ).rejects.toThrow(/assay_is_a_fraction/)
+  })
+})
+
+describe('what the refinery has sent back', () => {
+  // The owner view used to join the receipts through a LATERAL that already
+  // summed them for the whole lot, then sum that again across the lot's lines.
+  // Two lines doubled it; five multiplied it by five. What that costs is the
+  // figure beside it — "still owed" is the share less what came back, so an
+  // inflated receipt makes a lot look settled while the refinery still holds
+  // metal, and settled is the state nobody looks at again.
+  async function lotWithLines(code: string, lines: number) {
+    const lot = await db.query<{ id: string }>(
+      `INSERT INTO pc49.refining_lot (lot_code, refinery_name, status)
+       VALUES ($1, 'Metalor US', 'SENT') RETURNING id`, [code])
+    for (let seq = 1; seq <= lines; seq += 1) {
+      await db.query(
+        `INSERT INTO pc49.refining_lot_line
+           (lot_id, seq, owner_code, gross_weight_gram, gold_pct)
+         VALUES ($1, $2, 'PC49', 100, 0.583)`, [lot.rows[0].id, seq])
+    }
+    return lot.rows[0].id
+  }
+
+  it('is counted once however many lines the lot has', async () => {
+    for (const lines of [1, 2, 5]) {
+      const id = await lotWithLines(`RECEIPT-${lines}`, lines)
+      await db.query(
+        `INSERT INTO pc49.refining_receipt
+           (lot_id, receive_date, gold_type_code, owner_code, qty_gram)
+         VALUES ($1, '2026-02-01', 'GRAIN', 'PC49', 120)`, [id])
+      const r = await db.query<{ got: string }>(
+        `SELECT received_gram::text AS got FROM pc49.v_refining_owner_share
+          WHERE lot_id = $1 AND owner_code = 'PC49'`, [id])
+      expect(Number(r.rows[0].got)).toBe(120)
+    }
+  })
+
+  it('adds up several receipts against one lot', async () => {
+    const id = await lotWithLines('RECEIPT-MANY', 3)
+    for (const qty of [40, 55, 25]) {
+      await db.query(
+        `INSERT INTO pc49.refining_receipt
+           (lot_id, receive_date, gold_type_code, owner_code, qty_gram)
+         VALUES ($1, '2026-02-02', 'GRAIN', 'PC49', $2)`, [id, qty])
+    }
+    const r = await db.query<{ got: string }>(
+      `SELECT received_gram::text AS got FROM pc49.v_refining_owner_share
+        WHERE lot_id = $1 AND owner_code = 'PC49'`, [id])
+    expect(Number(r.rows[0].got)).toBe(120)
+  })
+
+  it('keeps one owner\'s receipts out of another\'s', async () => {
+    const lot = await db.query<{ id: string }>(
+      `INSERT INTO pc49.refining_lot (lot_code, refinery_name, status)
+       VALUES ('RECEIPT-SPLIT', 'Metalor US', 'SENT') RETURNING id`)
+    const id = lot.rows[0].id
+    for (const [seq, owner] of [[1, 'PC49'], [2, 'TL']] as const) {
+      await db.query(
+        `INSERT INTO pc49.refining_lot_line
+           (lot_id, seq, owner_code, gross_weight_gram, gold_pct)
+         VALUES ($1, $2, $3, 100, 0.583)`, [id, seq, owner])
+    }
+    await db.query(
+      `INSERT INTO pc49.refining_receipt
+         (lot_id, receive_date, gold_type_code, owner_code, qty_gram)
+       VALUES ($1, '2026-02-03', 'GRAIN', 'PC49', 90)`, [id])
+    const r = await db.query<{ owner: string; got: string }>(
+      `SELECT owner_code AS owner, received_gram::text AS got
+         FROM pc49.v_refining_owner_share WHERE lot_id = $1 ORDER BY owner_code`, [id])
+    expect(r.rows.map((x) => [x.owner, Number(x.got)])).toEqual([['PC49', 90], ['TL', 0]])
+  })
+})

@@ -158,3 +158,53 @@ describe('payments', () => {
     ).rejects.toThrow(/gold_txn_payment_seq/)
   })
 })
+
+describe('the unit a row is measured in', () => {
+  // Every gold type names the unit it trades in, and `gold_price_daily` holds
+  // the price per that unit. Valuation multiplies the two, so a row in any
+  // other unit is priced against a number that means something else — and it
+  // balances, and it reports, and nobody is told.
+  //
+  // The screen cannot get this wrong; it takes the unit from the type. The
+  // importer could, and did: a blank unit column made every row grams, which
+  // for Rong Phung is a luong priced as a gram.
+  it('has to be the one that gold type is traded in', async () => {
+    await expect(
+      db.query(
+        `INSERT INTO pc49.gold_txn (txn_date, txn_type, gold_type_code, uom, qty, amount)
+         VALUES ('2026-01-01', 'PO', 'RP', 'GRAM', 1, -139)`),
+    ).rejects.toThrow(/traded in LUONG but this row is in GRAM/)
+  })
+
+  it('accepts the type\'s own unit', async () => {
+    await expect(
+      db.query(
+        `INSERT INTO pc49.gold_txn (txn_date, txn_type, gold_type_code, uom, qty, amount)
+         VALUES ('2026-01-01', 'PO', 'RP', 'LUONG', 1, -5213)`),
+    ).resolves.toBeTruthy()
+    await expect(
+      db.query(
+        `INSERT INTO pc49.gold_txn (txn_date, txn_type, gold_type_code, uom, qty, amount)
+         VALUES ('2026-01-01', 'PO', 'SG', 'GRAM', 40, -2000)`),
+    ).resolves.toBeTruthy()
+  })
+
+  it('refuses an ounce type written in grams', async () => {
+    // The direction that bites hardest: an ounce is 31.105 grams, so a coin
+    // entered in grams is valued at thirty-one times its weight.
+    await expect(
+      db.query(
+        `INSERT INTO pc49.gold_txn (txn_date, txn_type, gold_type_code, uom, qty, amount)
+         VALUES ('2026-01-01', 'PO', 'AE', 'GRAM', 31.105, -2400)`),
+    ).rejects.toThrow(/traded in OZ but this row is in GRAM/)
+  })
+
+  it('will not let an existing row be moved to another unit', async () => {
+    const r = await db.query<{ id: string }>(
+      `INSERT INTO pc49.gold_txn (txn_date, txn_type, gold_type_code, uom, qty, amount)
+       VALUES ('2026-01-02', 'PO', 'SG', 'GRAM', 10, -500) RETURNING id`)
+    await expect(
+      db.query(`UPDATE pc49.gold_txn SET uom = 'LUONG' WHERE id = $1`, [r.rows[0].id]),
+    ).rejects.toThrow(/traded in GRAM but this row is in LUONG/)
+  })
+})

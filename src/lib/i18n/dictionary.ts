@@ -375,6 +375,8 @@ export const dictionary = {
     'fb.status.FIXED': 'Đã sửa',
     'fb.status.DECLINED': 'Không làm',
     'nav.feedback': 'Báo lỗi',
+    'refining.sentWeight': '(đã gửi)',
+    'refining.receivedGram': 'Đã nhận về',
   },
   en: {
     'app.name': 'PC49',
@@ -752,5 +754,7 @@ export const dictionary = {
     'fb.status.FIXED': 'Fixed',
     'fb.status.DECLINED': 'Not doing',
     'nav.feedback': 'Reports',
+    'refining.sentWeight': '(sent)',
+    'refining.receivedGram': 'Received back',
   },
 } as const

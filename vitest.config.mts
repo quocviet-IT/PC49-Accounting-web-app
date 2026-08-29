@@ -7,6 +7,18 @@ export default defineConfig({
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
 
     /*
+     * Sixty seconds was enough when there were twenty migrations. Every SQL
+     * test file replays all of them into a fresh PGlite before its first test,
+     * and that setup was measured at forty-six seconds a file on a quiet
+     * laptop — close enough to the default that two files failed on a busy one
+     * while passing on their own, which is the worst kind of red.
+     *
+     * A hook that is genuinely stuck still fails; it just takes longer to say
+     * so, which is the right trade for a number that grows with the schema.
+     */
+    hookTimeout: 180_000,
+
+    /*
      * Parallelism is left at the default, which is right for CI.
      *
      * Every SQL test file starts its own PGlite — a whole PostgreSQL compiled to

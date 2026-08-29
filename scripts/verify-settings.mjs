@@ -30,6 +30,15 @@ const IN_PERIOD = `${PERIOD}-14`
 
 const db = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } })
 await db.connect()
+
+// This run closes and reopens the current month on the client's own database.
+// Whether that month already existed decides whether the teardown may remove
+// it: deleting a period row somebody else opened takes their closing date with
+// it.
+const periodExisted = (await db.query(
+  `SELECT count(*)::int n FROM pc49.accounting_period WHERE period = $1`, [PERIOD])
+).rows[0].n > 0
+
 const browser = await chromium.launch()
 
 async function signIn(page, email, password) {
@@ -235,12 +244,22 @@ try {
   // The client's database is not a scratch pad.
   await db.query(`DELETE FROM pc49.gold_price_daily WHERE price_date IN ($1, $2)`, [DAY, NEXT_DAY])
   await db.query(`DELETE FROM pc49.spot_price_daily WHERE price_date IN ($1, $2)`, [DAY, NEXT_DAY])
+  // Only the entry this run tried to write, found by its memo. This used to
+  // delete every journal entry in the current month — which was harmless while
+  // the database was empty and would have taken the client's own books with it
+  // the day it was not. It failed loudly the first time real entries existed,
+  // which is the only reason it was found.
   await db.query(`DELETE FROM pc49.journal_line WHERE entry_id IN (
-                    SELECT id FROM pc49.journal_entry WHERE period = $1)`, [PERIOD])
-  await db.query(`DELETE FROM pc49.journal_entry WHERE period = $1`, [PERIOD])
+                    SELECT id FROM pc49.journal_entry
+                     WHERE period = $1 AND memo = 'settings check')`, [PERIOD])
+  await db.query(
+    `DELETE FROM pc49.journal_entry WHERE period = $1 AND memo = 'settings check'`, [PERIOD])
   await db.query(`DELETE FROM pc49.audit_log WHERE entity_type = 'journal_entry'
                    AND entity_id NOT IN (SELECT id::text FROM pc49.journal_entry)`)
-  await db.query(`DELETE FROM pc49.accounting_period WHERE period = $1`, [PERIOD])
+  // And the month only if this run opened it.
+  if (!periodExisted) {
+    await db.query(`DELETE FROM pc49.accounting_period WHERE period = $1`, [PERIOD])
+  }
   // Closing and reopening a month is audited, and that trail belongs to this
   // run rather than to the client's history.
   await db.query(`DELETE FROM pc49.audit_log
@@ -251,13 +270,20 @@ try {
   const rest = await db.query(
     `SELECT (SELECT count(*) FROM pc49.gold_price_daily WHERE price_date IN ($1, $2)) AS prices,
             (SELECT count(*) FROM pc49.spot_price_daily WHERE price_date IN ($1, $2)) AS spot,
-            (SELECT count(*) FROM pc49.accounting_period WHERE period = $3) AS periods,
-            (SELECT count(*) FROM pc49.journal_entry WHERE period = $3) AS entries`,
-    [DAY, NEXT_DAY, PERIOD])
+            (SELECT count(*) FROM pc49.accounting_period
+              WHERE period = $3 AND NOT $4) AS periods,
+            (SELECT count(*) FROM pc49.journal_entry
+              WHERE period = $3 AND memo = 'settings check') AS entries,
+            (SELECT status::text FROM pc49.accounting_period WHERE period = $3) AS state`,
+    [DAY, NEXT_DAY, PERIOD, periodExisted])
   const r = rest.rows[0]
   check('the check cleaned up after itself',
     [r.prices, r.spot, r.periods, r.entries].every((n) => Number(n) === 0),
     `${r.prices} prices, ${r.spot} spot, ${r.periods} periods, ${r.entries} entries`)
+  // A month it found open has to be left open. Closing one blocks every
+  // posting in it, so leaving it shut would stop the day's work.
+  check('and left the month as it found it',
+    !periodExisted || r.state === 'OPEN', r.state ?? '(gone)')
   await db.end()
 }
 

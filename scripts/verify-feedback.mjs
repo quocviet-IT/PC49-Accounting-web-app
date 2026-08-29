@@ -177,10 +177,14 @@ try {
                           WHERE description LIKE 'verify-feedback:%')`)
   await db.query(`DELETE FROM pc49.feedback_report WHERE description LIKE 'verify-feedback:%'`)
 
+  // Scoped to this run's own rows. A demo dataset or a real report filed by
+  // somebody is not this check's mess to answer for.
   const left = await db.query(
-    `SELECT (SELECT count(*)::int FROM pc49.feedback_report) AS reports,
+    `SELECT (SELECT count(*)::int FROM pc49.feedback_report
+              WHERE description LIKE 'verify-feedback:%') AS reports,
             (SELECT count(*)::int FROM pc49.audit_log
-              WHERE entity_type = 'feedback_report') AS audits`)
+              WHERE entity_type = 'feedback_report'
+                AND entity_id NOT IN (SELECT id::text FROM pc49.feedback_report)) AS audits`)
   check('the check cleaned up after itself',
     left.rows[0].reports === 0 && left.rows[0].audits === 0,
     `${left.rows[0].reports} reports, ${left.rows[0].audits} audit rows`)

@@ -15,7 +15,7 @@ export default async function RefiningPage() {
   const supabase = await createServerSupabase()
   const [summary, share, types] = await Promise.all([
     supabase.from('v_refining_lot_summary')
-      .select('lot_id, lot_code, status, sent_date, assay_date, received_date, total_assay_gram, spot_variance_per_gram, spot_variance_value')
+      .select('lot_id, lot_code, status, sent_date, assay_date, received_date, total_gross_gram, total_assay_gram, spot_variance_per_gram, spot_variance_value')
       .order('sent_date', { ascending: false }),
     supabase.from('v_refining_owner_share')
       .select('lot_id, owner_code, assay_weight_gram, share_pct, received_gram'),
@@ -30,6 +30,7 @@ export default async function RefiningPage() {
     sentDate: (r.sent_date as string) ?? null,
     assayDate: (r.assay_date as string) ?? null,
     receivedDate: (r.received_date as string) ?? null,
+    totalGrossGram: Number(r.total_gross_gram ?? 0),
     totalAssayGram: Number(r.total_assay_gram ?? 0),
     spotVariancePerGram: r.spot_variance_per_gram === null ? null : Number(r.spot_variance_per_gram),
     spotVarianceValue: r.spot_variance_value === null ? null : Number(r.spot_variance_value),

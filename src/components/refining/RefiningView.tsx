@@ -13,6 +13,7 @@ export type LotRow = {
   sentDate: string | null
   assayDate: string | null
   receivedDate: string | null
+  totalGrossGram: number
   totalAssayGram: number
   spotVariancePerGram: number | null
   spotVarianceValue: number | null
@@ -81,7 +82,16 @@ export function RefiningView({
                   <td className={ledger.muted}>{l.sentDate ?? '—'}</td>
                   <td className={ledger.muted}>{l.assayDate ?? '—'}</td>
                   <td className={ledger.muted}>{l.receivedDate ?? '—'}</td>
-                  <td className={ledger.num}>{weight.format(l.totalAssayGram)}</td>
+                  {/* The assayed weight once the refinery has reported it, and
+                      until then what was sent. A lot in flight has no assay
+                      weight, and printing that as 0.00 said the lot was empty
+                      while the panel below it said 739 grams. */}
+                  <td className={ledger.num}>
+                    {weight.format(l.totalAssayGram || l.totalGrossGram)}
+                    {l.totalAssayGram === 0 && l.totalGrossGram > 0 && (
+                      <span className={ledger.muted}> {t('refining.sentWeight')}</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -106,7 +116,9 @@ export function RefiningView({
                     <th>{t('refining.owner')}</th>
                     <th className={ledger.num}>{t('refining.weight')}</th>
                     <th className={ledger.num}>{t('refining.share')}</th>
-                    <th className={ledger.num}>{t('refining.received')}</th>
+                    {/* A weight, not the date the lot list shows under the same
+                        word. One key was carrying both. */}
+                    <th className={ledger.num}>{t('refining.receivedGram')}</th>
                     <th className={ledger.num}>{t('refining.owed')}</th>
                     <th />
                   </tr>

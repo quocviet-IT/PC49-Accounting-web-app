@@ -110,9 +110,14 @@ try {
   await db.query(`DELETE FROM pc49.cash_reconciliation WHERE rec_date = $1`, [MONTH_END])
   await db.query(`DELETE FROM pc49.cash_opening_balance WHERE as_of = $1`, [OPENING_AS_OF])
 
+  // Scoped to the dates this run wrote. Counting the whole table reports
+  // somebody else's rows — the client's own opening balances among them — as
+  // litter this check left behind.
   const left = await db.query(
-    `SELECT (SELECT count(*)::int FROM pc49.cash_reconciliation) AS rec,
-            (SELECT count(*)::int FROM pc49.cash_opening_balance) AS opening`)
+    `SELECT (SELECT count(*)::int FROM pc49.cash_reconciliation
+              WHERE rec_date = $1) AS rec,
+            (SELECT count(*)::int FROM pc49.cash_opening_balance
+              WHERE as_of = $2) AS opening`, [MONTH_END, OPENING_AS_OF])
   check('the check cleaned up after itself',
     left.rows[0].rec === 0 && left.rows[0].opening === 0,
     `${left.rows[0].rec} reconciliations, ${left.rows[0].opening} opening balances`)

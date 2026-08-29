@@ -17,12 +17,9 @@ const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const OUT = 'ui-shots'
 mkdirSync(OUT, { recursive: true })
 
-// A day's trading, put in before the pictures are taken and removed after.
-// Without it every screenshot is of an empty table, which hides most of what a
-// picture is taken to check: how figures line up, where a column runs out of
-// room, what a negative looks like beside a positive.
-const DAY = '2026-01-15'
-const PERIOD = '2026-01'
+// The busiest day of the demo fortnight, and the month it sits in.
+const DAY = '2026-08-26'
+const PERIOD = '2026-08'
 
 const url = process.env.SUPABASE_DB_URL
 if (!url) {
@@ -32,83 +29,18 @@ if (!url) {
 const db = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } })
 await db.connect()
 
-/** A morning's worth of buying and selling, enough to fill the screens. */
-async function seed() {
-  for (const [code, price] of [['GRAIN', 139.20], ['SG', 141.05], ['9999', 142.60]]) {
-    await db.query(
-      `INSERT INTO pc49.gold_price_daily (price_date, gold_type_code, market_price)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (price_date, gold_type_code) DO UPDATE SET market_price = $3`,
-      [DAY, code, price])
-  }
-
-  // Buying takes gold in and money out; selling is the other way round. The
-  // table's constraints say so, and these rows are written to satisfy them
-  // rather than to be waved through.
-  const rows = [
-    ['PO',   'Kim Anh',   'GRAIN',  31.5, -4382.40, 139.12, 'mua le buoi sang'],
-    ['PO',   'Ngoc Ha',   'SG',     18.2, -2565.11, 140.94, null],
-    ['SALE', 'Tran Bao',  'GRAIN', -12.4,  1748.16, 141.00, 'khach quen'],
-    ['SALE', 'Le Thu',    '9999',  -7.85,  1123.41, 143.11, null],
-    ['SALE', 'Pham Quoc', 'SG',    -22.0,  3124.20, 142.01, 'giao chieu'],
-  ]
-  for (const [type, partner, gold, qty, amount, price, remark] of rows) {
-    await db.query(
-      `INSERT INTO pc49.gold_txn
-         (txn_date, txn_type, partner_code, gold_type_code, uom, qty, unit_price, amount, remarks)
-       VALUES ($1, $2, $3, $4, 'GRAM', $5, $6, $7, $8)`,
-      [DAY, type, partner, gold, qty, price, amount, remark])
-  }
-
-  // And something in the report queue, so that screen is not a picture of
-  // nothing either.
-  await db.query(
-    `INSERT INTO pc49.feedback_report (kind, impact, description, page_url, page_route, page_title)
-     VALUES
-       ('WRONG_NUMBER', 'BLOCKING',
-        'ui-shots: tong cuoi ngay 15/01 lech 250 so voi so tay, dong ban cho Le Thu ra sai',
-        '/gold-transactions?date=2026-01-15', '/gold-transactions', 'Giao dich vang'),
-       ('SUGGESTION', 'MINOR',
-        'ui-shots: cho go tat ngay hom nay bang phim thay vi chon tren lich',
-        '/prices', '/prices', 'Gia vang')`)
+// The pictures are of the demo fortnight, put there by `npm run demo`. This
+// used to seed a day of its own, which meant two sets of assumptions about how
+// a transaction is written — and the copy here was already wrong, entering
+// 9999 in grams when it trades in luong.
+const present = await db.query(
+  `SELECT count(*)::int n FROM pc49.gold_txn WHERE doc_no LIKE 'DEMO-%'`)
+await db.end()
+if (present.rows[0].n === 0) {
+  console.error('No demo data to photograph. Run "npm run demo" first.')
+  process.exit(1)
 }
-
-/** Puts the client's database back exactly as it was. */
-async function unseed() {
-  const txns = await db.query(`SELECT id FROM pc49.gold_txn WHERE txn_date = $1`, [DAY])
-  for (const t of txns.rows) {
-    await db.query(`DELETE FROM pc49.inventory_movement WHERE source_id = $1`, [t.id])
-    await db.query(`DELETE FROM pc49.gold_txn_payment WHERE txn_id = $1`, [t.id])
-    await db.query(`DELETE FROM pc49.gold_txn WHERE id = $1`, [t.id])
-  }
-  // Unpost first: a posted entry's lines are immutable, which is the same road
-  // the system forces on everyone else.
-  await db.query(`UPDATE pc49.journal_entry SET posted_at = NULL WHERE period = $1`, [PERIOD])
-  await db.query(`DELETE FROM pc49.journal_line WHERE entry_id IN (
-                    SELECT id FROM pc49.journal_entry WHERE period = $1)`, [PERIOD])
-  await db.query(`DELETE FROM pc49.journal_entry WHERE period = $1 AND reversal_of_id IS NOT NULL`,
-                 [PERIOD])
-  await db.query(`DELETE FROM pc49.journal_entry WHERE period = $1`, [PERIOD])
-  await db.query(`DELETE FROM pc49.gold_price_daily WHERE price_date = $1`, [DAY])
-  await db.query(`DELETE FROM pc49.feedback_report WHERE description LIKE 'ui-shots:%'`)
-  await db.query(`DELETE FROM pc49.audit_log WHERE entity_type = 'journal_entry'
-                   AND entity_id NOT IN (SELECT id::text FROM pc49.journal_entry)`)
-
-  const left = await db.query(
-    `SELECT (SELECT count(*)::int FROM pc49.gold_txn WHERE txn_date = $1) AS txns,
-            (SELECT count(*)::int FROM pc49.journal_entry WHERE period = $2) AS entries,
-            (SELECT count(*)::int FROM pc49.gold_price_daily WHERE price_date = $1) AS prices,
-            (SELECT count(*)::int FROM pc49.feedback_report
-              WHERE description LIKE 'ui-shots:%') AS reports`, [DAY, PERIOD])
-  const r = left.rows[0]
-  const clean = [r.txns, r.entries, r.prices, r.reports].every((n) => n === 0)
-  console.log(clean
-    ? 'the database is back as it was'
-    : `LEFT BEHIND: ${r.txns} txns, ${r.entries} entries, ${r.prices} prices, ${r.reports} reports`)
-  return clean
-}
-
-await seed()
+console.log(`photographing ${present.rows[0].n} demo transactions`)
 
 const PAGES = [
   ['dashboard', '/'],
@@ -135,7 +67,6 @@ const VIEWPORTS = [
 
 const browser = await chromium.launch()
 
-try {
 for (const theme of ['light', 'dark']) {
   for (const [prefix, viewport] of VIEWPORTS) {
     // The phone only needs one theme; the point there is layout, not colour.
@@ -175,11 +106,5 @@ for (const theme of ['light', 'dark']) {
   }
 }
 
+await browser.close()
 console.log(`\n${readdirSync(OUT).length} pictures in ${OUT}/`)
-} finally {
-  await browser.close()
-  // The client's database is not a scratch pad, whatever went wrong above.
-  const clean = await unseed()
-  await db.end()
-  if (!clean) process.exit(1)
-}
