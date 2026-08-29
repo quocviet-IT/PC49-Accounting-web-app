@@ -104,6 +104,15 @@
   text-overflow: ellipsis;
 }
 
+/* A cell holding prose rather than a figure. Written as `.table td.wrap` on
+   purpose: a bare `.wrap` is less specific than the `.table td` rule above it,
+   so it would be overruled and the text cut off with an ellipsis regardless. */
+.table td.wrap {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
 .table tbody tr:last-child td { border-bottom: 0; }
 .table tbody tr:hover td { background: var(--pc-surface-subtle); }
 

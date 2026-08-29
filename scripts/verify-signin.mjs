@@ -7,16 +7,17 @@ import { openPage } from './support/page.mjs'
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const USERS = [
   { email: 'kt@pc49.test',    password: 'pc49-test-KT-2026',    role: 'KT',
-    expect: ['Tổng quan', 'Vàng', 'Dòng tiền', 'Sổ sách', 'Cấu hình'] },
+    expect: ['Tổng quan', 'Vàng', 'Dòng tiền', 'Sổ sách', 'Báo lỗi', 'Cấu hình'] },
   { email: 'gsus@pc49.test',  password: 'pc49-test-GSUS-2026',  role: 'GS_US',
     // No money group: the supervisor reads reports and closes periods, and
     // neither the cash book nor the conversion screen is theirs.
-    expect: ['Tổng quan', 'Vàng', 'Sổ sách', 'Cấu hình'] },
+    expect: ['Tổng quan', 'Vàng', 'Sổ sách', 'Báo lỗi', 'Cấu hình'] },
   { email: 'oc@pc49.test',    password: 'pc49-test-OC-2026',    role: 'OC',
-    // Two groups, each holding the one read-only screen the owner may open.
-    expect: ['Tổng quan', 'Vàng', 'Sổ sách'] },
+    // Two groups, each holding the one read-only screen the owner may open —
+    // and reporting a problem, which every role gets.
+    expect: ['Tổng quan', 'Vàng', 'Sổ sách', 'Báo lỗi'] },
   { email: 'admin@pc49.test', password: 'pc49-test-ADMIN-2026', role: 'ADMIN',
-    expect: ['Tổng quan', 'Vàng', 'Dòng tiền', 'Sổ sách', 'Cấu hình'] },
+    expect: ['Tổng quan', 'Vàng', 'Dòng tiền', 'Sổ sách', 'Báo lỗi', 'Cấu hình'] },
 ]
 
 let failures = 0

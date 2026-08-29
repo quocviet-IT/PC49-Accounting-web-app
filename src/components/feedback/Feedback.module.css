@@ -1,0 +1,143 @@
+/*
+ * Reporting a problem. Plain and quick: somebody who has just hit a wrong
+ * figure is annoyed, and a form that makes them think about the form is a form
+ * they close.
+ */
+
+.form { display: flex; flex-direction: column; gap: 16px; }
+
+.choice { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+
+.legend {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--pc-text-faint);
+  font-weight: 600;
+  padding: 0;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+
+.textarea {
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.5;
+  padding: 8px 10px;
+  border: 1px solid var(--pc-border-default);
+  border-radius: 6px;
+  background: var(--pc-surface-card);
+  color: inherit;
+  resize: vertical;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--pc-intent-primary);
+  box-shadow: 0 0 0 2px var(--pc-accent-wash);
+}
+
+.context { margin: 0; font-size: 12px; color: var(--pc-text-faint); }
+
+.context code {
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  font-size: 11.5px;
+}
+
+.failed { margin: 0; font-size: 12.5px; color: var(--pc-money-negative); }
+
+.buttons { display: flex; gap: 8px; justify-content: flex-end; }
+
+.primary,
+.quiet {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.primary {
+  border: 1px solid var(--pc-intent-primarySolid);
+  background: var(--pc-intent-primarySolid);
+  color: var(--pc-text-onDark);
+  font-weight: 600;
+}
+
+.quiet {
+  border: 1px solid var(--pc-border-strong);
+  background: transparent;
+  color: var(--pc-text-secondary);
+}
+
+.primary:disabled,
+.quiet:disabled { opacity: 0.45; cursor: default; }
+
+.quiet:hover:not(:disabled) { color: inherit; border-color: currentColor; }
+
+.primary:focus-visible,
+.quiet:focus-visible {
+  outline: 2px solid var(--pc-intent-primary);
+  outline-offset: 2px;
+}
+
+.sent { display: flex; flex-direction: column; gap: 10px; }
+.sentLead { margin: 0; font-size: 15px; font-weight: 600; color: var(--pc-money-positive); }
+.sentNote { margin: 0; font-size: 13px; color: var(--pc-text-secondary); max-width: 52ch; }
+
+/* ------------------------------------------------------------- the queue */
+
+.queueTabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+
+.tab {
+  font-size: 12.5px;
+  padding: 5px 12px;
+  border: 1px solid var(--pc-border-strong);
+  border-radius: 999px;
+  color: var(--pc-text-secondary);
+  background: var(--pc-surface-card);
+  text-decoration: none;
+}
+
+.tab:hover { color: var(--pc-intent-primary); border-color: var(--pc-intent-primary); }
+
+.tabOn {
+  background: var(--pc-accent-wash);
+  border-color: var(--pc-intent-primary);
+  color: var(--pc-intent-primary);
+  font-weight: 600;
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--pc-intent-primary);
+  outline-offset: 2px;
+}
+
+/* Blocking is the one that stops somebody working, so it is the one that reads
+   loud. The other two are quiet on purpose. */
+.blocking { color: var(--pc-money-negative); font-weight: 600; }
+.minor { color: var(--pc-text-faint); }
+
+
+.triage { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+.triage select,
+.triage input {
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 7px;
+  border: 1px solid var(--pc-border-default);
+  border-radius: 5px;
+  background: var(--pc-surface-card);
+  color: inherit;
+}
+
+.triage input { min-width: 160px; }

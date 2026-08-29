@@ -58,6 +58,10 @@ const ALL: NavItem[] = [
       { key: '/reports', labelKey: 'nav.reports', requires: 'report.read' },
     ],
   },
+  // No capability. Everybody may report a problem, and everybody may see what
+  // happened to what they reported — the row filtering is the database's job,
+  // not the menu's.
+  { key: '/feedback', labelKey: 'nav.feedback', requires: null },
   {
     key: '/settings',
     labelKey: 'nav.settings',

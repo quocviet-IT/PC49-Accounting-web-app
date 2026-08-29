@@ -26,7 +26,8 @@
     "verify:bank-import": "node --env-file=.env.local scripts/verify-bank-import.mjs",
     "verify:refining": "node --env-file=.env.local scripts/verify-refining.mjs",
     "verify:reconcile": "node --env-file=.env.local scripts/verify-reconcile.mjs",
-    "verify:reports": "node --env-file=.env.local scripts/verify-reports.mjs"
+    "verify:reports": "node --env-file=.env.local scripts/verify-reports.mjs",
+    "verify:feedback": "node --env-file=.env.local scripts/verify-feedback.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",

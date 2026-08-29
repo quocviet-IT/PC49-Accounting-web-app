@@ -10,7 +10,8 @@ import {
 import {
   BankOutlined, BarChartOutlined, DashboardOutlined, DollarOutlined, ExperimentOutlined,
   GoldOutlined, LeftOutlined, LogoutOutlined, MenuOutlined, ReadOutlined, RightOutlined,
-  SettingOutlined, ShopOutlined, SwapOutlined, TableOutlined, UserOutlined,
+  MessageOutlined, SettingOutlined, ShopOutlined, SwapOutlined, TableOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
 import { createBrowserSupabase } from '@/lib/supabase/client'
 import type { Role } from '@/lib/auth/roles'
@@ -18,6 +19,7 @@ import { findActiveGroup, findActivePage, isNavGroup, navigationForRole } from '
 import { useLocale } from '@/lib/i18n/provider'
 import { LocaleSwitch } from '@/components/LocaleSwitch'
 import { ThemeToggle } from '@/components/theme/ThemeToggle'
+import { ReportDialog } from '@/components/feedback/ReportDialog'
 
 const { Header, Sider, Content } = Layout
 
@@ -39,6 +41,7 @@ const ICONS: Record<string, ReactNode> = {
   '/bank-conversion': <SwapOutlined />,
   '/journal': <ReadOutlined />,
   '/reports': <BarChartOutlined />,
+  '/feedback': <MessageOutlined />,
 }
 
 const COLLAPSED_KEY = 'pc49.sidebar-collapsed'
@@ -205,6 +208,7 @@ export function AppShell({
           </span>
 
           <div className="pc-shell__header-end">
+            <ReportDialog />
             <ThemeToggle />
             <LocaleSwitch />
             <Dropdown

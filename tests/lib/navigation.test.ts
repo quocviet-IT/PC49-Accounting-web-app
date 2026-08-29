@@ -17,8 +17,15 @@ describe('what each role is offered', () => {
       ['/gold-transactions', '/prices', '/cash', '/bank-conversion', '/journal']))
   })
 
-  it('gives the owner three read-only screens and nothing else', () => {
-    expect(paths('OC').sort()).toEqual(['/', '/inventory', '/reports'])
+  it('gives the owner read-only screens and nothing else', () => {
+    // Reporting a problem is on the list because it is not a privilege: the
+    // owner is the likeliest person to notice a figure is wrong and the least
+    // likely to have anywhere else to say so.
+    expect(paths('OC').sort()).toEqual(['/', '/feedback', '/inventory', '/reports'])
+  })
+
+  it('lets every role report a problem', () => {
+    for (const role of ROLES) expect(paths(role)).toContain('/feedback')
   })
 
   it('does not offer the owner anything that writes', () => {

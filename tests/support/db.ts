@@ -67,3 +67,28 @@ export async function asUser<T>(db: PGlite, userId: string, fn: () => Promise<T>
     await db.exec(`SELECT set_config('request.jwt.claim.sub', '', false)`)
   }
 }
+
+/**
+ * Runs `fn` the way the application runs it: as `authenticated`, with the
+ * user's id in the JWT claim.
+ *
+ * `asUser` above only sets the claim, so it still executes as the database
+ * owner — which is exempt from both table grants and row-level security. That
+ * is fine for testing what a function computes and useless for testing what a
+ * function is allowed to touch. A triage function that could not write to the
+ * audit log passed eleven tests under `asUser` and failed on the first real
+ * click, because owner-me was allowed and authenticated-me was not.
+ *
+ * Use this wherever a test's point is permission rather than arithmetic.
+ */
+export async function asRole<T>(db: PGlite, userId: string, fn: () => Promise<T>): Promise<T> {
+  await db.exec(`SELECT set_config('request.jwt.claim.sub', '${userId}', false)`)
+  await db.exec(`SET ROLE authenticated`)
+  try {
+    return await fn()
+  } finally {
+    // RESET, not SET ROLE postgres: the owner's name is not ours to assume.
+    await db.exec(`RESET ROLE`)
+    await db.exec(`SELECT set_config('request.jwt.claim.sub', '', false)`)
+  }
+}
