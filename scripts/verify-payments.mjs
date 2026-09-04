@@ -1,12 +1,19 @@
-// Two things an accountant reported about the payment columns, checked the way
-// they hit them.
+// Three things an accountant reported about the payment columns, checked the
+// way they hit them.
 //
 //   "Hinh thuc thanh toan da nhap roi nhung khi luu khong hien thi"
 //   "Chua phan loai truong hop khach thanh toan nhieu hinh thuc trong cung 1 don"
+//   "Thanh toan chi dang co dinh khach chi duoc thanh toan 2 lan cho 1 don"
 //
 // The first was a display fault: the payment was stored correctly and the row
 // drew two empty cells over it. The second was a screen that could only say
 // what the books had always been able to record.
+//
+// The third went deeper than the screen. The table itself carried
+// `CHECK (seq IN (1, 2))`, copied from a spreadsheet with two payment columns,
+// so a customer settling one order three ways lost the third into the remarks.
+// Migration 0046 removed it. The posting function never needed it: it loops
+// over every payment row it finds.
 //
 // Everything this writes is removed at the end. Run with the dev server up.
 import { chromium } from 'playwright'
@@ -64,8 +71,16 @@ try {
   const appeared = await until(async () => (await page.getByLabel('Thanh toán 2').count()) > 0)
   check('and appears once the first payment is entered', appeared === true)
 
-  await page.getByLabel('Thanh toán 2').first().fill('1000')
+  await page.getByLabel('Thanh toán 2').first().fill('700')
   await page.getByLabel('Hình thức 2').first().selectOption('BANKWIRE')
+
+  // And a third, which is where the screen used to stop. The lines keep
+  // arriving one at a time for as long as the settlement takes.
+  const third = await until(async () => (await page.getByLabel('Thanh toán 3').count()) > 0)
+  check('a third line appears once the second is entered', third === true)
+
+  await page.getByLabel('Thanh toán 3').first().fill('300')
+  await page.getByLabel('Hình thức 3').first().selectOption('ZELLE')
   await page.getByLabel('Ghi chú').first().press('Enter')
 
   const saved = await untilRow(db,
@@ -73,13 +88,21 @@ try {
       WHERE txn_date = $1 AND partner_code = $2`, [DAY, PARTNER])
   check('the order saves', saved !== null, saved ? `${saved.amount}` : '(nothing)')
 
-  const paid = await db.query(
-    `SELECT seq, amount::float8 AS amount, method::text FROM pc49.gold_txn_payment
-      WHERE txn_id = $1 ORDER BY seq`, [saved?.id])
-  check('both payments are recorded, in order',
-    paid.rows.length === 2
+  // Waited for, like the posting below. Saving is several round trips — the
+  // row, whoever sold it, its payments, then the posting — and a read that
+  // stops at the first finds the transaction there and its payments not yet
+  // written, which reads as "the payments were lost" rather than "ask again".
+  const paid = await until(async () => {
+    const r = await db.query(
+      `SELECT seq, amount::float8 AS amount, method::text FROM pc49.gold_txn_payment
+        WHERE txn_id = $1 ORDER BY seq`, [saved?.id])
+    return r.rows.length === 3 ? r : null
+  }) ?? { rows: [] }
+  check('all three payments are recorded, in order',
+    paid.rows.length === 3
       && paid.rows[0].amount === 1500 && paid.rows[0].method === 'CASH'
-      && paid.rows[1].amount === 1000 && paid.rows[1].method === 'BANKWIRE',
+      && paid.rows[1].amount === 700 && paid.rows[1].method === 'BANKWIRE'
+      && paid.rows[2].amount === 300 && paid.rows[2].method === 'ZELLE',
     paid.rows.map((r) => `${r.amount} ${r.method}`).join(' + '))
 
   // And the books took them. A purchase with no payment will not post at all,
@@ -97,16 +120,17 @@ try {
   const lines = await db.query(
     `SELECT count(*)::int n FROM pc49.journal_line
       WHERE entry_id = $1 AND debit_account IS NOT NULL`, [posted?.e])
-  check('with a line for each way it was paid', lines.rows[0].n === 2, `${lines.rows[0].n} lines`)
+  check('with a line for each way it was paid', lines.rows[0].n === 3, `${lines.rows[0].n} lines`)
 
   // ---- And the screen says so afterwards ----------------------------------
   await page.reload({ waitUntil: 'networkidle' })
   const row = page.locator('tr').filter({ hasText: PARTNER })
   const shown = (await row.textContent()) ?? ''
   check('the saved row shows what was paid, not two blank cells',
-    shown.includes('1,500.00') && shown.includes('1,000.00'), shown.replace(/\s+/g, ' ').slice(-70))
-  check('and by which methods',
-    shown.includes('CASH') && shown.includes('BANKWIRE'))
+    shown.includes('1,500.00') && shown.includes('700.00') && shown.includes('300.00'),
+    shown.replace(/\s+/g, ' ').slice(-70))
+  check('and by which methods, all three of them',
+    shown.includes('CASH') && shown.includes('BANKWIRE') && shown.includes('ZELLE'))
 
   await page.screenshot({ path: 'payments.png', fullPage: false })
 } finally {
@@ -119,6 +143,10 @@ try {
     await db.query(`DELETE FROM pc49.gold_txn_payment WHERE txn_id = $1`, [t.id])
     await db.query(`DELETE FROM pc49.gold_txn WHERE id = $1`, [t.id])
   }
+  // Naming a customer on a row now files them in the catalogue, so the check
+  // has to take its invented one back out. A customer list that grew a test
+  // name on every run is a customer list nobody trusts.
+  await db.query(`DELETE FROM pc49.partner WHERE code = $1`, [PARTNER])
   await db.query(`UPDATE pc49.journal_entry SET posted_at = NULL WHERE period = $1`, [PERIOD])
   await db.query(`DELETE FROM pc49.journal_line WHERE entry_id IN (
                     SELECT id FROM pc49.journal_entry WHERE period = $1)`, [PERIOD])

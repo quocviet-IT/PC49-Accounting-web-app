@@ -31,6 +31,7 @@ function check(name, ok, detail = '') {
 const LOT = 'VERIFY.01'
 const SENT = '2019-04-02'
 const ASSAYED = '2019-04-09'
+const PICKED_FROM = 'verify-refining seller'
 
 const db = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } })
 await db.connect()
@@ -60,6 +61,55 @@ try {
   check('a lot can be opened from the screen', made.rows[0]?.s === 'DRAFT',
     made.rows[0]?.s ?? '(no lot)')
   lotId = made.rows[0]?.id
+
+
+  // ---- Assembling the lot out of the purchases going into it ---------------
+  //
+  // The checkbox column of sheet `1.Scrap Gold`. Until this existed the lines
+  // of a lot had to be retyped from the purchases they came from, which is
+  // both slower than the spreadsheet and a second place for the figures to
+  // disagree with each other.
+  await db.query(
+    `INSERT INTO pc49.gold_txn
+       (txn_date, txn_type, gold_type_code, uom, qty, unit_price, amount, partner_code,
+        scrap_detail, gold_pct)
+     VALUES ($1, 'PO', 'SG', 'GRAM', 20, 50, -1000, $2, '14k/grs', 0.583),
+            ($1, 'PO', 'SG', 'GRAM', 10, 90, -900,  $2, '23-24k/grs', 0.9893)`,
+    [SENT, PICKED_FROM])
+
+  await page.reload({ waitUntil: 'networkidle' })
+  const offered = page.getByLabel(new RegExp(`Chọn .*${PICKED_FROM}`))
+  check('the scrap bought is offered to the lot, not retyped into it',
+    (await offered.count()) === 2, `${await offered.count()} offered`)
+
+  await offered.first().check()
+  await offered.last().check()
+  await page.locator('button', { hasText: 'Đưa vào đợt' }).first().click()
+  await page.waitForTimeout(3000)
+
+  const linked = await db.query(
+    `SELECT count(*)::int AS n FROM pc49.refining_lot_source WHERE lot_id = $1`, [lotId])
+  check('ticking them puts them in the lot', linked.rows[0].n === 2, `${linked.rows[0].n} picked`)
+
+  // The four figures the spreadsheet's batch tab computes, in the two bands
+  // the scrap is actually sent in.
+  const bands = await db.query(
+    `SELECT grade_band AS b, gross_weight_gram::float8 AS gross,
+            round(pure_weight_gram, 4)::float8 AS pure, total_cost::float8 AS cost
+       FROM pc49.v_refining_lot_source_summary WHERE lot_id = $1 ORDER BY grade_band`, [lotId])
+  const low = bands.rows.find((r) => r.b === '10-18k/grs')
+  const high = bands.rows.find((r) => r.b === '19-24k/grs')
+  check('and totals them in the two bands the scrap is sent in',
+    bands.rows.length === 2
+      && low?.gross === 20 && low?.pure === 11.66 && low?.cost === 1000
+      && high?.gross === 10 && high?.pure === 9.893 && high?.cost === 900,
+    bands.rows.map((r) => `${r.b} ${r.gross}g/${r.pure}g24k/$${r.cost}`).join('  '))
+
+  const stillOffered = await db.query(
+    `SELECT count(*)::int AS n FROM pc49.v_refining_available_purchase WHERE partner_code = $1`,
+    [PICKED_FROM])
+  check('and takes them off the list of what can still be sent',
+    stillOffered.rows[0].n === 0, `${stillOffered.rows[0].n} left`)
 
   // Two owners on one shipment: PC49's metal and a partner's travel together.
   await db.query(
@@ -146,16 +196,42 @@ try {
   } catch (e) { skipped = /one stage at a time/.test(String(e.message)) }
   check('a lot cannot skip a stage', skipped)
 
-  // Closing while a partner is still owed metal is what turns "closed" into a
-  // claim somebody can check.
+  // Closing while a partner has been settled with in neither way is what turns
+  // "closed" into a claim somebody can check. The refusal no longer says "owes
+  // metal": since 0050 an owner may take the money instead, and a lot whose
+  // partner did was the one thing that could never be closed at all.
   let owing = false
   try {
     await db.query(`UPDATE pc49.refining_lot SET status = 'CLOSED' WHERE id = $1`, [lotId])
-  } catch (e) { owing = /still owes metal to MH/.test(String(e.message)) }
-  check('a lot will not close while a partner is still owed', owing)
+  } catch (e) { owing = /has not settled with MH/.test(String(e.message)) }
+  check('a lot will not close while a partner is settled with neither way', owing)
+
+  // And it closes once they take the money, which is column S of the source
+  // sheet: `Lấy tiền / Lấy vàng`.
+  await db.query(
+    `INSERT INTO pc49.refining_receipt
+       (lot_id, receive_date, gold_type_code, owner_code, settle_kind, amount_usd)
+     VALUES ($1, '2019-04-20', 'GRAIN', 'MH', 'CASH', 64000)`, [lotId])
+  let closed = false
+  try {
+    await db.query(`UPDATE pc49.refining_lot SET status = 'CLOSED' WHERE id = $1`, [lotId])
+    const r = await db.query(
+      `SELECT status::text AS s FROM pc49.refining_lot WHERE id = $1`, [lotId])
+    closed = r.rows[0].s === 'CLOSED'
+  } catch (e) { closed = String(e.message) }
+  check('and closes once the partner takes the money instead', closed === true,
+    closed === true ? '' : String(closed))
 } finally {
   await browser.close()
   // The client's database is not a scratch pad.
+  const bought = await db.query(
+    `SELECT id FROM pc49.gold_txn WHERE partner_code = $1`, [PICKED_FROM])
+  for (const t of bought.rows) {
+    await db.query(`DELETE FROM pc49.refining_lot_source WHERE txn_id = $1`, [t.id])
+    await db.query(`DELETE FROM pc49.inventory_movement WHERE source_id = $1`, [t.id])
+    await db.query(`DELETE FROM pc49.gold_txn WHERE id = $1`, [t.id])
+  }
+  await db.query(`DELETE FROM pc49.partner WHERE code = $1`, [PICKED_FROM])
   await db.query(`DELETE FROM pc49.refining_receipt WHERE lot_id IN (
                     SELECT id FROM pc49.refining_lot WHERE lot_code LIKE $1)`, [`${LOT}%`])
   await db.query(`DELETE FROM pc49.refining_lot_line WHERE lot_id IN (

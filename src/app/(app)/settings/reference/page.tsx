@@ -1,5 +1,6 @@
 import {
   ReferenceView, type Param, type GoldTypeRow, type CashAccountRow, type SalesPersonRow,
+  type PartnerRow,
 } from '@/components/settings/ReferenceView'
 import { Forbidden } from '@/components/Forbidden'
 import { getCurrentUser } from '@/lib/auth/currentUser'
@@ -14,7 +15,8 @@ export default async function ReferencePage() {
   }
 
   const supabase = await createServerSupabase()
-  const [paramResult, goldResult, cashResult, salesResult, accountResult] = await Promise.all([
+  const [paramResult, goldResult, cashResult, salesResult, partnerResult, accountResult] =
+    await Promise.all([
     supabase.from('system_param')
       .select('key, value, unit, description, description_vi').order('key'),
     supabase.from('gold_type')
@@ -24,6 +26,7 @@ export default async function ReferencePage() {
       .select('code, display_name, account_type, bank_name, status_note, is_active')
       .order('sort_order'),
     supabase.from('sales_person').select('code, full_name, is_active').order('code'),
+    supabase.from('partner').select('code, full_name, phone, is_active').order('code'),
     supabase.from('account').select('code'),
   ])
 
@@ -62,12 +65,21 @@ export default async function ReferencePage() {
       isActive: Boolean(r.is_active),
     }))
 
+  const partners: PartnerRow[] = (partnerResult.data ?? []).map(
+    (r: Record<string, unknown>) => ({
+      code: r.code as string,
+      fullName: (r.full_name as string) ?? null,
+      phone: (r.phone as string) ?? null,
+      isActive: Boolean(r.is_active),
+    }))
+
   return (
     <ReferenceView
         params={params}
         goldTypes={goldTypes}
         cashAccounts={cashAccounts}
         salesPeople={salesPeople}
+        partners={partners}
         accountCount={accountResult.data?.length ?? 0}
       />
   )

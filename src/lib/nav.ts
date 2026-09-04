@@ -40,6 +40,11 @@ const ALL: NavItem[] = [
       { key: '/prices', labelKey: 'nav.prices', requires: 'goldTxn.write' },
       { key: '/refining', labelKey: 'nav.refining', requires: 'refining.write' },
       { key: '/inventory', labelKey: 'nav.inventory', requires: 'report.read' },
+      // Reachable from the settings hub since it was built, and nowhere else,
+      // which is how somebody with the spreadsheet open in front of them
+      // reported that the system could not load one. It is a screen you use
+      // next to the day's entry, not a thing you configure once.
+      { key: '/import', labelKey: 'nav.import', requires: 'dataImport.run' },
     ],
   },
   {

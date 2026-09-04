@@ -58,6 +58,33 @@
   margin-left: auto;
 }
 
+.dateField {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dateLabel {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dateInput {
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  background: transparent;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+}
+
+.dateInput:focus {
+  background: var(--pc-accent-wash);
+  outline: 2px solid var(--pc-intent-primary);
+  outline-offset: -2px;
+}
+
 .scroll {
   flex: 1;
   overflow: auto;
@@ -250,3 +277,13 @@
 }
 
 .voidButton:disabled { opacity: 0.45; cursor: default; }
+
+.shareLine {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sharePct {
+  max-width: 56px;
+}

@@ -39,6 +39,22 @@ describe('what each role is offered', () => {
     expect(paths('GS_US')).not.toContain('/prices')
   })
 
+  it('offers the data import to whoever may run one', () => {
+    // It sat behind the settings hub and nowhere else, so somebody with the
+    // spreadsheet in front of them reported that the system could not load
+    // one. It is a screen used beside the day's entry, not a setting.
+    for (const role of ['KT', 'ADMIN'] as const) {
+      expect(paths(role)).toContain('/import')
+    }
+    for (const role of ['GS_US', 'OC'] as const) {
+      expect(paths(role)).not.toContain('/import')
+    }
+  })
+
+  it('puts the data import beside the day it feeds, not in settings', () => {
+    expect(findActiveGroup('/import')).toBe('trading')
+  })
+
   it('offers settings to everyone with something behind it', () => {
     // Three roles reach three different cards there; the owner reaches none.
     for (const role of ['KT', 'GS_US', 'ADMIN'] as const) {

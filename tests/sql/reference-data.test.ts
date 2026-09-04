@@ -174,3 +174,58 @@ describe('sales people', () => {
     expect(r.rows.map((x) => x.code)).toContain('S.Mai')
   })
 })
+
+describe('the customers traded with', () => {
+  it('lists everybody already named on a transaction', async () => {
+    // The catalogue was created after two years of trading, so it had to start
+    // by describing what was already there rather than empty.
+    await db.query(
+      `INSERT INTO pc49.gold_txn
+         (txn_date, txn_type, gold_type_code, uom, qty, amount, partner_code)
+       VALUES ('2026-02-02', 'PO', 'SG', 'GRAM', 5, -250, 'BACKFILLME')`)
+    // The seed in 0049 has already run; this stands in for what it did.
+    await db.query(
+      `INSERT INTO pc49.partner (code)
+       SELECT DISTINCT partner_code FROM pc49.gold_txn
+        WHERE partner_code IS NOT NULL AND btrim(partner_code) <> ''
+       ON CONFLICT (code) DO NOTHING`)
+    const r = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pc49.partner WHERE code = 'BACKFILLME'`)
+    expect(Number(r.rows[0].n)).toBe(1)
+  })
+
+  it('keeps a phone number as text, so a leading zero survives', async () => {
+    await db.query(
+      `INSERT INTO pc49.partner (code, full_name, phone)
+       VALUES ('CHIHOA', 'Chi Hoa', '0912345678')
+       ON CONFLICT (code) DO UPDATE SET phone = EXCLUDED.phone`)
+    const r = await db.query<{ phone: string }>(
+      `SELECT phone FROM pc49.partner WHERE code = 'CHIHOA'`)
+    expect(r.rows[0].phone).toBe('0912345678')
+  })
+
+  it('holds one number per customer, however many orders they have', async () => {
+    await db.query(
+      `INSERT INTO pc49.partner (code, phone) VALUES ('ONCE', '111')
+       ON CONFLICT (code) DO UPDATE SET phone = EXCLUDED.phone`)
+    await db.query(
+      `INSERT INTO pc49.partner (code, phone) VALUES ('ONCE', '222')
+       ON CONFLICT (code) DO UPDATE SET phone = EXCLUDED.phone`)
+    const r = await db.query<{ n: string; phone: string }>(
+      `SELECT count(*)::text AS n, max(phone) AS phone
+         FROM pc49.partner WHERE code = 'ONCE'`)
+    expect(Number(r.rows[0].n)).toBe(1)
+    expect(r.rows[0].phone).toBe('222')
+  })
+
+  it('does not stop a transaction naming somebody who is not on the list', async () => {
+    // The old workbooks carry codes nobody ever catalogued. A foreign key here
+    // would refuse a real day's trading over a spelling, so there is not one.
+    const r = await db.query<{ id: string }>(
+      `INSERT INTO pc49.gold_txn
+         (txn_date, txn_type, gold_type_code, uom, qty, amount, partner_code)
+       VALUES ('2026-02-03', 'PO', 'SG', 'GRAM', 1, -50, 'NEVER-CATALOGUED')
+       RETURNING id`)
+    expect(r.rows[0].id).toBeTruthy()
+  })
+})
