@@ -35,6 +35,9 @@ const rowSchema = z.object({
   unitPrice: z.number().nullable(),
   amount: z.number(),
   partnerCode: z.string().nullable(),
+  // The customer's telephone number, which is a fact about the customer and
+  // is stored against them rather than on this row.
+  partnerPhone: z.string().trim().max(40).nullable().default(null),
   salesPeople: z.array(salesShareSchema).max(10)
     .refine((list) => new Set(list.map((p) => p.code)).size === list.length,
       'the same person is on this order twice')
@@ -96,6 +99,23 @@ export async function saveTransaction(input: unknown): Promise<SaveResult> {
     .single()
 
   if (error) return { ok: false, message: error.message }
+
+  // Naming a customer on a row is what puts them in the catalogue: nobody has
+  // to enter a list before they can trade. A number given here is written
+  // against the customer, so it is there next time whoever serves them opens
+  // the screen. A blank leaves whatever is on file alone — this records a
+  // number, it does not delete one, and an empty box is far more often "I did
+  // not type it" than "she no longer has a telephone".
+  if (row.partnerCode) {
+    const partner: { code: string; phone?: string } = { code: row.partnerCode }
+    if (row.partnerPhone) partner.phone = row.partnerPhone
+    const { error: partnerError } = await supabase
+      .from('partner')
+      .upsert(partner, { onConflict: 'code' })
+    // Not fatal. A transaction that posted correctly must not be reported as
+    // failed because the address book could not be updated.
+    if (partnerError) console.error('partner not recorded:', partnerError.message)
+  }
 
   // In one statement, so the deferred check that the shares come to a hundred
   // sees the whole split rather than the first name on its own.

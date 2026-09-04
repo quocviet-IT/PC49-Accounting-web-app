@@ -136,6 +136,10 @@ try {
     await db.query(`DELETE FROM pc49.gold_txn_payment WHERE txn_id = $1`, [t.id])
     await db.query(`DELETE FROM pc49.gold_txn WHERE id = $1`, [t.id])
   }
+  // Naming a customer on a row now files them in the catalogue, so the check
+  // has to take its invented one back out. A customer list that grew a test
+  // name on every run is a customer list nobody trusts.
+  await db.query(`DELETE FROM pc49.partner WHERE code = $1`, [PARTNER])
   await db.query(`UPDATE pc49.journal_entry SET posted_at = NULL WHERE period = $1`, [PERIOD])
   await db.query(`DELETE FROM pc49.journal_line WHERE entry_id IN (
                     SELECT id FROM pc49.journal_entry WHERE period = $1)`, [PERIOD])

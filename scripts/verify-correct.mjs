@@ -17,7 +17,7 @@ import { chromium } from 'playwright'
 import pg from 'pg'
 import { openPage, signIn } from './support/page.mjs'
 import { accountFor } from './support/accounts.mjs'
-import { untilRow, untilRowIs } from './support/until.mjs'
+import { until, untilRowIs } from './support/until.mjs'
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const url = process.env.SUPABASE_DB_URL
@@ -80,12 +80,24 @@ try {
     voided !== null && /600/.test(voided.why ?? ''), voided?.why ?? '')
 
   // The whole point: what was typed comes back, so one field changes.
+  //
+  // Waited for rather than read straight away. The poll above returns the
+  // moment the database says the row is cancelled, which is a round trip
+  // before the browser has been told and the replacement row drawn — so
+  // reading here found the empty row waiting at the foot of the grid and
+  // called a working correction broken, about half the time.
+  const arrived = await until(async () =>
+    (await page.getByLabel('Đơn giá').count()) > 1
+      && (await page.getByLabel('Đơn giá').last().inputValue()) === '600')
+
   const price = page.getByLabel('Đơn giá').last()
   check('and the new row arrives holding what the old one said',
-    (await price.inputValue()) === '600'
+    arrived !== null
       && (await page.getByLabel('Khách / NCC').last().inputValue()) === PARTNER
       && (await page.getByLabel('Thanh toán 1').last().inputValue()) === '12000',
-    await page.getByLabel('Khách / NCC').last().inputValue())
+    arrived === null
+      ? '(the replacement row never arrived)'
+      : await page.getByLabel('Khách / NCC').last().inputValue())
 
   // Change the one thing that was wrong.
   await price.fill('60')
@@ -133,6 +145,10 @@ try {
     await db.query(`DELETE FROM pc49.gold_txn_payment WHERE txn_id = $1`, [t.id])
     await db.query(`DELETE FROM pc49.gold_txn WHERE id = $1`, [t.id])
   }
+  // Naming a customer on a row now files them in the catalogue, so the check
+  // has to take its invented one back out. A customer list that grew a test
+  // name on every run is a customer list nobody trusts.
+  await db.query(`DELETE FROM pc49.partner WHERE code = $1`, [PARTNER])
   await db.query(`UPDATE pc49.journal_entry SET posted_at = NULL WHERE period = $1`, [PERIOD])
   await db.query(`DELETE FROM pc49.journal_line WHERE entry_id IN (
                     SELECT id FROM pc49.journal_entry WHERE period = $1)`, [PERIOD])

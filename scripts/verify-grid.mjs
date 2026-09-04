@@ -45,11 +45,11 @@ await page.getByLabel('Tuổi vàng', { exact: true }).first().fill('14k/grs')
 await page.getByLabel('Số lượng', { exact: true }).first().fill('4.5')
 await page.getByLabel('Đơn giá', { exact: true }).first().fill('55.55555556')
 
-const amount = await page.locator('tbody tr').first().locator('td').nth(9).textContent()
+const amount = await page.locator('tbody tr').first().locator('td').nth(10).textContent()
 // A purchase is a negative amount by the source convention: gold in, money out.
 check('amount is calculated, negative for a purchase', amount?.trim() === '-250.00', amount ?? '')
 
-const grams = await page.locator('tbody tr').first().locator('td').nth(7).textContent()
+const grams = await page.locator('tbody tr').first().locator('td').nth(8).textContent()
 check('the gram equivalent shows next to the quantity', (grams ?? '').includes('4.50 g'), grams ?? '')
 
 await page.getByLabel('Thanh toán 1', { exact: true }).first().fill('250')
@@ -149,6 +149,33 @@ await split.getByLabel('Thanh toán 1', { exact: true }).fill('100')
 await split.getByLabel('Ghi chú', { exact: true }).press('Enter')
 await page.waitForTimeout(2500)
 
+// ---- The customer's telephone number ----------------------------------------
+//
+// Reported as "khong co truong nhap sdt khach". It is typed on the row, where
+// the customer is standing, but written against the customer — so it comes
+// back up next time somebody serves them instead of being retyped per order.
+await page.reload({ waitUntil: 'networkidle' })
+const phoned = page.locator('tbody tr').last()
+await phoned.getByLabel('Loại', { exact: true }).selectOption('PO')
+await phoned.getByLabel('Loại vàng', { exact: true }).selectOption('SG')
+await phoned.getByLabel('Khách / NCC', { exact: true }).fill('CHIHOA-VERIFY')
+await phoned.getByLabel('SĐT khách', { exact: true }).fill('0912345678')
+await phoned.getByLabel('Số lượng', { exact: true }).fill('1')
+await phoned.getByLabel('Đơn giá', { exact: true }).fill('50')
+await phoned.getByLabel('Thanh toán 1', { exact: true }).fill('50')
+await phoned.getByLabel('Ghi chú', { exact: true }).press('Enter')
+await page.waitForTimeout(2500)
+
+// The proof is that it survives leaving the screen: it is on the customer now,
+// not on the row that happened to record it.
+await page.reload({ waitUntil: 'networkidle' })
+const again = page.locator('tbody tr').last()
+await again.getByLabel('Khách / NCC', { exact: true }).fill('CHIHOA-VERIFY')
+await page.waitForTimeout(500)
+check('naming a known customer brings their number back up',
+  (await again.getByLabel('SĐT khách', { exact: true }).inputValue()) === '0912345678',
+  await again.getByLabel('SĐT khách', { exact: true }).inputValue())
+
 await page.screenshot({ path: 'grid.png', fullPage: true })
 console.log('\nscreenshot written to grid.png')
 
@@ -197,10 +224,21 @@ if (dbUrl) {
       await db.query('DELETE FROM pc49.journal_entry WHERE id = $1', [row.journal_entry_id])
     }
   }
+  // The customer this run invented goes too. The rows it was named on are
+  // already gone, and a catalogue that grew a test name every run is a
+  // catalogue nobody trusts.
+  await db.query(
+    `DELETE FROM pc49.partner WHERE code IN ('CHIHOA-VERIFY', 'SPLITCO', 'HPAREZ')
+       AND code NOT IN (SELECT DISTINCT partner_code FROM pc49.gold_txn
+                         WHERE partner_code IS NOT NULL)`)
+
   const left = await db.query(
     'SELECT count(*)::int AS n FROM pc49.gold_txn WHERE txn_date = $1', [DAY])
-  check('the check cleaned up after itself', left.rows[0].n === 0,
-    `${left.rows[0].n} transaction(s) left`)
+  const strays = await db.query(
+    `SELECT count(*)::int AS n FROM pc49.partner WHERE code = 'CHIHOA-VERIFY'`)
+  check('the check cleaned up after itself',
+    left.rows[0].n === 0 && strays.rows[0].n === 0,
+    `${left.rows[0].n} transaction(s), ${strays.rows[0].n} partner(s) left`)
   await db.end()
 } else {
   console.log('NOTE  SUPABASE_DB_URL is not set, so the typed rows were left in the database')

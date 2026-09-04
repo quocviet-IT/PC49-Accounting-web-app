@@ -24,14 +24,18 @@ export type CashAccountRow = {
   bankName: string | null; statusNote: string | null; isActive: boolean
 }
 export type SalesPersonRow = { code: string; fullName: string | null; isActive: boolean }
+export type PartnerRow = {
+  code: string; fullName: string | null; phone: string | null; isActive: boolean
+}
 
 export function ReferenceView({
-  params, goldTypes, cashAccounts, salesPeople, accountCount,
+  params, goldTypes, cashAccounts, salesPeople, partners, accountCount,
 }: {
   params: Param[]
   goldTypes: GoldTypeRow[]
   cashAccounts: CashAccountRow[]
   salesPeople: SalesPersonRow[]
+  partners: PartnerRow[]
   accountCount: number
 }) {
   const { locale, t } = useLocale()
@@ -210,6 +214,42 @@ export function ReferenceView({
             </tbody>
           </table>
         </Frame>
+      </Section>
+
+      <Section titleKey="ref.partners">
+        <Frame>
+          <table className={ledger.table}>
+            <colgroup>
+              <col style={{ width: '22%' }} /><col style={{ width: '38%' }} />
+              <col style={{ width: '25%' }} /><col style={{ width: '15%' }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>{t('ref.code')}</th>
+                <th>{t('ref.name')}</th>
+                <th>{t('ref.phone')}</th>
+                <th>{t('ref.state')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {partners.map((p) => (
+                <tr key={p.code} className={p.isActive ? undefined : ledger.aside}>
+                  <td>{p.code}</td>
+                  <td>{p.fullName ?? '—'}</td>
+                  <td>{p.phone ?? '—'}</td>
+                  <td>
+                    <span className={ledger.badge}>
+                      {t(p.isActive ? 'ref.active' : 'ref.inactive')}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Frame>
+        {/* The list fills itself from the entry screen, so it starts empty on
+            a fresh database rather than being wrong. */}
+        <p className={ledger.note}>{t('ref.partnersNote')}</p>
       </Section>
 
       <p className={ledger.note}>{t('ref.chartNote')}: {accountCount}</p>

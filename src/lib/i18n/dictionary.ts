@@ -113,6 +113,9 @@ export const dictionary = {
     'txn.shareMissing': 'Mỗi người trên đơn cần một tỷ lệ',
     'txn.shareBad': 'Tỷ lệ chia giữa các nhân viên phải cộng đủ 100%',
     'txn.col.partner': 'Khách / NCC',
+    // Belongs to the customer, not to the row: typing it here writes it
+    // against them, and naming a customer we know brings it back up.
+    'txn.col.phone': 'SĐT khách',
     'txn.col.gold': 'Loại vàng',
     'txn.col.scrap': 'Tuổi vàng',
     // The same fact as the note beside it, as a number a report can use.
@@ -242,6 +245,9 @@ export const dictionary = {
     'ref.type': 'Loại',
     'ref.bank': 'Ngân hàng',
     'ref.statusNote': 'Ghi chú',
+    'ref.partners': 'Khách hàng & nhà cung cấp',
+    'ref.phone': 'Số điện thoại',
+    'ref.partnersNote': 'Danh sách tự thêm khi gõ tên khách trên màn hình giao dịch. Số điện thoại lưu theo khách, dùng chung cho mọi đơn của khách đó.',
     'ref.salesPeople': 'Nhân viên bán',
     'ref.chartNote': 'Số tài khoản trong hệ thống tài khoản',
     'set.import': 'Nạp dữ liệu',
@@ -517,6 +523,7 @@ export const dictionary = {
     'txn.shareMissing': 'Everybody on the order needs a share',
     'txn.shareBad': 'The shares between staff must come to 100%',
     'txn.col.partner': 'Customer / Vendor',
+    'txn.col.phone': 'Phone',
     'txn.col.gold': 'Gold',
     'txn.col.scrap': 'Purity',
     'txn.col.purity': 'Purity (0–1)',
@@ -641,6 +648,9 @@ export const dictionary = {
     'ref.type': 'Type',
     'ref.bank': 'Bank',
     'ref.statusNote': 'Note',
+    'ref.partners': 'Customers & vendors',
+    'ref.phone': 'Phone',
+    'ref.partnersNote': 'The list fills itself as customers are named on the entry screen. A phone number is kept against the customer and is the same on every order of theirs.',
     'ref.salesPeople': 'Sales people',
     'ref.chartNote': 'Accounts in the chart of accounts',
     'set.import': 'Data import',

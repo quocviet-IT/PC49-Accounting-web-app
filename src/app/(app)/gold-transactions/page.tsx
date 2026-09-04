@@ -25,13 +25,16 @@ export default async function GoldTransactionsPage({
 
   const supabase = await createServerSupabase()
 
-  const [goldTypesResult, salesResult, existingResult, paymentsResult, sharesResult] =
-    await Promise.all([
+  const [goldTypesResult, salesResult, partnerResult, existingResult, paymentsResult,
+         sharesResult] = await Promise.all([
     supabase.from('gold_type')
       .select('code, name_vi, name_en, native_uom')
       .eq('is_active', true)
       .order('sort_order'),
     supabase.from('sales_person').select('code').eq('is_active', true).order('code'),
+    // Who has been traded with, and how to reach them. Offered as suggestions
+    // on the row so the codes converge on one spelling instead of drifting.
+    supabase.from('partner').select('code, phone').eq('is_active', true).order('code'),
     supabase.from('gold_txn')
       .select('id, txn_type, partner_code, sales_person_code, gold_type_code, scrap_detail, gold_pct, uom, qty, unit_price, amount, remarks')
       .eq('txn_date', txnDate)
@@ -77,6 +80,7 @@ export default async function GoldTransactionsPage({
         txnDate={txnDate}
         goldTypes={(goldTypesResult.data ?? []) as GoldTypeOption[]}
         salesPeople={(salesResult.data ?? []).map((s: { code: string }) => s.code)}
+        partners={(partnerResult.data ?? []) as { code: string; phone: string | null }[]}
         existing={((existingResult.data ?? []) as Omit<SavedRow, 'payments' | 'soldBy'>[])
           .map((r) => ({
             ...r,

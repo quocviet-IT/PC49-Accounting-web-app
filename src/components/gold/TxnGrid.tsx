@@ -53,6 +53,8 @@ type Draft = {
   /** Whoever worked the order. Always ends in an empty line. */
   salesPeople: DraftShare[]
   partnerCode: string
+  /** The customer's number. Stored against the customer, not on the row. */
+  partnerPhone: string
   goldTypeCode: string
   scrapDetail: string
   goldPct: string
@@ -84,7 +86,7 @@ const MAX_SALES_PEOPLE = 10
 function blankDraft(key: number): Draft {
   return {
     key, txnType: 'PO', salesPeople: [{ code: '', sharePct: '100' }],
-    partnerCode: '', goldTypeCode: '',
+    partnerCode: '', partnerPhone: '', goldTypeCode: '',
     scrapDetail: '', goldPct: '', uom: '', qty: '', unitPrice: '',
     payments: [{ amount: '', method: 'CASH' }], remarks: '',
   }
@@ -107,11 +109,13 @@ export function TxnGrid({
   txnDate,
   goldTypes,
   salesPeople,
+  partners,
   existing,
 }: {
   txnDate: string
   goldTypes: GoldTypeOption[]
   salesPeople: string[]
+  partners: { code: string; phone: string | null }[]
   existing: SavedRow[]
 }) {
   const { locale, t } = useLocale()
@@ -129,11 +133,19 @@ export function TxnGrid({
   const goldName = (g: GoldTypeOption) => (locale === 'vi' ? g.name_vi : g.name_en)
   const uomOf = (code: string) => goldTypes.find((g) => g.code === code)?.native_uom ?? ''
 
+  /** The number already on file for a customer, if this is one we know. */
+  const phoneOf = (code: string) =>
+    partners.find((p) => p.code === code.trim())?.phone ?? ''
+
   function patch(key: number, change: Partial<Draft>) {
     setDrafts((rows) => rows.map((r) => {
       if (r.key !== key) return r
       const next = { ...r, ...change, error: undefined }
       if (change.goldTypeCode !== undefined) next.uom = uomOf(change.goldTypeCode)
+      // Naming a customer we know brings their number up rather than making
+      // somebody go and look it up. Typing over it changes it for that
+      // customer, which is the only thing a telephone number can mean.
+      if (change.partnerCode !== undefined) next.partnerPhone = phoneOf(change.partnerCode)
       return next
     }))
   }
@@ -242,7 +254,8 @@ export function TxnGrid({
         qty,
         unitPrice: price,
         amount,
-        partnerCode: row.partnerCode || null,
+        partnerCode: row.partnerCode.trim() || null,
+        partnerPhone: row.partnerPhone.trim() || null,
         salesPeople: soldBy,
         scrapDetail: row.scrapDetail || null,
         goldPct: row.goldPct ? Number(row.goldPct) : null,
@@ -347,6 +360,7 @@ export function TxnGrid({
         { code: '', sharePct: r.soldBy.length === 0 ? '100' : '' },
       ],
       partnerCode: r.partner_code ?? '',
+      partnerPhone: phoneOf(r.partner_code ?? ''),
       goldTypeCode: r.gold_type_code,
       scrapDetail: r.scrap_detail ?? '',
       goldPct: r.gold_pct === null ? '' : String(r.gold_pct),
@@ -400,6 +414,7 @@ export function TxnGrid({
               <th>{t('txn.col.type')}</th>
               <th>{t('txn.col.sales')}</th>
               <th>{t('txn.col.partner')}</th>
+              <th>{t('txn.col.phone')}</th>
               <th>{t('txn.col.gold')}</th>
               <th>{t('txn.col.scrap')}</th>
               <th className={styles.num}>{t('txn.col.purity')}</th>
@@ -426,6 +441,9 @@ export function TxnGrid({
                     : r.sales_person_code}
                 </td>
                 <td>{r.partner_code}</td>
+                {/* Read off the customer, not off the row — one number per
+                    person, so it is the same on every order they appear on. */}
+                <td>{phoneOf(r.partner_code ?? '')}</td>
                 <td>{goldTypes.find((g) => g.code === r.gold_type_code)
                       ? goldName(goldTypes.find((g) => g.code === r.gold_type_code)!)
                       : r.gold_type_code}</td>
@@ -549,9 +567,18 @@ export function TxnGrid({
                     )}
                   </td>
                   <td>
-                    <input className={styles.cell} value={row.partnerCode} disabled={!!row.savedId}
+                    <input className={styles.cell} list="partners" value={row.partnerCode}
+                           disabled={!!row.savedId}
                            aria-label={t('txn.col.partner')}
                            onChange={(e) => patch(row.key, { partnerCode: e.target.value })} />
+                  </td>
+                  {/* Typed here because here is where the customer is standing,
+                      but written against the customer rather than the row. */}
+                  <td>
+                    <input className={styles.cell} inputMode="tel" value={row.partnerPhone}
+                           disabled={!!row.savedId}
+                           aria-label={t('txn.col.phone')}
+                           onChange={(e) => patch(row.key, { partnerPhone: e.target.value })} />
                   </td>
                   <td>
                     <select className={styles.select} value={row.goldTypeCode} disabled={!!row.savedId}
@@ -648,6 +675,10 @@ export function TxnGrid({
         </table>
 
         {savedCount === 0 && <p className={styles.empty}>{t('txn.empty')}</p>}
+
+        <datalist id="partners">
+          {partners.map((p) => <option key={p.code} value={p.code} />)}
+        </datalist>
 
         <datalist id="sales-people">
           {salesPeople.map((s) => <option key={s} value={s} />)}
