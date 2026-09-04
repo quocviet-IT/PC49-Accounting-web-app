@@ -78,3 +78,54 @@
   flex-wrap: wrap;
   margin-bottom: 14px;
 }
+
+/* Assembling a lot out of the purchases going into it: the checkbox column of
+   sheet 1.Scrap Gold, and the four totals its batch tab computes. Dense,
+   because the point is to scan a month of counter purchases and tick some. */
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.pickerTitle {
+  font-size: 13px;
+  font-weight: 650;
+  margin: 0;
+}
+
+.pickTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.pickTable th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pc-text-faint);
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--pc-border-default);
+  white-space: nowrap;
+}
+
+.pickTable td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--pc-border-subtle);
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+
+.none {
+  font-size: 12px;
+  color: var(--pc-text-faint);
+  margin: 0;
+}

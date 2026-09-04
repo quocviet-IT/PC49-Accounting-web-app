@@ -4,6 +4,7 @@ import { useLocale } from '@/lib/i18n/provider'
 import { Page, Section, Empty, Signed, weight, ledger, Frame } from '@/components/ledger/Ledger'
 import { ReceiveRow } from './ReceiveRow'
 import { AddLine, AdvanceLot, NewLot, type GoldOption } from './LotLifecycle'
+import { PurchasePicker, type AvailablePurchase, type PickedBand } from './PurchasePicker'
 import styles from './Refining.module.css'
 
 export type LotRow = {
@@ -42,8 +43,18 @@ function canReceive(status: string): boolean {
 }
 
 export function RefiningView({
+  available,
+  pickedByLot,
+  bandsByLot,
   lots, shares, goldTypes,
-}: { lots: LotRow[]; shares: ShareRow[]; goldTypes: GoldOption[] }) {
+}: {
+  lots: LotRow[]
+  shares: ShareRow[]
+  goldTypes: GoldOption[]
+  available: AvailablePurchase[]
+  pickedByLot: Record<string, AvailablePurchase[]>
+  bandsByLot: Record<string, PickedBand[]>
+}) {
   const { t } = useLocale()
 
   // An empty screen still has to offer the way in. This used to return early
@@ -101,7 +112,10 @@ export function RefiningView({
 
       {lots.map((l) => {
         const own = shares.filter((s) => s.lotId === l.lotId)
-        if (own.length === 0) return null
+        const picked = pickedByLot[l.lotId] ?? []
+        // A draft with nothing in it yet is exactly the lot somebody needs the
+        // picker for, so it no longer disappears for having no lines.
+        if (own.length === 0 && l.status !== 'DRAFT') return null
         return (
           <Section key={`${l.lotId}-owners`}>
             <h2 className={ledger.sectionTitle}>{l.lotCode} · {t('refining.owner')}</h2>
@@ -109,6 +123,18 @@ export function RefiningView({
               <AdvanceLot lotId={l.lotId} status={l.status} />
               {l.status === 'DRAFT' && <AddLine lotId={l.lotId} goldTypes={goldTypes} />}
             </div>
+            {/* The checkbox column of sheet 1.Scrap Gold: a lot is assembled
+                out of the purchases going into it, not retyped. Only while it
+                is a draft — once the gold has left the vault, what was in the
+                bag is a matter of record. */}
+            {l.status === 'DRAFT' && (
+              <PurchasePicker
+                  lotId={l.lotId}
+                  available={available}
+                  picked={picked}
+                  pickedTotals={bandsByLot[l.lotId] ?? []}
+              />
+            )}
             <Frame>
 <table className={ledger.table}>
                 <thead>

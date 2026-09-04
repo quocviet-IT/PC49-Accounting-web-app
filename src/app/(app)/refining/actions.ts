@@ -8,14 +8,19 @@ const receiptSchema = z.object({
   lotId: z.string().uuid(),
   ownerCode: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'a receipt needs the day it arrived'),
-  qtyGram: z.number().positive('a receipt of nothing is not a receipt'),
+  // Lấy vàng or lấy tiền — column S of the source sheet. Metal carries a
+  // weight, cash carries an amount, and the shape follows the choice.
+  settleKind: z.enum(['METAL', 'CASH']).default('METAL'),
+  qtyGram: z.number().positive('a receipt of nothing is not a receipt').nullable().default(null),
   unitPrice: z.number().positive().nullable().optional(),
+  amountUsd: z.number().positive('taking money means taking an amount')
+    .nullable().default(null),
 })
 
 export type ReceiptResult = { ok: true } | { ok: false; message: string }
 
 /**
- * Records gold coming back from the refinery.
+ * Records how an owner was settled: gold back, or money.
  *
  * This is the third stage the source spreadsheet has no column for, and its
  * absence is why nobody could prove a lot had been settled. `receive_refining`
@@ -25,6 +30,10 @@ export type ReceiptResult = { ok: true } | { ok: false; message: string }
  * Several receipts against one lot are normal: metal comes back in more than
  * one delivery, and each is recorded as it arrives rather than waiting for the
  * last one.
+ *
+ * An owner may also take the money instead, which the source sheet has a
+ * column for and this system did not. Until it did, a pooled lot whose partner
+ * took cash could never be closed.
  */
 export async function recordReceipt(input: unknown): Promise<ReceiptResult> {
   const parsed = receiptSchema.safeParse(input)
@@ -38,6 +47,8 @@ export async function recordReceipt(input: unknown): Promise<ReceiptResult> {
     p_owner_code: parsed.data.ownerCode,
     p_qty_gram: parsed.data.qtyGram,
     p_unit_price: parsed.data.unitPrice ?? null,
+    p_settle_kind: parsed.data.settleKind,
+    p_amount_usd: parsed.data.amountUsd,
   })
   // The database's refusals name the lot and its stage, so they are passed on
   // as they are.
@@ -180,4 +191,60 @@ export async function advanceLot(input: unknown): Promise<LineResult> {
 
   revalidatePath('/refining')
   return { ok: true }
+}
+
+const pickSchema = z.object({
+  lotId: z.string().uuid(),
+  txnIds: z.array(z.string().uuid()).min(1, 'pick at least one purchase'),
+})
+
+export type PickResult = { ok: true; picked: number } | { ok: false; message: string }
+
+/**
+ * Puts purchases into a lot.
+ *
+ * This is the checkbox column of sheet `1.Scrap Gold`, which is how a refining
+ * batch is actually assembled: nobody retypes weights, they tick the purchases
+ * physically going in the bag and the totals fall out. Picking one that is
+ * already in another lot is refused by the table, because gold cannot be sent
+ * twice and a screen is not the only way in.
+ */
+export async function pickPurchases(input: unknown): Promise<PickResult> {
+  const parsed = pickSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Invalid selection' }
+  }
+  const supabase = await createServerSupabase()
+  const { error } = await supabase.from('refining_lot_source').insert(
+    parsed.data.txnIds.map((txnId) => ({ lot_id: parsed.data.lotId, txn_id: txnId })),
+  )
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/refining')
+  return { ok: true, picked: parsed.data.txnIds.length }
+}
+
+const unpickSchema = z.object({
+  lotId: z.string().uuid(),
+  txnId: z.string().uuid(),
+})
+
+/**
+ * Takes one back out again, while the lot is still being assembled.
+ *
+ * Unticking a box, in other words. The purchase returns to the list of scrap
+ * that could still be sent somewhere.
+ */
+export async function unpickPurchase(input: unknown): Promise<PickResult> {
+  const parsed = unpickSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Invalid request' }
+  }
+  const supabase = await createServerSupabase()
+  const { error } = await supabase.from('refining_lot_source').delete()
+    .eq('lot_id', parsed.data.lotId).eq('txn_id', parsed.data.txnId)
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/refining')
+  return { ok: true, picked: 0 }
 }

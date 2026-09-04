@@ -88,9 +88,16 @@ try {
       WHERE txn_date = $1 AND partner_code = $2`, [DAY, PARTNER])
   check('the order saves', saved !== null, saved ? `${saved.amount}` : '(nothing)')
 
-  const paid = await db.query(
-    `SELECT seq, amount::float8 AS amount, method::text FROM pc49.gold_txn_payment
-      WHERE txn_id = $1 ORDER BY seq`, [saved?.id])
+  // Waited for, like the posting below. Saving is several round trips — the
+  // row, whoever sold it, its payments, then the posting — and a read that
+  // stops at the first finds the transaction there and its payments not yet
+  // written, which reads as "the payments were lost" rather than "ask again".
+  const paid = await until(async () => {
+    const r = await db.query(
+      `SELECT seq, amount::float8 AS amount, method::text FROM pc49.gold_txn_payment
+        WHERE txn_id = $1 ORDER BY seq`, [saved?.id])
+    return r.rows.length === 3 ? r : null
+  }) ?? { rows: [] }
   check('all three payments are recorded, in order',
     paid.rows.length === 3
       && paid.rows[0].amount === 1500 && paid.rows[0].method === 'CASH'
