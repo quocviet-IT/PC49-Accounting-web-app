@@ -111,6 +111,27 @@ try {
   check('and takes them off the list of what can still be sent',
     stillOffered.rows[0].n === 0, `${stillOffered.rows[0].n} left`)
 
+  // The last step of the batch tab: the totals stop being a calculation and
+  // become the rows that leave the vault, one per band. Without this the
+  // figures were worked out and then retyped, which is the retyping the
+  // picking was meant to remove.
+  await page.locator('button', { hasText: 'Chốt đợt thành dòng gửi đi' }).first().click()
+  await page.waitForTimeout(3000)
+
+  const made2 = await db.query(
+    `SELECT source_desc AS d, gross_weight_gram::float8 AS g, gold_pct::float8 AS p
+       FROM pc49.refining_lot_line WHERE lot_id = $1 ORDER BY source_desc`, [lotId])
+  check('the picked bands become the lines that are sent',
+    made2.rows.length === 2
+      && made2.rows[0].d === '10-18k/grs' && made2.rows[0].g === 20 && made2.rows[0].p === 0.583
+      && made2.rows[1].d === '19-24k/grs' && made2.rows[1].g === 10 && made2.rows[1].p === 0.9893,
+    made2.rows.map((r) => `${r.d} ${r.g}g @${r.p}`).join('  '))
+
+  // Cleared again so the pooled-owner part below starts from the lines it
+  // expects rather than from these.
+  await db.query(`DELETE FROM pc49.refining_lot_line WHERE lot_id = $1`, [lotId])
+  await db.query(`DELETE FROM pc49.refining_lot_source WHERE lot_id = $1`, [lotId])
+
   // Two owners on one shipment: PC49's metal and a partner's travel together.
   await db.query(
     // pure_weight_gram is generated from the gross weight and the purity.
@@ -119,6 +140,10 @@ try {
         assay_weight_gram)
      VALUES ($1, 1, 'PC49', 'SG', 600, 0.75, 600),
             ($1, 2, 'MH',   'SG', 400, 0.75, 400)`, [lotId])
+  // What the refinery says it is, which is the whole point of an assay and is
+  // what the settle price is worked out from.
+  await db.query(
+    `UPDATE pc49.refining_lot_line SET assay_pct = 0.74 WHERE lot_id = $1`, [lotId])
 
   // Send it, then record the assay — one stage at a time, which the database
   // enforces and the screen only offers.
@@ -137,8 +162,28 @@ try {
   check('and says what each owner is still owed',
     body.includes('600.00') && body.includes('400.00'))
 
+  // Sheet 3.3 read left to right: what the refinery weighed, what that settles
+  // at, and the three things the assay changed. Computed since 0051 and shown
+  // here, or the figure the lot is actually priced at lives nowhere anybody
+  // can see it.
+  const lineValues = await db.query(
+    `SELECT round(assay_pure_weight_gram, 4)::float8 AS p,
+            round(assay_value, 2)::float8 AS t,
+            round(purity_variance, 4)::float8 AS w
+       FROM pc49.v_refining_lot_line_value WHERE lot_id = $1 AND owner_code = 'PC49'`, [lotId])
+  // 600 g came back weighed at 74%, so 444 g of it is 24k — not the 600 that
+  // went, which is the entire reason the sheet has an assay column.
+  check('the lot says what it settles at, not only what it was estimated at',
+    lineValues.rows[0]?.p === 444 && lineValues.rows[0]?.t > 0,
+    `24k ${lineValues.rows[0]?.p}g settles at ${lineValues.rows[0]?.t}`)
+  check('and the screen shows it',
+    ((await page.locator('body').textContent()) ?? '').includes('Giá chốt'))
+
   // Record what came back for PC49, leaving the partner still owed.
-  const row = page.locator('tr', { hasText: 'PC49' }).filter({ hasText: '600.00' }).first()
+  // Last, not first: the lines table above says PC49 too, and the owner table
+  // is below it. Filtering on the button instead would have stopped matching
+  // the moment it was clicked and became a form.
+  const row = page.locator('tr').filter({ hasText: 'PC49' }).last()
   await row.locator('button', { hasText: 'Ghi nhận về' }).click()
   await page.waitForTimeout(400)
   const qty = row.getByLabel('Ghi nhận về PC49', { exact: true })

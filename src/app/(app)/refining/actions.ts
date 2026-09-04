@@ -248,3 +248,77 @@ export async function unpickPurchase(input: unknown): Promise<PickResult> {
   revalidatePath('/refining')
   return { ok: true, picked: 0 }
 }
+
+const fromPickedSchema = z.object({
+  lotId: z.string().uuid(),
+  ownerCode: z.string().trim().min(1).default('PC49'),
+  goldTypeCode: z.string().trim().min(1).default('SG'),
+})
+
+export type FromPickedResult =
+  | { ok: true; created: number }
+  | { ok: false; message: string }
+
+/**
+ * Turns what was picked into the lines that are actually sent.
+ *
+ * One line per grade band, which is how the scrap leaves: the source journal
+ * records the send as a row per band — "Send to assay", 16-18k/grs and
+ * 23-24k/grs, negative weight — and the batch tab is what says how much goes
+ * in each. Until this existed the totals were computed and then retyped by
+ * hand into the lines, which is the retyping the picking was meant to remove.
+ *
+ * The purity on the line is the picked purchases' average weighted by weight,
+ * not a plain average: five grams at 99% and five hundred at 65% is not
+ * eighty-two percent of anything, and the number goes straight into the 24k
+ * weight the send is priced against.
+ *
+ * A band nobody recorded a purity for is left out rather than sent at a
+ * guessed grade. It is reported back, so the accountant is told which
+ * purchases need a purity before they can go.
+ */
+export async function linesFromPicked(input: unknown): Promise<FromPickedResult> {
+  const parsed = fromPickedSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Invalid request' }
+  }
+  const supabase = await createServerSupabase()
+
+  const { data: bands, error: bandError } = await supabase
+    .from('v_refining_lot_source_summary')
+    .select('grade_band, gross_weight_gram, avg_gold_pct')
+    .eq('lot_id', parsed.data.lotId)
+  if (bandError) return { ok: false, message: bandError.message }
+
+  const usable = (bands ?? []).filter(
+    (b: { grade_band: string | null; avg_gold_pct: number | null }) =>
+      b.grade_band !== null && b.avg_gold_pct !== null)
+  if (usable.length === 0) {
+    return { ok: false, message: 'nothing picked yet has a purity to send it at' }
+  }
+
+  const { data: existing } = await supabase
+    .from('refining_lot_line').select('seq').eq('lot_id', parsed.data.lotId)
+  let seq = Math.max(0, ...(existing ?? []).map((r: { seq: number }) => r.seq))
+
+  const rows = usable.map((b: {
+    grade_band: string; gross_weight_gram: number; avg_gold_pct: number
+  }) => {
+    seq += 1
+    return {
+      lot_id: parsed.data.lotId,
+      seq,
+      owner_code: parsed.data.ownerCode,
+      gold_type_code: parsed.data.goldTypeCode,
+      source_desc: b.grade_band,
+      gross_weight_gram: Number(b.gross_weight_gram),
+      gold_pct: Number(b.avg_gold_pct),
+    }
+  })
+
+  const { error } = await supabase.from('refining_lot_line').insert(rows)
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/refining')
+  return { ok: true, created: rows.length }
+}
