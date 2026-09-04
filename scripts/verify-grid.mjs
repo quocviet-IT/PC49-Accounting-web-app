@@ -45,11 +45,11 @@ await page.getByLabel('Tuổi vàng', { exact: true }).first().fill('14k/grs')
 await page.getByLabel('Số lượng', { exact: true }).first().fill('4.5')
 await page.getByLabel('Đơn giá', { exact: true }).first().fill('55.55555556')
 
-const amount = await page.locator('tbody tr').first().locator('td').nth(8).textContent()
+const amount = await page.locator('tbody tr').first().locator('td').nth(9).textContent()
 // A purchase is a negative amount by the source convention: gold in, money out.
 check('amount is calculated, negative for a purchase', amount?.trim() === '-250.00', amount ?? '')
 
-const grams = await page.locator('tbody tr').first().locator('td').nth(6).textContent()
+const grams = await page.locator('tbody tr').first().locator('td').nth(7).textContent()
 check('the gram equivalent shows next to the quantity', (grams ?? '').includes('4.50 g'), grams ?? '')
 
 await page.getByLabel('Thanh toán 1', { exact: true }).first().fill('250')
@@ -70,6 +70,32 @@ const movement = await page.getByTestId('total-movement').textContent()
 check('gold movement counts the row once, not twice',
   (movement ?? '').includes('SG +4.50 g'), movement ?? '')
 
+// ---- Getting back to a day you have already entered -------------------------
+//
+// Reported as "da nhap 2 giao dich vao ngay 31 nhung bi mat khong tim lai
+// duoc". Nothing was lost. The grid always opened on today and loaded only
+// today's rows, and there was no control that changed the day — so a day
+// entered under any other date had no way back to it, and the totals at the
+// foot of the screen read zero because they count the rows on the day shown.
+const NEXT_DAY = '2026-03-17'
+const dateField = page.getByLabel('Ngày', { exact: true })
+check('the grid says which day it is showing', (await dateField.inputValue()) === DAY)
+
+await dateField.fill(NEXT_DAY)
+await page.waitForURL(`**/gold-transactions?date=${NEXT_DAY}`, { timeout: 30000 })
+await page.waitForLoadState('networkidle')
+const elsewhere = await page.getByTestId('total-purchases').textContent()
+check('another day is a different set of books', elsewhere?.trim() === '0.00', elsewhere ?? '')
+
+await page.getByLabel('Ngày', { exact: true }).fill(DAY)
+await page.waitForURL(`**/gold-transactions?date=${DAY}`, { timeout: 30000 })
+await page.waitForLoadState('networkidle')
+const returned = await page.getByTestId('total-purchases').textContent()
+check('and the day you entered is still there when you go back',
+  returned?.trim() === '250.00', returned ?? '')
+check('with the row on it, not just the total',
+  (await page.locator('tbody tr').filter({ hasText: 'HPAREZ' }).count()) === 1)
+
 // A row that breaks a seeded flow rule must be refused, with the reason shown.
 await page.click('text=Thêm dòng')
 const rows = page.locator('tbody tr')
@@ -85,6 +111,44 @@ await page.waitForTimeout(2500)
 const refusal = await page.locator('[class*="rowError"]').first().textContent()
 check('a movement the Link sheet forbids is refused', (refusal ?? '').length > 0, refusal ?? '')
 
+// ---- Two people on one order ------------------------------------------------
+//
+// Reported as "1 don hang he thong chi dang ghi nhan duoc 1 nhan vien". The
+// column holds one name, so whoever else worked the sale appeared in no figure
+// taken from these rows. The percent stays hidden while one person has the
+// order and comes out the moment a second name does, because from then on only
+// the person typing knows how it divides.
+await page.click('text=Thêm dòng')
+const split = page.locator('tbody tr').last()
+
+await split.getByLabel('Loại', { exact: true }).selectOption('PO')
+await split.getByLabel('Loại vàng', { exact: true }).selectOption('SG')
+await split.getByLabel('Khách / NCC', { exact: true }).fill('SPLITCO')
+
+check('one person on an order is not asked for a percentage',
+  (await split.getByLabel('Tỷ lệ 1', { exact: true }).count()) === 0)
+
+await split.getByLabel('Sales', { exact: true }).fill('L.Thanh')
+await split.getByLabel('Sales 2', { exact: true }).fill('P.Minh')
+check('a second name brings out the shares',
+  (await split.getByLabel('Tỷ lệ 1', { exact: true }).count()) === 1)
+
+await split.getByLabel('Tỷ lệ 1', { exact: true }).fill('60')
+await split.getByLabel('Tỷ lệ 2', { exact: true }).fill('30')
+await split.getByLabel('Số lượng', { exact: true }).fill('2')
+await split.getByLabel('Đơn giá', { exact: true }).fill('50')
+await split.getByLabel('Ghi chú', { exact: true }).press('Enter')
+await page.waitForTimeout(1500)
+
+const short = await split.locator('[class*="rowError"]').first().textContent()
+check('shares that do not come to a hundred are refused, on the row',
+  (short ?? '').includes('100'), (short ?? '').trim())
+
+await split.getByLabel('Tỷ lệ 2', { exact: true }).fill('40')
+await split.getByLabel('Thanh toán 1', { exact: true }).fill('100')
+await split.getByLabel('Ghi chú', { exact: true }).press('Enter')
+await page.waitForTimeout(2500)
+
 await page.screenshot({ path: 'grid.png', fullPage: true })
 console.log('\nscreenshot written to grid.png')
 
@@ -98,6 +162,24 @@ const dbUrl = process.env.SUPABASE_DB_URL
 if (dbUrl) {
   const db = new pg.Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } })
   await db.connect()
+
+  // What the split row actually recorded, read before the cleanup takes it.
+  const shared = await db.query(
+    `SELECT s.sales_person_code AS code, s.share_pct::float8 AS pct, t.sales_person_code AS lead
+       FROM pc49.gold_txn_sales_person s
+       JOIN pc49.gold_txn t ON t.id = s.txn_id
+      WHERE t.txn_date = $1 AND t.partner_code = 'SPLITCO'
+      ORDER BY s.share_pct DESC`, [DAY])
+  check('the order is credited to both people, in the shares typed',
+    shared.rows.length === 2
+      && shared.rows[0].code === 'L.Thanh' && shared.rows[0].pct === 60
+      && shared.rows[1].code === 'P.Minh' && shared.rows[1].pct === 40,
+    shared.rows.map((r) => `${r.code} ${r.pct}%`).join(' + ') || '(nothing)')
+  // The single column a report or an import still reads holds the leading name
+  // rather than whichever row happened to be written first.
+  check('and the row still names one of them for whoever reads one name',
+    shared.rows[0]?.lead === 'L.Thanh', shared.rows[0]?.lead ?? '(none)')
+
   const made = await db.query(
     'SELECT id, journal_entry_id FROM pc49.gold_txn WHERE txn_date = $1', [DAY])
   for (const row of made.rows) {

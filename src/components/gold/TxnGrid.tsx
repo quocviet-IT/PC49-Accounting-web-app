@@ -23,6 +23,7 @@ export type SavedRow = {
   sales_person_code: string | null
   gold_type_code: string
   scrap_detail: string | null
+  gold_pct: number | null
   uom: Uom
   qty: number
   unit_price: number | null
@@ -30,22 +31,36 @@ export type SavedRow = {
   remarks: string | null
   /** How it was settled, in the order it was entered. */
   payments: { seq: number; amount: number; method: string }[]
+  /** Who is credited with it, largest share first. */
+  soldBy: { code: string; sharePct: number }[]
+}
+
+/** One way a row was settled, as typed. */
+type DraftPayment = {
+  amount: string
+  method: string
+}
+
+/** One member of staff on the order, and their part of it, as typed. */
+type DraftShare = {
+  code: string
+  sharePct: string
 }
 
 type Draft = {
   key: number
   txnType: string
-  salesPersonCode: string
+  /** Whoever worked the order. Always ends in an empty line. */
+  salesPeople: DraftShare[]
   partnerCode: string
   goldTypeCode: string
   scrapDetail: string
+  goldPct: string
   uom: Uom | ''
   qty: string
   unitPrice: string
-  pay1: string
-  method1: string
-  pay2: string
-  method2: string
+  /** As many lines as the settlement took. Always ends in an empty one. */
+  payments: DraftPayment[]
   remarks: string
   error?: string
   savedId?: string
@@ -54,11 +69,24 @@ type Draft = {
 const TXN_TYPES = ['PO', 'PO_VENDOR', 'SALE', 'DEPOSIT', 'PICKUP', 'MEMO', 'ON_THE_WAY'] as const
 const METHODS = ['CASH', 'BANKWIRE', 'ZELLE', 'CHECK'] as const
 
+/**
+ * A ceiling on the payment lines one row may carry.
+ *
+ * Not a business rule — an order settled twenty ways does not happen at this
+ * counter. It is a bound on what a runaway client can ask the database to
+ * insert in one go, set far enough above real use that nobody meets it.
+ */
+const MAX_PAYMENTS = 20
+
+/** The same kind of bound, on how many people may share one order. */
+const MAX_SALES_PEOPLE = 10
+
 function blankDraft(key: number): Draft {
   return {
-    key, txnType: 'PO', salesPersonCode: '', partnerCode: '', goldTypeCode: '',
-    scrapDetail: '', uom: '', qty: '', unitPrice: '', pay1: '', method1: 'CASH',
-    pay2: '', method2: '', remarks: '',
+    key, txnType: 'PO', salesPeople: [{ code: '', sharePct: '100' }],
+    partnerCode: '', goldTypeCode: '',
+    scrapDetail: '', goldPct: '', uom: '', qty: '', unitPrice: '',
+    payments: [{ amount: '', method: 'CASH' }], remarks: '',
   }
 }
 
@@ -110,9 +138,67 @@ export function TxnGrid({
     }))
   }
 
+  /**
+   * Changes one payment line, and offers another once the last has a figure.
+   *
+   * The lines grow one at a time instead of being asked for up front, so the
+   * common row — settled one way — still shows a single line, and the counter
+   * never runs out of them. Half in cash, half by transfer and the rest by
+   * check is an ordinary morning; until migration 0046 the table refused the
+   * third outright, so it went into the remarks as prose no report can add up.
+   */
+  function patchPayment(key: number, index: number, change: Partial<DraftPayment>) {
+    setDrafts((rows) => rows.map((r) => {
+      if (r.key !== key) return r
+      const payments = r.payments.map((p, i) => (i === index ? { ...p, ...change } : p))
+      const last = payments[payments.length - 1]
+      // Blank rather than assumed: an empty method means there is no further
+      // payment, not a payment of nothing.
+      if (Number(last.amount) > 0 && payments.length < MAX_PAYMENTS) {
+        payments.push({ amount: '', method: '' })
+      }
+      return { ...r, payments, error: undefined }
+    }))
+  }
+
+  /**
+   * Changes one line of the split, and offers another once the last has a name.
+   *
+   * The shares are typed rather than worked out. Two people on an order did
+   * not necessarily do half each, and a system that assumes they did pays the
+   * wrong commission quietly. So the percent stays out of the way while one
+   * person has the order — the single line is the whole of it — and appears
+   * for every line the moment a second name arrives.
+   */
+  function patchShare(key: number, index: number, change: Partial<DraftShare>) {
+    setDrafts((rows) => rows.map((r) => {
+      if (r.key !== key) return r
+      const salesPeople = r.salesPeople.map((p, i) => (i === index ? { ...p, ...change } : p))
+      const last = salesPeople[salesPeople.length - 1]
+      if (last.code.trim() && salesPeople.length < MAX_SALES_PEOPLE) {
+        // Blank rather than a guess at the split, which is the whole point.
+        salesPeople.push({ code: '', sharePct: '' })
+      }
+      return { ...r, salesPeople, error: undefined }
+    }))
+  }
+
   function addRow() {
     setDrafts((rows) => [...rows, blankDraft(nextKey)])
     setNextKey((k) => k + 1)
+  }
+
+  /**
+   * Opens another day.
+   *
+   * The date goes in the address so the day is a place: it survives a reload,
+   * it can be linked to from a report or a problem report, and the back button
+   * returns to the day before. Clearing the field leaves the day alone rather
+   * than navigating to nothing.
+   */
+  function goToDate(next: string) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(next) || next === txnDate) return
+    router.push(`/gold-transactions?date=${next}`)
   }
 
   function commit(row: Draft) {
@@ -123,10 +209,29 @@ export function TxnGrid({
     inFlight.current.add(row.key)
 
     const amount = amountOf(qty, price)
-    const payments = [
-      { amount: Number(row.pay1), method: row.method1 },
-      { amount: Number(row.pay2), method: row.method2 },
-    ].filter((p) => p.amount > 0 && p.method)
+    const payments = row.payments
+      .map((p) => ({ amount: Number(p.amount), method: p.method }))
+      .filter((p) => p.amount > 0 && p.method)
+
+    // One person holds the whole order without having to type a hundred; two
+    // or more have to say how it divides, because nothing else can know.
+    const named = row.salesPeople.filter((p) => p.code.trim())
+    const soldBy = named.length === 1
+      ? [{ code: named[0].code.trim(), sharePct: 100 }]
+      : named.map((p) => ({ code: p.code.trim(), sharePct: Number(p.sharePct) }))
+
+    // Caught here so the accountant reads it beside the row they are typing,
+    // rather than getting a constraint name back from the database.
+    if (soldBy.length > 1) {
+      const total = Math.round(soldBy.reduce((sum, p) => sum + (p.sharePct || 0), 0) * 100) / 100
+      if (soldBy.some((p) => !(p.sharePct > 0)) || total !== 100) {
+        inFlight.current.delete(row.key)
+        setDrafts((rows) => rows.map((r) => (r.key === row.key
+          ? { ...r, error: t('txn.shareBad') }
+          : r)))
+        return
+      }
+    }
 
     startTransition(async () => {
       const result: SaveResult = await saveTransaction({
@@ -138,8 +243,9 @@ export function TxnGrid({
         unitPrice: price,
         amount,
         partnerCode: row.partnerCode || null,
-        salesPersonCode: row.salesPersonCode || null,
+        salesPeople: soldBy,
         scrapDetail: row.scrapDetail || null,
+        goldPct: row.goldPct ? Number(row.goldPct) : null,
         remarks: row.remarks || null,
         payments,
       })
@@ -236,17 +342,23 @@ export function TxnGrid({
     setDrafts((rows) => [...rows, {
       key: nextKey,
       txnType: r.txn_type,
-      salesPersonCode: r.sales_person_code ?? '',
+      salesPeople: [
+        ...r.soldBy.map((p) => ({ code: p.code, sharePct: String(p.sharePct) })),
+        { code: '', sharePct: r.soldBy.length === 0 ? '100' : '' },
+      ],
       partnerCode: r.partner_code ?? '',
       goldTypeCode: r.gold_type_code,
       scrapDetail: r.scrap_detail ?? '',
+      goldPct: r.gold_pct === null ? '' : String(r.gold_pct),
       uom: r.uom,
       qty: String(r.qty),
       unitPrice: r.unit_price === null ? '' : String(r.unit_price),
-      pay1: r.payments[0] ? String(r.payments[0].amount) : '',
-      method1: r.payments[0]?.method ?? 'CASH',
-      pay2: r.payments[1] ? String(r.payments[1].amount) : '',
-      method2: r.payments[1]?.method ?? '',
+      payments: [
+        ...r.payments.map((p) => ({ amount: String(p.amount), method: p.method })),
+        // One more line, so a correction can add a way it was settled as
+        // easily as it can change one.
+        { amount: '', method: r.payments.length === 0 ? 'CASH' : '' },
+      ],
       remarks: r.remarks ?? '',
     }])
     setNextKey((k) => k + 1)
@@ -257,6 +369,22 @@ export function TxnGrid({
     <div className={styles.wrap}>
       <div className={styles.head}>
         <h1 className={styles.title}>{t('txn.title')} · {txnDate}</h1>
+        {/* The day being entered, and the only way to reach any other one.
+            Without it the grid always opened on today and loaded only today's
+            rows, so a day entered under a different date became unreachable —
+            which is what somebody meant when they reported that two
+            transactions had gone missing. Nothing had; there was no way back
+            to the day they were on. */}
+        <label className={styles.dateField}>
+          <span className={styles.dateLabel}>{t('txn.date')}</span>
+          <input
+            type="date"
+            className={styles.dateInput}
+            value={txnDate}
+            aria-label={t('txn.date')}
+            onChange={(e) => goToDate(e.target.value)}
+          />
+        </label>
         <button type="button" onClick={addRow} className={styles.select}
                 style={{ width: 'auto', border: '1px solid var(--rule-strong)' }}>
           {t('txn.addRow')}
@@ -274,10 +402,11 @@ export function TxnGrid({
               <th>{t('txn.col.partner')}</th>
               <th>{t('txn.col.gold')}</th>
               <th>{t('txn.col.scrap')}</th>
+              <th className={styles.num}>{t('txn.col.purity')}</th>
               <th className={styles.num}>{t('txn.col.qty')}</th>
               <th className={styles.num}>{t('txn.col.price')}</th>
               <th className={styles.num}>{t('txn.col.amount')}</th>
-              <th className={styles.num}>{t('txn.col.pay1')}</th>
+              <th className={styles.num}>{t('txn.col.pay')}</th>
               <th>{t('txn.col.method')}</th>
               <th>{t('txn.col.remarks')}</th>
             </tr>
@@ -287,12 +416,21 @@ export function TxnGrid({
               <tr key={r.id}>
                 <td className={styles.status}>✓</td>
                 <td>{r.txn_type}</td>
-                <td>{r.sales_person_code}</td>
+                <td>
+                  {/* Everybody on it, not just the leading name. A share of
+                      the whole order needs no percent beside it. */}
+                  {r.soldBy.length > 1
+                    ? r.soldBy.map((p) => (
+                        <div key={p.code}>{p.code} {p.sharePct}%</div>
+                      ))
+                    : r.sales_person_code}
+                </td>
                 <td>{r.partner_code}</td>
                 <td>{goldTypes.find((g) => g.code === r.gold_type_code)
                       ? goldName(goldTypes.find((g) => g.code === r.gold_type_code)!)
                       : r.gold_type_code}</td>
                 <td>{r.scrap_detail}</td>
+                <td className={styles.num}>{r.gold_pct ?? ''}</td>
                 <td className={styles.num}>
                   {weight.format(r.qty)}
                   <span className={`${styles.grams} ${r.qty > 0 ? styles.in : styles.out}`}>
@@ -350,6 +488,24 @@ export function TxnGrid({
               const uom = (row.uom || uomOf(row.goldTypeCode)) as Uom | ''
               const grams = qty && uom ? toGrams(qty, uom) : null
               const amount = qty && price ? amountOf(qty, price) : null
+              // A saved row shows what was settled and nothing else. The
+              // trailing empty line is an invitation to type, and there is
+              // nothing left to type into it.
+              const payLines = row.savedId
+                ? row.payments.filter((p) => Number(p.amount) > 0)
+                : row.payments
+              const shareLines = row.savedId
+                ? row.salesPeople.filter((p) => p.code.trim())
+                : row.salesPeople
+              const named = row.salesPeople.filter((p) => p.code.trim())
+              const manyPeople = named.length > 1
+              const shareTotal = Math.round(
+                named.reduce((sum, p) => sum + (Number(p.sharePct) || 0), 0) * 100) / 100
+              // A blank share on a named line is not a share of nothing, it is
+              // a share nobody has stated. Saying so beats letting the total
+              // read a plausible hundred while one person holds all of it.
+              const shareMissing = named.some((p) => !(Number(p.sharePct) > 0))
+              const sharesValid = !manyPeople || (!shareMissing && shareTotal === 100)
               return (
                 <tr key={row.key} className={row.savedId ? styles.saved : undefined}>
                   <td className={styles.status}>{row.savedId ? '✓' : ''}</td>
@@ -361,10 +517,36 @@ export function TxnGrid({
                       {TXN_TYPES.map((tt) => <option key={tt} value={tt}>{tt}</option>)}
                     </select>
                   </td>
+                  {/* One name is the ordinary case and stays a single box.
+                      A second name brings out the percents, because from then
+                      on the order divides and only the person typing knows
+                      how. The shares have to come to a hundred; the row says
+                      so rather than letting a commission run find out. */}
                   <td>
-                    <input className={styles.cell} list="sales-people" value={row.salesPersonCode}
-                           disabled={!!row.savedId} aria-label={t('txn.col.sales')}
-                           onChange={(e) => patch(row.key, { salesPersonCode: e.target.value })} />
+                    {shareLines.map((p, i) => (
+                      <div key={i} className={styles.shareLine}>
+                        <input className={styles.cell} list="sales-people" value={p.code}
+                               disabled={!!row.savedId}
+                               aria-label={i === 0
+                                 ? t('txn.col.sales')
+                                 : `${t('txn.col.sales')} ${i + 1}`}
+                               onChange={(e) => patchShare(row.key, i, { code: e.target.value })} />
+                        {manyPeople && (
+                          <input className={`${styles.cell} ${styles.num} ${styles.sharePct}`}
+                                 inputMode="decimal" value={p.sharePct} disabled={!!row.savedId}
+                                 aria-label={`${t('txn.col.share')} ${i + 1}`} placeholder="%"
+                                 onChange={(e) =>
+                                   patchShare(row.key, i, { sharePct: e.target.value })} />
+                        )}
+                      </div>
+                    ))}
+                    {manyPeople && !sharesValid && !row.savedId && (
+                      <div className={styles.rowError}>
+                        {shareMissing
+                          ? t('txn.shareMissing')
+                          : `${t('txn.shareTotal')} ${shareTotal}%`}
+                      </div>
+                    )}
                   </td>
                   <td>
                     <input className={styles.cell} value={row.partnerCode} disabled={!!row.savedId}
@@ -386,6 +568,18 @@ export function TxnGrid({
                            aria-label={t('txn.col.scrap')}
                            onChange={(e) => patch(row.key, { scrapDetail: e.target.value })} />
                   </td>
+                  {/* The note beside it says "14k/grs", which reads well and
+                      adds up to nothing. This is the same fact as a number, so
+                      a report can weigh what was bought against what came back
+                      from refining. A fraction, as everywhere else: 14k is
+                      0.583, and 58.3 is refused rather than valuing the row at
+                      a hundred times what it is worth. */}
+                  <td className={styles.num}>
+                    <input className={`${styles.cell} ${styles.num}`} inputMode="decimal"
+                           value={row.goldPct} disabled={!!row.savedId}
+                           aria-label={t('txn.col.purity')} placeholder="0.583"
+                           onChange={(e) => patch(row.key, { goldPct: e.target.value })} />
+                  </td>
                   <td className={styles.num}>
                     <input className={`${styles.cell} ${styles.num}`} inputMode="decimal"
                            value={row.qty} disabled={!!row.savedId} aria-label={t('txn.col.qty')}
@@ -405,41 +599,35 @@ export function TxnGrid({
                   <td className={`${styles.num}`} style={{ padding: '6px 8px' }}>
                     {amount !== null ? money.format(amount) : ''}
                   </td>
-                  {/* A second line appears once the first has a figure in it.
-                      Half in cash and half by transfer is an ordinary morning
-                      at the counter, and the books have always been able to
-                      record it — `gold_txn_payment` is keyed by sequence and
-                      the posting function loops over every row it finds. Only
-                      the screen could not say it, so the accountant had to
-                      choose one method and write the truth in the remarks. */}
+                  {/* One line per way the row was settled, and always one
+                      spare. The books have never had a limit here — the
+                      posting function loops over every payment row it finds —
+                      so the screen no longer imposes one either. */}
                   <td className={styles.num}>
-                    <input className={`${styles.cell} ${styles.num}`} inputMode="decimal"
-                           value={row.pay1} disabled={!!row.savedId} aria-label={t('txn.col.pay1')}
-                           onChange={(e) => patch(row.key, { pay1: e.target.value })} />
-                    {Number(row.pay1) > 0 && !row.savedId && (
-                      <input className={`${styles.cell} ${styles.num}`} inputMode="decimal"
-                             value={row.pay2} aria-label={t('txn.col.pay2')}
-                             placeholder={t('txn.col.pay2')}
-                             onChange={(e) => patch(row.key, { pay2: e.target.value })} />
-                    )}
+                    {payLines.map((p, i) => (
+                      <input key={i} className={`${styles.cell} ${styles.num}`} inputMode="decimal"
+                             value={p.amount} disabled={!!row.savedId}
+                             aria-label={`${t('txn.col.pay')} ${i + 1}`}
+                             placeholder={i === 0 ? undefined : `${t('txn.col.pay')} ${i + 1}`}
+                             onChange={(e) => patchPayment(row.key, i, { amount: e.target.value })} />
+                    ))}
                   </td>
                   <td>
-                    <select className={styles.select} value={row.method1} disabled={!!row.savedId}
-                            aria-label={t('txn.col.method')}
-                            onChange={(e) => patch(row.key, { method1: e.target.value })}>
-                      {METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
-                    </select>
-                    {Number(row.pay1) > 0 && !row.savedId && (
-                      <select className={styles.select} value={row.method2}
-                              aria-label={t('txn.col.method2')}
-                              onChange={(e) => patch(row.key, { method2: e.target.value })}>
-                        {/* Blank by default: a second method is offered, not
-                            assumed, and an empty one means there is no second
-                            payment rather than a payment of nothing. */}
-                        <option value="" />
+                    {payLines.map((p, i) => (
+                      <select key={i} className={styles.select} value={p.method}
+                              disabled={!!row.savedId}
+                              aria-label={i === 0
+                                ? t('txn.col.method')
+                                : `${t('txn.col.method')} ${i + 1}`}
+                              onChange={(e) => patchPayment(row.key, i, { method: e.target.value })}>
+                        {/* Every line after the first starts blank: a further
+                            method is offered, not assumed, and an empty one
+                            means there is no further payment rather than a
+                            payment of nothing. */}
+                        {i > 0 && <option value="" />}
                         {METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
                       </select>
-                    )}
+                    ))}
                   </td>
                   <td>
                     <input className={styles.cell} value={row.remarks} disabled={!!row.savedId}

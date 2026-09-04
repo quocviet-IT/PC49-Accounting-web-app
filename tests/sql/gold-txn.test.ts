@@ -16,15 +16,17 @@ type Txn = {
   amount: number
   partner?: string
   scrap?: string
+  who?: string
 }
 
 async function addTxn(t: Txn): Promise<string> {
   const r = await db.query<{ id: string }>(
     `INSERT INTO pc49.gold_txn
-       (txn_date, txn_type, gold_type_code, uom, qty, unit_price, amount, partner_code, scrap_detail)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+       (txn_date, txn_type, gold_type_code, uom, qty, unit_price, amount, partner_code,
+        scrap_detail, sales_person_code)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
     [t.date ?? '2026-01-01', t.type, t.gold, t.uom, t.qty, t.price ?? null, t.amount,
-     t.partner ?? 'TRANS', t.scrap ?? null],
+     t.partner ?? 'TRANS', t.scrap ?? null, t.who ?? null],
   )
   return r.rows[0].id
 }
@@ -146,16 +148,45 @@ describe('payments', () => {
     expect(Number(r.rows[0].n)).toBe(2)
   })
 
-  it('refuses a third payment, since the source allows at most two', async () => {
+  it('takes a third payment, and a fourth', async () => {
+    // The table used to refuse these: `CHECK (seq IN (1, 2))`, copied from a
+    // spreadsheet that had Amount-1st and Amount-2nd and no third column. An
+    // accountant met the limit at the counter with a customer settling one
+    // order three ways, and the third went into the remarks as prose.
     const id = await addTxn({ type: 'PO', gold: 'SG', uom: 'GRAM', qty: 1, amount: -100 })
     await db.query(
       `INSERT INTO pc49.gold_txn_payment (txn_id, seq, direction, amount, method) VALUES
-         ($1, 1, 'AP', 50, 'CASH'), ($1, 2, 'AP', 50, 'CHECK')`, [id],
+         ($1, 1, 'AP', 40, 'CASH'), ($1, 2, 'AP', 30, 'CHECK'),
+         ($1, 3, 'AP', 20, 'ZELLE'), ($1, 4, 'AP', 10, 'BANKWIRE')`, [id],
+    )
+    const r = await db.query<{ total: string; n: string }>(
+      `SELECT sum(amount)::text AS total, count(*)::text AS n
+         FROM pc49.gold_txn_payment WHERE txn_id = $1`, [id],
+    )
+    expect(Number(r.rows[0].n)).toBe(4)
+    expect(Number(r.rows[0].total)).toBe(100)
+  })
+
+  it('still refuses a payment with no place in the order they were taken', async () => {
+    // Dropping the ceiling is not dropping the sequence. It says which payment
+    // came first, and the ledger writes its lines in that order.
+    const id = await addTxn({ type: 'PO', gold: 'SG', uom: 'GRAM', qty: 1, amount: -100 })
+    await expect(
+      db.query(`INSERT INTO pc49.gold_txn_payment (txn_id, seq, direction, amount, method)
+                VALUES ($1, 0, 'AP', 100, 'CASH')`, [id]),
+    ).rejects.toThrow(/gold_txn_payment_seq/)
+  })
+
+  it('still refuses two payments in the same place in the order', async () => {
+    const id = await addTxn({ type: 'PO', gold: 'SG', uom: 'GRAM', qty: 1, amount: -100 })
+    await db.query(
+      `INSERT INTO pc49.gold_txn_payment (txn_id, seq, direction, amount, method)
+       VALUES ($1, 1, 'AP', 50, 'CASH')`, [id],
     )
     await expect(
       db.query(`INSERT INTO pc49.gold_txn_payment (txn_id, seq, direction, amount, method)
-                VALUES ($1, 3, 'AP', 10, 'ZELLE')`, [id]),
-    ).rejects.toThrow(/gold_txn_payment_seq/)
+                VALUES ($1, 1, 'AP', 50, 'CHECK')`, [id]),
+    ).rejects.toThrow()
   })
 })
 
@@ -206,5 +237,107 @@ describe('the unit a row is measured in', () => {
     await expect(
       db.query(`UPDATE pc49.gold_txn SET uom = 'LUONG' WHERE id = $1`, [r.rows[0].id]),
     ).rejects.toThrow(/traded in GRAM but this row is in LUONG/)
+  })
+})
+
+describe('purity as a number', () => {
+  it('takes a fraction beside the note', async () => {
+    const id = await addTxn({
+      type: 'PO', gold: 'SG', uom: 'GRAM', qty: 10, amount: -500, scrap: '14k/grs',
+    })
+    await db.query(`UPDATE pc49.gold_txn SET gold_pct = 0.583 WHERE id = $1`, [id])
+    const r = await db.query<{ p: string; d: string }>(
+      `SELECT gold_pct::text AS p, scrap_detail AS d FROM pc49.gold_txn WHERE id = $1`, [id],
+    )
+    // The prose and the number say the same thing, and only one of them adds up.
+    expect(Number(r.rows[0].p)).toBeCloseTo(0.583, 4)
+    expect(r.rows[0].d).toBe('14k/grs')
+  })
+
+  it('refuses purity written the way it is spoken', async () => {
+    // 58.3 is how everybody says it and a hundredfold error if it is stored.
+    const id = await addTxn({ type: 'PO', gold: 'SG', uom: 'GRAM', qty: 10, amount: -500 })
+    await expect(
+      db.query(`UPDATE pc49.gold_txn SET gold_pct = 58.3 WHERE id = $1`, [id]),
+    ).rejects.toThrow(/purity_is_a_fraction/)
+  })
+
+  it('leaves purity alone when nobody recorded it', async () => {
+    const id = await addTxn({ type: 'PO', gold: 'SG', uom: 'GRAM', qty: 10, amount: -500 })
+    const r = await db.query<{ p: string | null }>(
+      `SELECT gold_pct::text AS p FROM pc49.gold_txn WHERE id = $1`, [id],
+    )
+    expect(r.rows[0].p).toBeNull()
+  })
+})
+
+describe('more than one person on an order', () => {
+  it('gives a row written with one name a share of the whole', async () => {
+    const id = await addTxn({
+      type: 'PO', gold: 'SG', uom: 'GRAM', qty: 10, amount: -500, who: 'L.Thanh',
+    })
+    const r = await db.query<{ code: string; pct: string }>(
+      `SELECT sales_person_code AS code, share_pct::text AS pct
+         FROM pc49.gold_txn_sales_person WHERE txn_id = $1`, [id],
+    )
+    expect(r.rows).toEqual([{ code: 'L.Thanh', pct: '100.00' }])
+  })
+
+  it('splits one order between two people', async () => {
+    const id = await addTxn({ type: 'SALE', gold: 'SG', uom: 'GRAM', qty: -10, amount: 500 })
+    await db.query(
+      `INSERT INTO pc49.gold_txn_sales_person (txn_id, sales_person_code, share_pct) VALUES
+         ($1, 'L.Thanh', 60), ($1, 'P.Minh', 40)`, [id],
+    )
+    const r = await db.query<{ n: string; total: string }>(
+      `SELECT count(*)::text AS n, sum(share_pct)::text AS total
+         FROM pc49.gold_txn_sales_person WHERE txn_id = $1`, [id],
+    )
+    expect(Number(r.rows[0].n)).toBe(2)
+    expect(Number(r.rows[0].total)).toBe(100)
+  })
+
+  it('refuses shares that do not come to a hundred', async () => {
+    const id = await addTxn({ type: 'SALE', gold: 'SG', uom: 'GRAM', qty: -10, amount: 500 })
+    await expect(
+      db.query(
+        `INSERT INTO pc49.gold_txn_sales_person (txn_id, sales_person_code, share_pct) VALUES
+           ($1, 'L.Thanh', 60), ($1, 'P.Minh', 30)`, [id]),
+    ).rejects.toThrow(/come to 100 percent/)
+  })
+
+  it('refuses a split written as fractions, because it does not add up', async () => {
+    // The unit cannot be mistaken the way purity's could: 0.6 and 0.4 come to
+    // one, not a hundred, so the wrong unit is refused rather than stored.
+    const id = await addTxn({ type: 'SALE', gold: 'SG', uom: 'GRAM', qty: -10, amount: 500 })
+    await expect(
+      db.query(
+        `INSERT INTO pc49.gold_txn_sales_person (txn_id, sales_person_code, share_pct) VALUES
+           ($1, 'L.Thanh', 0.6), ($1, 'P.Minh', 0.4)`, [id]),
+    ).rejects.toThrow(/come to 100 percent/)
+  })
+
+  it('writes the leading name back into the column a reader expects', async () => {
+    const id = await addTxn({ type: 'SALE', gold: 'SG', uom: 'GRAM', qty: -10, amount: 500 })
+    await db.query(
+      `INSERT INTO pc49.gold_txn_sales_person (txn_id, sales_person_code, share_pct) VALUES
+         ($1, 'P.Minh', 30), ($1, 'L.Thanh', 70)`, [id],
+    )
+    const r = await db.query<{ code: string }>(
+      `SELECT sales_person_code AS code FROM pc49.gold_txn WHERE id = $1`, [id],
+    )
+    // Largest share, not whichever row happened to be written first.
+    expect(r.rows[0].code).toBe('L.Thanh')
+  })
+
+  it('lets the last share be removed, for a name typed by mistake', async () => {
+    const id = await addTxn({
+      type: 'PO', gold: 'SG', uom: 'GRAM', qty: 10, amount: -500, who: 'S.Mai',
+    })
+    await db.query(`DELETE FROM pc49.gold_txn_sales_person WHERE txn_id = $1`, [id])
+    const r = await db.query<{ code: string | null }>(
+      `SELECT sales_person_code AS code FROM pc49.gold_txn WHERE id = $1`, [id],
+    )
+    expect(r.rows[0].code).toBeNull()
   })
 })
