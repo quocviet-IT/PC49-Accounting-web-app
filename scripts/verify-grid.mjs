@@ -5,6 +5,7 @@ import { chromium } from 'playwright'
 import { openPage } from './support/page.mjs'
 import pg from 'pg'
 import { passwordFor } from './support/accounts.mjs'
+import { until } from './support/until.mjs'
 
 /** Resolved before anything is launched, so a missing password is
  *  reported as a missing password rather than as a failed sign-in. */
@@ -56,7 +57,14 @@ await page.getByLabel('Thanh toán 1', { exact: true }).first().fill('250')
 await page.getByLabel('Ghi chú', { exact: true }).first().fill('Mua vao 4.5gr vang 14k')
 await page.getByLabel('Ghi chú', { exact: true }).first().press('Enter')
 
-await page.waitForTimeout(2500)
+// Waited for rather than slept through. Against a deployment the round trip is
+// a network hop and a database away, and a fixed two and a half seconds that is
+// generous on a warm localhost is not always enough there: the row saves, the
+// screen has not been told yet, and the running total reads zero. That is the
+// check going red for where it was pointed rather than for what it found.
+await until(async () =>
+  (await page.getByTestId('total-purchases').textContent())?.trim() !== before?.trim()
+    || (await page.locator('[class*="rowError"]').count()) > 0)
 
 const error = await page.locator('[class*="rowError"]').count()
 check('the row saved without an error', error === 0,
@@ -106,7 +114,7 @@ await last.getByLabel('Số lượng', { exact: true }).fill('-10')
 await last.getByLabel('Đơn giá', { exact: true }).fill('50')
 await last.getByLabel('Ghi chú', { exact: true }).fill('should be refused')
 await last.getByLabel('Ghi chú', { exact: true }).press('Enter')
-await page.waitForTimeout(2500)
+await until(async () => (await page.locator('[class*="rowError"]').count()) > 0)
 
 const refusal = await page.locator('[class*="rowError"]').first().textContent()
 check('a movement the Link sheet forbids is refused', (refusal ?? '').length > 0, refusal ?? '')
@@ -138,7 +146,7 @@ await split.getByLabel('Tỷ lệ 2', { exact: true }).fill('30')
 await split.getByLabel('Số lượng', { exact: true }).fill('2')
 await split.getByLabel('Đơn giá', { exact: true }).fill('50')
 await split.getByLabel('Ghi chú', { exact: true }).press('Enter')
-await page.waitForTimeout(1500)
+await until(async () => (await split.locator('[class*="rowError"]').count()) > 0)
 
 const short = await split.locator('[class*="rowError"]').first().textContent()
 check('shares that do not come to a hundred are refused, on the row',
@@ -147,7 +155,8 @@ check('shares that do not come to a hundred are refused, on the row',
 await split.getByLabel('Tỷ lệ 2', { exact: true }).fill('40')
 await split.getByLabel('Thanh toán 1', { exact: true }).fill('100')
 await split.getByLabel('Ghi chú', { exact: true }).press('Enter')
-await page.waitForTimeout(2500)
+await until(async () =>
+  (await page.locator('tbody tr').filter({ hasText: 'SPLITCO' }).count()) > 0)
 
 // ---- The customer's telephone number ----------------------------------------
 //
@@ -164,7 +173,8 @@ await phoned.getByLabel('Số lượng', { exact: true }).fill('1')
 await phoned.getByLabel('Đơn giá', { exact: true }).fill('50')
 await phoned.getByLabel('Thanh toán 1', { exact: true }).fill('50')
 await phoned.getByLabel('Ghi chú', { exact: true }).press('Enter')
-await page.waitForTimeout(2500)
+await until(async () =>
+  (await page.locator('tbody tr').filter({ hasText: 'CHIHOA-VERIFY' }).count()) > 0)
 
 // The proof is that it survives leaving the screen: it is on the customer now,
 // not on the row that happened to record it.
