@@ -5,6 +5,7 @@ import { Page, Section, Empty, Signed, weight, ledger, Frame } from '@/component
 import { ReceiveRow } from './ReceiveRow'
 import { AddLine, AdvanceLot, NewLot, type GoldOption } from './LotLifecycle'
 import { PurchasePicker, type AvailablePurchase, type PickedBand } from './PurchasePicker'
+import { LotLines, type LotLineValue } from './LotLines'
 import styles from './Refining.module.css'
 
 export type LotRow = {
@@ -46,6 +47,7 @@ export function RefiningView({
   available,
   pickedByLot,
   bandsByLot,
+  linesByLot,
   lots, shares, goldTypes,
 }: {
   lots: LotRow[]
@@ -54,6 +56,7 @@ export function RefiningView({
   available: AvailablePurchase[]
   pickedByLot: Record<string, AvailablePurchase[]>
   bandsByLot: Record<string, PickedBand[]>
+  linesByLot: Record<string, LotLineValue[]>
 }) {
   const { t } = useLocale()
 
@@ -127,6 +130,9 @@ export function RefiningView({
                 out of the purchases going into it, not retyped. Only while it
                 is a draft — once the gold has left the vault, what was in the
                 bag is a matter of record. */}
+            {/* Once the refinery has weighed it, what the lot is actually
+                worth is the thing to read — so the lines come out then. */}
+            {l.status !== 'DRAFT' && <LotLines lines={linesByLot[l.lotId] ?? []} />}
             {l.status === 'DRAFT' && (
               <PurchasePicker
                   lotId={l.lotId}

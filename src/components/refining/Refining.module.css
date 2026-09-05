@@ -129,3 +129,13 @@
   color: var(--pc-text-faint);
   margin: 0;
 }
+
+/* A lot read left to right the way sheet 3.3 does: send, assay, and what
+   changed between them. Thirteen columns is wide on purpose — the point is to
+   read one line across, so it scrolls rather than wraps. */
+.scrollX {
+  overflow-x: auto;
+}
+
+.up { color: var(--pc-money-positive); }
+.down { color: var(--pc-money-negative); }

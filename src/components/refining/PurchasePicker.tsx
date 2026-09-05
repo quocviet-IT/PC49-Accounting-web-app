@@ -4,7 +4,9 @@ import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale } from '@/lib/i18n/provider'
 import { money, weight } from '@/components/ledger/Ledger'
-import { pickPurchases, unpickPurchase } from '@/app/(app)/refining/actions'
+import {
+  linesFromPicked, pickPurchases, unpickPurchase,
+} from '@/app/(app)/refining/actions'
 import styles from './Refining.module.css'
 
 export type AvailablePurchase = {
@@ -102,6 +104,22 @@ export function PurchasePicker({
     })
   }
 
+  /**
+   * Turns the bands into the lines that get sent.
+   *
+   * The last step of the spreadsheet's batch tab: the totals stop being a
+   * calculation and become the rows that leave the vault, one per band, which
+   * is exactly how the journal records a send.
+   */
+  function toLines() {
+    setError(null)
+    startTransition(async () => {
+      const result = await linesFromPicked({ lotId })
+      if (!result.ok) { setError(result.message); return }
+      router.refresh()
+    })
+  }
+
   function drop(txnId: string) {
     setError(null)
     startTransition(async () => {
@@ -154,6 +172,11 @@ export function PurchasePicker({
               ))}
             </tbody>
           </table>
+          <div className={styles.actions}>
+            <button type="button" className={styles.quiet} disabled={pending} onClick={toLines}>
+              {t('refining.makeLines')}
+            </button>
+          </div>
         </>
       )}
 

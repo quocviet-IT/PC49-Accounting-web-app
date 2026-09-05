@@ -1,6 +1,7 @@
 import { RefiningView, type LotRow, type ShareRow } from '@/components/refining/RefiningView'
 import type { GoldOption } from '@/components/refining/LotLifecycle'
 import type { AvailablePurchase, PickedBand } from '@/components/refining/PurchasePicker'
+import type { LotLineValue } from '@/components/refining/LotLines'
 import { Forbidden } from '@/components/Forbidden'
 import { getCurrentUser } from '@/lib/auth/currentUser'
 import { can } from '@/lib/auth/roles'
@@ -14,8 +15,8 @@ export default async function RefiningPage() {
   }
 
   const supabase = await createServerSupabase()
-  const [summary, share, types, availableResult, sourceResult, bandResult, txnResult] =
-    await Promise.all([
+  const [summary, share, types, availableResult, sourceResult, bandResult, txnResult,
+         lineResult] = await Promise.all([
     supabase.from('v_refining_lot_summary')
       .select('lot_id, lot_code, status, sent_date, assay_date, received_date, total_gross_gram, total_assay_gram, spot_variance_per_gram, spot_variance_value')
       .order('sent_date', { ascending: false }),
@@ -35,6 +36,10 @@ export default async function RefiningPage() {
     supabase.from('gold_txn')
       .select('id, txn_date, partner_code, scrap_detail, gold_pct, qty_gram, amount')
       .is('voided_at', null),
+    // A lot read the way sheet 3.3 reads it: send, assay, and the difference.
+    supabase.from('v_refining_lot_line_value')
+      .select('lot_id, seq, owner_code, source_desc, gross_weight_gram, gold_pct, pure_weight_gram, estimated_value, assay_pct, assay_weight_gram, assay_pure_weight_gram, assay_value, purity_variance, weight_variance, value_variance')
+      .order('seq'),
   ])
 
   const lots: LotRow[] = (summary.data ?? []).map((r: Record<string, unknown>) => ({
@@ -104,6 +109,32 @@ export default async function RefiningPage() {
     bandsByLot.set(lotId, list)
   }
 
+  const num = (v: unknown) => (v === null || v === undefined ? null : Number(v))
+
+  const linesByLot = new Map<string, LotLineValue[]>()
+  for (const r of (lineResult.data ?? []) as Record<string, unknown>[]) {
+    const lotId = r.lot_id as string
+    const list = linesByLot.get(lotId) ?? []
+    list.push({
+      lotId,
+      seq: Number(r.seq),
+      ownerCode: r.owner_code as string,
+      sourceDesc: (r.source_desc as string) ?? null,
+      grossWeightGram: num(r.gross_weight_gram),
+      goldPct: num(r.gold_pct),
+      pureWeightGram: num(r.pure_weight_gram),
+      estimatedValue: num(r.estimated_value),
+      assayPct: num(r.assay_pct),
+      assayWeightGram: num(r.assay_weight_gram),
+      assayPureWeightGram: num(r.assay_pure_weight_gram),
+      assayValue: num(r.assay_value),
+      purityVariance: num(r.purity_variance),
+      weightVariance: num(r.weight_variance),
+      valueVariance: num(r.value_variance),
+    })
+    linesByLot.set(lotId, list)
+  }
+
   return (
     <RefiningView
         lots={lots}
@@ -112,6 +143,7 @@ export default async function RefiningPage() {
         available={available}
         pickedByLot={Object.fromEntries(pickedByLot)}
         bandsByLot={Object.fromEntries(bandsByLot)}
+        linesByLot={Object.fromEntries(linesByLot)}
     />
   )
 }
