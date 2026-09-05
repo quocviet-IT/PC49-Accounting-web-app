@@ -287,3 +287,21 @@
 .sharePct {
   max-width: 56px;
 }
+
+/* The row saved; something beside the money did not. Distinct from an error,
+   because the difference matters: one means try again, the other means the
+   purchase is on the books and a phone number is not. */
+.rowWarning {
+  font-size: 11px;
+  color: var(--pc-text-faint);
+  padding: 2px 8px 6px;
+}
+
+/* A note is prose, so it wraps rather than being cut off with an ellipsis the
+   way a figure never should be. Bounded, or one long note stretches the row. */
+.remarks {
+  padding: 6px 8px;
+  max-width: 22rem;
+  white-space: normal;
+  word-break: break-word;
+}

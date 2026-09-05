@@ -49,6 +49,12 @@ type DraftShare = {
 
 type Draft = {
   key: number
+  /**
+   * Stable for the life of this row, so that pressing Enter twice, or trying
+   * again after an answer went missing, is recognised as the same intention
+   * rather than as a second purchase.
+   */
+  requestKey: string
   txnType: string
   /** Whoever worked the order. Always ends in an empty line. */
   salesPeople: DraftShare[]
@@ -65,6 +71,8 @@ type Draft = {
   payments: DraftPayment[]
   remarks: string
   error?: string
+  /** The row saved; something beside the money did not. */
+  warning?: string
   savedId?: string
 }
 
@@ -85,7 +93,8 @@ const MAX_SALES_PEOPLE = 10
 
 function blankDraft(key: number): Draft {
   return {
-    key, txnType: 'PO', salesPeople: [{ code: '', sharePct: '100' }],
+    key, requestKey: crypto.randomUUID(),
+    txnType: 'PO', salesPeople: [{ code: '', sharePct: '100' }],
     partnerCode: '', partnerPhone: '', goldTypeCode: '',
     scrapDetail: '', goldPct: '', uom: '', qty: '', unitPrice: '',
     payments: [{ amount: '', method: 'CASH' }], remarks: '',
@@ -247,6 +256,7 @@ export function TxnGrid({
 
     startTransition(async () => {
       const result: SaveResult = await saveTransaction({
+        requestKey: row.requestKey,
         txnDate,
         txnType: row.txnType,
         goldTypeCode: row.goldTypeCode,
@@ -265,7 +275,9 @@ export function TxnGrid({
 
       if (result.ok) {
         setDrafts((rows) => {
-          const cleared = rows.map((r) => (r.key === row.key ? { ...r, savedId: result.id } : r))
+          const cleared = rows.map((r) => (r.key === row.key
+            ? { ...r, savedId: result.id, warning: result.warning }
+            : r))
           return cleared.some((r) => !r.savedId) ? cleared : [...cleared, blankDraft(nextKey)]
         })
         setNextKey((k) => k + 1)
@@ -354,6 +366,7 @@ export function TxnGrid({
     // corrected rather than retyped.
     setDrafts((rows) => [...rows, {
       key: nextKey,
+      requestKey: crypto.randomUUID(),
       txnType: r.txn_type,
       salesPeople: [
         ...r.soldBy.map((p) => ({ code: p.code, sharePct: String(p.sharePct) })),
@@ -424,6 +437,7 @@ export function TxnGrid({
               <th className={styles.num}>{t('txn.col.pay')}</th>
               <th>{t('txn.col.method')}</th>
               <th>{t('txn.col.remarks')}</th>
+              <th>{t('txn.col.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -471,9 +485,16 @@ export function TxnGrid({
                     <div key={p.seq}>{p.method}</div>
                   ))}
                 </td>
+                {/* What was written in the box, which the column is named
+                    after and did not show: the header said Ghi chú and the
+                    cell held two buttons, so a note typed at the counter
+                    vanished the moment the row saved. The data was queried the
+                    whole time. */}
+                <td className={styles.remarks}>{r.remarks}</td>
                 {/* A saved row is not editable — correcting it means cancelling
                     it and typing the right one, which is what the ledger can
-                    actually represent. */}
+                    actually represent. Its own column, so the note beside it
+                    has room to be read. */}
                 <td>
                   {/* Correcting comes first: it is what somebody who spotted a
                       typo actually wants, and cancelling outright is the rarer
@@ -667,7 +688,20 @@ export function TxnGrid({
                     {row.error && (
                       <div className={styles.rowError}>{t('txn.rowError')}: {row.error}</div>
                     )}
+                    {/* Saved, and something beside the money did not file. Said
+                        on the row rather than written to a server log nobody
+                        reads — and a log entry carrying a customer's name is
+                        not a way of handling anything. */}
+                    {row.warning && (
+                      <div className={styles.rowWarning}>
+                        {t('txn.savedWithWarning')}: {row.warning}
+                      </div>
+                    )}
                   </td>
+                  {/* Nothing to do to a row that is still being typed, but the
+                      column has to be here or every saved row below sits one
+                      cell to the left of its own heading. */}
+                  <td />
                 </tr>
               )
             })}
