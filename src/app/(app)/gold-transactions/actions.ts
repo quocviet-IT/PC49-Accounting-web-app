@@ -140,6 +140,64 @@ export async function saveTransaction(input: unknown): Promise<SaveResult> {
   return { ok: true, id: result.txnId, repeated: result.repeated, warning }
 }
 
+
+const correctionSchema = rowSchema.extend({
+  originalId: z.string().uuid(),
+  expectedRevision: z.number().int(),
+  reason: z.string().trim().min(3, 'say why in a few words'),
+  reversalDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
+})
+
+/**
+ * Replaces a posted transaction with a corrected one.
+ *
+ * Nothing is written until this is called. Pressing Sửa used to reverse the
+ * original immediately and only then offer a draft to type, so closing the tab
+ * between the two left the books with the old row cancelled and nothing in its
+ * place. Now the original stays live and posted while the correction is being
+ * typed, and the reversal and the replacement happen together or not at all.
+ *
+ * The revision is the one the screen was showing. If somebody else has changed
+ * the row since, the database says CONFLICT rather than quietly overwriting
+ * work this screen never saw.
+ */
+export async function correctTransaction(input: unknown): Promise<SaveResult> {
+  const parsed = correctionSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Invalid correction' }
+  }
+  const row = parsed.data
+  const supabase = await createServerSupabase()
+
+  const { data, error } = await supabase.rpc('correct_gold_transaction', {
+    p_request_key: row.requestKey,
+    p_original_id: row.originalId,
+    p_expected_revision: row.expectedRevision,
+    p_reason: row.reason,
+    p_reversal_date: row.reversalDate,
+    p_payload: {
+      txnDate: row.txnDate,
+      txnType: row.txnType,
+      goldTypeCode: row.goldTypeCode,
+      uom: row.uom,
+      qty: row.qty,
+      unitPrice: row.unitPrice,
+      amount: row.amount,
+      partnerCode: row.partnerCode,
+      scrapDetail: row.scrapDetail,
+      goldPct: row.goldPct,
+      remarks: row.remarks,
+      payments: row.payments,
+      salesPeople: row.salesPeople,
+    },
+  })
+  if (error) return { ok: false, message: error.message }
+
+  const result = data as { txnId: string; repeated: boolean }
+  revalidatePath('/gold-transactions')
+  return { ok: true, id: result.txnId, repeated: result.repeated }
+}
+
 const voidSchema = z.object({
   id: z.string().uuid(),
   reason: z.string().trim().min(3, 'say why in a few words'),

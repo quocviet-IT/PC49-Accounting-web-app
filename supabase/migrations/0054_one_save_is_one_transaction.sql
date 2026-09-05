@@ -19,26 +19,6 @@
 -- The function is a way to make five statements atomic, not a way around the
 -- permissions on them.
 
--- ---- Who is asking ------------------------------------------------------------
-
-/**
- * The signed-in user, readable from a SECURITY INVOKER function.
- *
- * `auth.uid()` lives in the `auth` schema, which `authenticated` has no USAGE
- * on. Every other function in this system reaches it as SECURITY DEFINER and
- * so never noticed. The save below is deliberately SECURITY INVOKER — the
- * point is that row-level security still decides what may be written — so it
- * needs one narrow definer function to answer this one question, rather than
- * becoming a definer itself and stepping around every policy on the way.
- */
-CREATE OR REPLACE FUNCTION pc49.current_actor()
-RETURNS uuid
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pc49, public, auth AS $$
-  SELECT auth.uid()
-$$;
-
-GRANT EXECUTE ON FUNCTION pc49.current_actor() TO authenticated;
-
 -- ---- Not writing the same transaction twice ----------------------------------
 
 /**
@@ -66,8 +46,8 @@ ALTER TABLE pc49.request_outcome ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS request_outcome_own ON pc49.request_outcome;
 CREATE POLICY request_outcome_own ON pc49.request_outcome
-  FOR ALL USING (actor = pc49.current_actor())
-  WITH CHECK (actor = pc49.current_actor());
+  FOR ALL USING (actor = auth.uid())
+  WITH CHECK (actor = auth.uid());
 
 GRANT SELECT, INSERT ON pc49.request_outcome TO authenticated;
 
@@ -92,9 +72,9 @@ CREATE OR REPLACE FUNCTION pc49.save_gold_transaction(
   p_request_key text,
   p_payload     jsonb)
 RETURNS jsonb
-LANGUAGE plpgsql SECURITY INVOKER SET search_path = pc49, public AS $$
+LANGUAGE plpgsql SECURITY INVOKER SET search_path = pc49, public, auth AS $$
 DECLARE
-  v_actor    uuid := pc49.current_actor();
+  v_actor    uuid := auth.uid();
   v_hash     text := md5(p_payload::text);
   v_seen     pc49.request_outcome;
   v_txn_id   uuid;

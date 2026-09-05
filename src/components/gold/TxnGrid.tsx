@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useLocale } from '@/lib/i18n/provider'
 import { toGrams, type Uom } from '@/lib/domain/units'
 import {
-  saveTransaction, voidTransaction, type SaveResult,
+  correctTransaction, saveTransaction, voidTransaction, type SaveResult,
 } from '@/app/(app)/gold-transactions/actions'
 import styles from './TxnGrid.module.css'
 
@@ -33,6 +33,10 @@ export type SavedRow = {
   payments: { seq: number; amount: number; method: string }[]
   /** Who is credited with it, largest share first. */
   soldBy: { code: string; sharePct: number }[]
+  /** What the screen was showing, so a correction can tell if it has moved. */
+  revision: number
+  /** Why this row cannot be corrected here, or null if it can. */
+  blockedReason: string | null
 }
 
 /** One way a row was settled, as typed. */
@@ -70,6 +74,12 @@ type Draft = {
   /** As many lines as the settlement took. Always ends in an empty one. */
   payments: DraftPayment[]
   remarks: string
+  /**
+   * Set when this draft replaces a posted transaction. Until it is committed
+   * the original is untouched and still posted: opening a correction writes
+   * nothing at all, which is the whole of the fault this fixes.
+   */
+  correcting?: { originalId: string; revision: number; reason: string }
   error?: string
   /** The row saved; something beside the money did not. */
   warning?: string
@@ -254,8 +264,7 @@ export function TxnGrid({
       }
     }
 
-    startTransition(async () => {
-      const result: SaveResult = await saveTransaction({
+    const body = {
         requestKey: row.requestKey,
         txnDate,
         txnType: row.txnType,
@@ -271,7 +280,20 @@ export function TxnGrid({
         goldPct: row.goldPct ? Number(row.goldPct) : null,
         remarks: row.remarks || null,
         payments,
-      })
+    }
+
+    startTransition(async () => {
+      // A correction and a fresh row are the same shape with a different
+      // destination: one writes a transaction, the other reverses one and
+      // writes its replacement in the same breath.
+      const result: SaveResult = row.correcting
+        ? await correctTransaction({
+            ...body,
+            originalId: row.correcting.originalId,
+            expectedRevision: row.correcting.revision,
+            reason: row.correcting.reason,
+          })
+        : await saveTransaction(body)
 
       if (result.ok) {
         setDrafts((rows) => {
@@ -352,21 +374,24 @@ export function TxnGrid({
    * worked, so a failure leaves the original standing rather than deleting a
    * transaction and losing what it said.
    */
-  async function correctRow(r: SavedRow) {
+  function correctRow(r: SavedRow) {
+    if (r.blockedReason) { setVoidError(r.blockedReason); return }
     const reason = window.prompt(t('txn.correctWhy'), t('txn.correctReason'))
     if (reason === null) return
-
-    setVoiding(r.id)
     setVoidError(null)
-    const result = await voidTransaction({ id: r.id, reason })
-    setVoiding(null)
-    if (!result.ok) { setVoidError(result.message); return }
 
-    // Everything the old row said, including how it was settled, waiting to be
-    // corrected rather than retyped.
+    // Nothing is written here. The original stays live and posted while the
+    // replacement is typed; the reversal happens with the replacement, in one
+    // database transaction, when this draft is committed.
+    //
+    // It used to reverse first and open the draft afterwards, so closing the
+    // tab in between left the books with the old row cancelled and nothing to
+    // take its place. The comment above the old code said the draft came
+    // first; the code did the opposite.
     setDrafts((rows) => [...rows, {
       key: nextKey,
       requestKey: crypto.randomUUID(),
+      correcting: { originalId: r.id, revision: r.revision, reason },
       txnType: r.txn_type,
       salesPeople: [
         ...r.soldBy.map((p) => ({ code: p.code, sharePct: String(p.sharePct) })),
@@ -389,7 +414,6 @@ export function TxnGrid({
       remarks: r.remarks ?? '',
     }])
     setNextKey((k) => k + 1)
-    router.refresh()
   }
 
   return (
@@ -504,8 +528,9 @@ export function TxnGrid({
                     type="button"
                     className={styles.select}
                     style={{ width: 'auto', marginRight: 6 }}
-                    disabled={voiding === r.id}
-                    onClick={() => void correctRow(r)}
+                    disabled={voiding === r.id || r.blockedReason !== null}
+                    title={r.blockedReason ?? undefined}
+                    onClick={() => correctRow(r)}
                   >
                     {t('txn.correct')}
                   </button>

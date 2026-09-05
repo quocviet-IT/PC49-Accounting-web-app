@@ -73,19 +73,10 @@ try {
   page.once('dialog', (d) => d.accept('Đơn giá gõ nhầm 600 thay vì 60'))
   await page.getByRole('button', { name: 'Sửa', exact: true }).first().click()
 
-  const voided = await untilRowIs(db,
-    `SELECT voided_at, void_reason AS why FROM pc49.gold_txn WHERE id = $1`, [wrong?.id],
-    (r) => r.voided_at !== null)
-  check('the original is cancelled, with the reason kept',
-    voided !== null && /600/.test(voided.why ?? ''), voided?.why ?? '')
-
   // The whole point: what was typed comes back, so one field changes.
   //
-  // Waited for rather than read straight away. The poll above returns the
-  // moment the database says the row is cancelled, which is a round trip
-  // before the browser has been told and the replacement row drawn — so
-  // reading here found the empty row waiting at the foot of the grid and
-  // called a working correction broken, about half the time.
+  // Waited for rather than read straight away, because the draft is drawn by
+  // the browser rather than reported by the database.
   const arrived = await until(async () =>
     (await page.getByLabel('Đơn giá').count()) > 1
       && (await page.getByLabel('Đơn giá').last().inputValue()) === '600')
@@ -99,6 +90,17 @@ try {
       ? '(the replacement row never arrived)'
       : await page.getByLabel('Khách / NCC').last().inputValue())
 
+  // And the books have not moved. This is the fault PC49-01 named: pressing
+  // Sửa used to reverse the original there and then, so closing the tab at
+  // this exact moment left the transaction cancelled with nothing in its
+  // place. Read after the draft is on screen, which is well past the point the
+  // old code had already written the reversal.
+  const stillOpen = await db.query(
+    `SELECT voided_at, journal_entry_id AS e FROM pc49.gold_txn WHERE id = $1`, [wrong?.id])
+  check('opening a correction has not touched the books',
+    stillOpen.rows[0]?.voided_at === null && stillOpen.rows[0]?.e !== null,
+    stillOpen.rows[0]?.voided_at ? 'already reversed' : 'still posted')
+
   // Change the one thing that was wrong.
   await price.fill('60')
   await page.getByLabel('Thanh toán 1').last().fill('1200')
@@ -108,9 +110,22 @@ try {
     `SELECT id, unit_price::float8 AS price, amount::float8 AS amount, journal_entry_id AS e
        FROM pc49.gold_txn
       WHERE txn_date = $1 AND partner_code = $2 AND voided_at IS NULL`,
-    [DAY, PARTNER], (r) => r.e !== null)
+    [DAY, PARTNER], (r) => r.e !== null && r.price === 60)
   check('the corrected row posts', fixed !== null && fixed.price === 60, `${fixed?.price}`)
   check('and carries the corrected amount', fixed?.amount === -1200, `${fixed?.amount}`)
+
+  // Only now is the original reversed, and it happened with the replacement.
+  const voided = await untilRowIs(db,
+    `SELECT voided_at, void_reason AS why FROM pc49.gold_txn WHERE id = $1`, [wrong?.id],
+    (r) => r.voided_at !== null)
+  check('and only then is the original cancelled, with the reason kept',
+    voided !== null && /600/.test(voided.why ?? ''), voided?.why ?? '')
+
+  // The replacement says what it replaces, so the pair can be read back later.
+  const linked = await db.query(
+    `SELECT corrects_txn_id::text AS c FROM pc49.gold_txn WHERE id = $1`, [fixed?.id])
+  check('and the replacement records which row it replaced',
+    linked.rows[0]?.c === wrong?.id, linked.rows[0]?.c ?? '(not linked)')
 
   // ---- And the books agree --------------------------------------------------
   const stock = await db.query(
@@ -140,6 +155,12 @@ try {
 } finally {
   await browser.close()
   const txns = await db.query(`SELECT id FROM pc49.gold_txn WHERE txn_date = $1`, [DAY])
+  // A replacement points at the row it replaced, so the link has to go before
+  // either can. Production never deletes a transaction at all — this exists
+  // because a check that leaves the client's books full of its own practice
+  // rows is worse than no check.
+  await db.query(
+    `UPDATE pc49.gold_txn SET corrects_txn_id = NULL WHERE txn_date = $1`, [DAY])
   for (const t of txns.rows) {
     await db.query(`DELETE FROM pc49.inventory_movement WHERE source_id = $1`, [t.id])
     await db.query(`DELETE FROM pc49.gold_txn_payment WHERE txn_id = $1`, [t.id])
