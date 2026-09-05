@@ -10,7 +10,8 @@ export default async function SettingsPage() {
   const mayClose = can(role, 'period.close')
   const mayManage = can(role, 'catalog.manage')
   const mayImport = can(role, 'dataImport.run')
-  if (!mayClose && !mayManage && !mayImport) {
+  const mayManagePeople = can(role, 'user.manage')
+  if (!mayClose && !mayManage && !mayImport && !mayManagePeople) {
     return <Forbidden locale={user?.locale} />
   }
 
@@ -18,11 +19,16 @@ export default async function SettingsPage() {
 
   // Each card says what is behind it, so the hub reads as a status board rather
   // than a list of links.
-  const [closed, params, batches, uncosted] = await Promise.all([
+  const [closed, params, batches, uncosted, people] = await Promise.all([
     supabase.from('accounting_period').select('period').eq('status', 'CLOSED'),
     supabase.from('system_param').select('key'),
     supabase.from('import_batch').select('id').is('committed_at', null),
     supabase.from('v_sale_without_cost').select('txn_id'),
+    // Only an administrator may read this, and only an administrator is shown
+    // the card, so an empty answer for everybody else is the right answer.
+    mayManagePeople
+      ? supabase.from('app_user').select('id').is('suspended_at', null)
+      : Promise.resolve({ data: [] }),
   ])
 
   const cards: HubCard[] = [
@@ -52,6 +58,15 @@ export default async function SettingsPage() {
       count: params.data?.length ?? 0,
       countLabelKey: 'set.paramCount',
       show: mayManage,
+    },
+    {
+      key: 'users',
+      href: '/settings/users',
+      titleKey: 'set.users',
+      noteKey: 'set.usersNote',
+      count: people.data?.length ?? 0,
+      countLabelKey: 'set.userCount',
+      show: mayManagePeople,
     },
   ]
 

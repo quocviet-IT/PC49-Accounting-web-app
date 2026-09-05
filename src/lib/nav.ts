@@ -70,7 +70,7 @@ const ALL: NavItem[] = [
   {
     key: '/settings',
     labelKey: 'nav.settings',
-    requires: ['dataImport.run', 'period.close', 'catalog.manage'],
+    requires: ['dataImport.run', 'period.close', 'catalog.manage', 'user.manage'],
   },
 ]
 
