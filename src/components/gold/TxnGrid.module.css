@@ -104,7 +104,7 @@
   z-index: 1;
   text-align: left;
   font-weight: 600;
-  font-size: 11px;
+  font-size: var(--pc-font-label);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
@@ -166,7 +166,7 @@
    it trades in luong and ounces, and no generic ledger shows it. */
 .grams {
   display: block;
-  font-size: 11px;
+  font-size: var(--pc-font-label);
   color: var(--muted);
   padding: 0 8px 5px;
   text-align: right;
@@ -177,7 +177,7 @@
 .out { color: var(--out); }
 
 .rowError {
-  font-size: 11px;
+  font-size: var(--pc-font-label);
   color: var(--out);
   padding: 2px 8px 6px;
 }
@@ -190,7 +190,7 @@
   width: 22px;
   text-align: center;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--pc-font-label);
 }
 
 /* The running total, pinned. The accountant's real daily job is proving the day
@@ -220,7 +220,7 @@
 }
 
 .totalLabel {
-  font-size: 11px;
+  font-size: var(--pc-font-label);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
@@ -257,7 +257,7 @@
    destructive one, so it should not compete with typing the next row. */
 .voidButton {
   font: inherit;
-  font-size: 11px;
+  font-size: var(--pc-font-label);
   padding: 2px 8px;
   border: 1px solid var(--rule-strong);
   border-radius: 4px;
@@ -292,7 +292,7 @@
    because the difference matters: one means try again, the other means the
    purchase is on the books and a phone number is not. */
 .rowWarning {
-  font-size: 11px;
+  font-size: var(--pc-font-label);
   color: var(--pc-text-faint);
   padding: 2px 8px 6px;
 }

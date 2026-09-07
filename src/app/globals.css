@@ -71,6 +71,59 @@
   --pc-accent-onDark: #5eead4;
 }
 
+/* ------------------------------------------------- type and spacing scale */
+/*
+ * PC49-08. There was no scale — labels sat at 10.5px, 11px and 12.5px across
+ * three stylesheets, each chosen on its own, and the same table was defined
+ * twice with different numbers. Small text is the part the accountant reads
+ * all day, and 10.5px uppercase is below what anybody should have to.
+ *
+ * Only sizes, weights and rhythm live here. Colour stays in tokens.ts, which
+ * generates the block above and is checked against it — a hex in this file is
+ * a second source of truth for a decision made there.
+ *
+ * The two densities are deliberate and different. A reading table breathes; the
+ * entry grid stays tight, because it is a spreadsheet replacement somebody
+ * types two hundred rows a month into and every millimetre of row height is a
+ * row they can no longer see.
+ */
+:root {
+  --pc-font-page: 24px;
+  --pc-line-page: 32px;
+  --pc-font-section: 15px;
+  --pc-line-section: 22px;
+  --pc-font-body: 14px;
+  --pc-line-body: 21px;
+  --pc-font-label: 12px;
+  --pc-line-label: 18px;
+  --pc-font-kpi: 26px;
+  --pc-line-kpi: 34px;
+
+  --pc-space-1: 4px;
+  --pc-space-2: 8px;
+  --pc-space-3: 12px;
+  --pc-space-4: 16px;
+  --pc-space-5: 24px;
+  --pc-space-6: 32px;
+
+  --pc-radius-control: 6px;
+  --pc-radius-frame: 10px;
+  --pc-radius-dialog: 12px;
+
+  --pc-control-height: 36px;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --pc-font-page: 22px;
+    --pc-line-page: 30px;
+    --pc-font-kpi: 24px;
+    --pc-line-kpi: 32px;
+    /* A finger is not a mouse pointer. */
+    --pc-control-height: 44px;
+  }
+}
+
 /* ------------------------------------------------------------------ base */
 
 * { box-sizing: border-box; }
@@ -159,7 +212,7 @@ html, body {
 
 .pc-shell__brand-copy { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
 .pc-shell__brand-name { color: var(--pc-chrome-text); font-size: 14px; font-weight: 600; }
-.pc-shell__brand-sub { color: var(--pc-chrome-textMuted); font-size: 11px; }
+.pc-shell__brand-sub { color: var(--pc-chrome-textMuted); font-size: var(--pc-font-label); }
 
 .pc-shell__nav-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px 0; }
 .pc-shell__nav-scroll::-webkit-scrollbar { width: 8px; }
@@ -219,7 +272,7 @@ html, body {
   line-height: 1.2;
 }
 .pc-shell__account-email { font-size: 12.5px; color: var(--pc-text-body); }
-.pc-shell__account-role { font-size: 11px; color: var(--pc-text-faint); }
+.pc-shell__account-role { font-size: var(--pc-font-label); color: var(--pc-text-faint); }
 
 .pc-shell__content { padding: 20px; }
 .pc-shell__content-inner { max-width: 1360px; margin: 0 auto; }
@@ -238,16 +291,18 @@ html, body {
 
 .pc-page-header__title.ant-typography {
   margin: 0;
-  font-size: 21px;
+  font-size: var(--pc-font-page);
+  line-height: var(--pc-line-page);
   font-weight: 650;
   letter-spacing: -0.015em;
   color: var(--pc-text-heading);
 }
 
 .pc-page-header__description.ant-typography {
-  margin: 6px 0 0;
+  margin: var(--pc-space-2) 0 0;
   max-width: 78ch;
-  font-size: 13px;
+  font-size: var(--pc-font-body);
+  line-height: var(--pc-line-body);
   color: var(--pc-text-secondary);
 }
 
@@ -265,7 +320,8 @@ html, body {
 .pc-table th {
   text-align: left;
   font-weight: 600;
-  font-size: 10.5px;
+  font-size: var(--pc-font-label);
+  line-height: var(--pc-line-label);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--pc-text-faint);
@@ -311,7 +367,8 @@ html, body {
 .pc-section { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
 
 .pc-section__title {
-  font-size: 11px;
+  font-size: var(--pc-font-section);
+  line-height: var(--pc-line-section);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--pc-text-faint);
@@ -335,21 +392,29 @@ html, body {
 .pc-stat { background: var(--pc-surface-card); padding: 13px 16px; }
 .pc-stat__label {
   display: block;
-  font-size: 10.5px;
+  font-size: var(--pc-font-label);
+  line-height: var(--pc-line-label);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--pc-text-faint);
 }
 .pc-stat__value {
   display: block;
-  margin-top: 3px;
-  font-size: 21px;
+  margin-top: var(--pc-space-1);
+  font-size: var(--pc-font-kpi);
+  line-height: var(--pc-line-kpi);
   font-weight: 620;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
 }
-.pc-stat__note { display: block; margin-top: 2px; font-size: 11px; color: var(--pc-text-faint); }
+.pc-stat__note {
+  display: block;
+  margin-top: var(--pc-space-1);
+  font-size: var(--pc-font-label);
+  line-height: var(--pc-line-label);
+  color: var(--pc-text-faint);
+}
 
 /* An editable figure inside a table. No border until it is being used, so a
    grid of inputs still reads as a table of numbers. */

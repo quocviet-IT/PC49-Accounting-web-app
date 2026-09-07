@@ -32,7 +32,8 @@
 .title { display: none; }
 
 .note {
-  font-size: 12.5px;
+  font-size: var(--pc-font-label);
+  line-height: var(--pc-line-label);
   color: var(--pc-text-secondary);
   max-width: 80ch;
   margin: 0;
@@ -52,7 +53,8 @@
 .section:last-child { margin-bottom: 8px; }
 
 .sectionTitle {
-  font-size: 11px;
+  font-size: var(--pc-font-section);
+  line-height: var(--pc-line-section);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--muted);
@@ -97,7 +99,8 @@
 .table th {
   text-align: left;
   font-weight: 600;
-  font-size: 10.5px;
+  font-size: var(--pc-font-label);
+  line-height: var(--pc-line-label);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--muted);
@@ -185,14 +188,16 @@
 }
 
 .statLabel {
-  font-size: 10.5px;
+  font-size: var(--pc-font-label);
+  line-height: var(--pc-line-label);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
 .statValue {
-  font-size: 21px;
+  font-size: var(--pc-font-kpi);
+  line-height: var(--pc-line-kpi);
   font-weight: 620;
   font-variant-numeric: tabular-nums;
   font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
@@ -200,11 +205,16 @@
   color: var(--pc-text-heading);
 }
 
-.statNote { font-size: 11px; color: var(--muted); }
+.statNote {
+  font-size: var(--pc-font-label);
+  line-height: var(--pc-line-label);
+  color: var(--muted);
+}
 
 .badge {
   display: inline-block;
-  font-size: 11px;
+  font-size: var(--pc-font-label);
+  line-height: var(--pc-line-label);
   letter-spacing: 0.02em;
   padding: 1px 8px;
   border-radius: 999px;
