@@ -14,7 +14,7 @@ export default async function UsersPage() {
   const supabase = await createServerSupabase()
   // The function refuses anybody who is not an administrator, so this is the
   // same answer whether it is asked from here or from anywhere else.
-  const { data } = await supabase.rpc('user_directory')
+  const { data, error } = await supabase.rpc('user_directory')
 
   const people: PersonRow[] = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     id: r.id as string,
@@ -26,5 +26,5 @@ export default async function UsersPage() {
     createdAt: (r.created_at as string) ?? '',
   }))
 
-  return <UsersView people={people} meId={user.id} />
+  return <UsersView people={people} meId={user.id} loadFailed={Boolean(error)} />
 }

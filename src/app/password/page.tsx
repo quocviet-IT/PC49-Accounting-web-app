@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { PasswordView } from '@/components/settings/PasswordView'
 import { getCurrentUser } from '@/lib/auth/currentUser'
-import { createServerSupabase } from '@/lib/supabase/server'
 
 /**
  * Deliberately outside the (app) group.
@@ -15,9 +14,8 @@ export default async function PasswordPage() {
   const user = await getCurrentUser()
   if (!user) redirect('/login')
 
-  const supabase = await createServerSupabase()
-  const { data } = await supabase
-    .from('app_user').select('must_change_password').eq('id', user.id).single()
-
-  return <PasswordView forced={Boolean(data?.must_change_password)} />
+  // The same read the layout does, and it is the same read: one query whose
+  // failure means no user, rather than a second one whose failure quietly
+  // turned a required change into an optional one.
+  return <PasswordView forced={user.mustChangePassword} />
 }

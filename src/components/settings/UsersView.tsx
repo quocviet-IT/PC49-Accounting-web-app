@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale } from '@/lib/i18n/provider'
-import { Page, Section, Frame } from '@/components/ledger/Ledger'
+import { Page, Section, Frame, LoadFailed } from '@/components/ledger/Ledger'
 import ledger from '@/components/ledger/Ledger.module.css'
 import {
   changeRole, createUser, renameUser, restoreUser, resetPassword, suspendUser,
@@ -112,7 +112,18 @@ function AddPerson({ onCreated }: { onCreated: (password: string) => void }) {
  * The refusals shown here are the database's own words. Nothing on this screen
  * decides whether a change is allowed — it asks, and repeats the answer.
  */
-export function UsersView({ people, meId }: { people: PersonRow[]; meId: string }) {
+export function UsersView({ people, meId, loadFailed = false }: {
+  people: PersonRow[]
+  meId: string
+  /**
+   * The directory did not arrive.
+   *
+   * Offering "add a colleague" beside an empty list that only looks empty is
+   * the same fault as offering to open a refining lot when the lot list failed
+   * — the remedy somebody reaches for creates the duplicate.
+   */
+  loadFailed?: boolean
+}) {
   const { t } = useLocale()
   const router = useRouter()
   const [secret, setSecret] = useState<string | null>(null)
@@ -126,6 +137,14 @@ export function UsersView({ people, meId }: { people: PersonRow[]; meId: string 
       if (!result.ok) { setError(result.message ?? 'Không thực hiện được'); return }
       router.refresh()
     })
+  }
+
+  if (loadFailed) {
+    return (
+      <Page titleKey="users.title" noteKey="users.note">
+        <Section><LoadFailed /></Section>
+      </Page>
+    )
   }
 
   return (

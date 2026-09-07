@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLocale } from '@/lib/i18n/provider'
-import { Page, Section, Empty, Frame, ledger } from '@/components/ledger/Ledger'
+import { Page, Section, Empty, Frame, ledger, LoadFailed } from '@/components/ledger/Ledger'
 import { triageReport } from '@/app/(app)/feedback/actions'
 import styles from './Feedback.module.css'
 
@@ -36,12 +36,18 @@ const STATUSES = ['NEW', 'LOOKING', 'FIXED', 'DECLINED'] as const
  * visibly happens to what they filed.
  */
 export function FeedbackQueue({
-  rows, status, counts, canTriage,
+  rows, status, counts, canTriage, loadFailed = false,
 }: {
   rows: ReportRow[]
   status: string | null
   counts: Record<string, number>
   canTriage: boolean
+  /**
+   * The queue did not arrive. An empty queue means every report has been dealt
+   * with — which is the one thing this screen must not say wrongly, since it
+   * is where somebody comes to check that what they reported was not lost.
+   */
+  loadFailed?: boolean
 }) {
   const { t } = useLocale()
 
@@ -67,7 +73,7 @@ export function FeedbackQueue({
       </nav>
 
       <Section>
-        {rows.length === 0 ? <Empty /> : (
+        {loadFailed ? <LoadFailed /> : rows.length === 0 ? <Empty /> : (
           <Frame>
             <table className={ledger.table}>
               <colgroup>

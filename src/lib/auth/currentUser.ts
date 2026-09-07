@@ -9,6 +9,16 @@ export type CurrentUser = {
   fullName: string
   role: Role
   locale: Locale
+  /**
+   * Set when an administrator issued the password and it has not been changed.
+   *
+   * It is read here, with the role, rather than by the layout on its own. That
+   * read discarded its error, so a query that failed left the flag undefined
+   * and let somebody who was required to change their password straight in.
+   * Folded into this one, a failed read returns no user at all — which sends
+   * them to the door. An authentication check has to fail closed.
+   */
+  mustChangePassword: boolean
 }
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
@@ -18,7 +28,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
   const { data } = await supabase
     .from('app_user')
-    .select('id, full_name, role, locale, suspended_at')
+    .select('id, full_name, role, locale, suspended_at, must_change_password')
     .eq('id', user.id)
     .single()
 
@@ -37,5 +47,6 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     fullName: data.full_name as string,
     role: data.role as Role,
     locale: data.locale as Locale,
+    mustChangePassword: Boolean(data.must_change_password),
   }
 }

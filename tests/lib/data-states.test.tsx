@@ -257,6 +257,60 @@ describe('bank conversion: the tolerance is a rule, not a default', async () => 
   })
 })
 
+describe('reports: a report of zeros is a conclusion, not a blank', async () => {
+  const { ReportView } = await import('@/components/reports/ReportView')
+  const { findReport } = await import('@/lib/domain/reports')
+  // The real definition, not a hand-written stand-in: a literal that drifts
+  // from the type is a test that stops describing the screen.
+  const report = findReport('pnl')!
+  const base = {
+    report,
+    period: '2026-09', date: '2026-09-30', from: '2026-09-01', to: '2026-09-30',
+  }
+
+  it('says the read failed rather than printing nothing', () => {
+    expect(text(render(<ReportView {...base} data={{ kind: 'failed' }} />)))
+      .toContain(FAILED)
+  })
+
+  it('and a period with genuinely nothing in it still reads as empty', () => {
+    const html = text(render(<ReportView {...base} data={{ kind: 'empty' }} />))
+    expect(html).toContain(EMPTY)
+    expect(html).not.toContain(FAILED)
+  })
+})
+
+describe('the report queue: an empty queue means nothing is outstanding', async () => {
+  const { FeedbackQueue } = await import('@/components/feedback/FeedbackQueue')
+  const base = { rows: [], status: null, counts: {}, canTriage: true }
+
+  it('so a failed read says so instead', () => {
+    expect(text(render(<FeedbackQueue {...base} loadFailed />))).toContain(FAILED)
+  })
+
+  it('and a queue that is really clear still reads as clear', () => {
+    const html = text(render(<FeedbackQueue {...base} />))
+    expect(html).toContain(EMPTY)
+    expect(html).not.toContain(FAILED)
+  })
+})
+
+describe('the directory: a failed read must not invite a duplicate colleague', async () => {
+  const { UsersView } = await import('@/components/settings/UsersView')
+
+  it('withholds "add a person" when it could not read who is already there', () => {
+    const html = render(<UsersView people={[]} meId="me" loadFailed />)
+    expect(html).not.toContain('Thêm người')
+    expect(text(html)).toContain(FAILED)
+  })
+
+  it('but offers it when the directory really did load', () => {
+    const html = render(<UsersView people={[]} meId="me" />)
+    expect(html).toContain('Thêm người')
+    expect(text(html)).not.toContain(FAILED)
+  })
+})
+
 describe('reference: a catalogue answers for itself alone', async () => {
   const { ReferenceView } = await import('@/components/settings/ReferenceView')
   const base = {

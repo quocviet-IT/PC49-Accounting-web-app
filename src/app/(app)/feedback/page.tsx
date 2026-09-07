@@ -27,7 +27,7 @@ export default async function FeedbackPage({
     .limit(300)
   if (status) query = query.eq('status', status)
 
-  const { data } = await query
+  const { data, error } = await query
 
   // The bucket is private, so a screenshot is reached through a link that
   // expires rather than by its path. Signed as this reader: the storage policy
@@ -64,13 +64,18 @@ export default async function FeedbackPage({
   // Counts for the tabs, so somebody can see there is a queue without opening
   // each one. Read unfiltered, which row-level security narrows to what this
   // reader may see anyway.
-  const { data: all } = await supabase.from('feedback_report').select('status')
+  const { data: all, error: countError } = await supabase
+    .from('feedback_report').select('status')
   const counts: Record<string, number> = {}
   for (const r of all ?? []) counts[r.status as string] = (counts[r.status as string] ?? 0) + 1
 
   return (
     <FeedbackQueue
       rows={rows}
+      // Both errors were discarded. An empty queue reads as "nothing
+      // outstanding", and this is the screen somebody opens to check that the
+      // problem they reported did not vanish.
+      loadFailed={Boolean(error || countError)}
       status={status}
       counts={counts}
       canTriage={user.role === 'ADMIN'}

@@ -47,10 +47,14 @@ export default async function ReportsPage({
   const supabase = await createServerSupabase()
   const num = (v: unknown) => Number(v ?? 0)
   let data: ReportData = { kind: 'empty' }
+  // One branch runs per request, so each checks its own read. Every one of
+  // these errors used to be discarded, which turned a failed query into a
+  // report of zeros.
+  const unread: ReportData = { kind: 'failed' }
 
   if (report.id === 'pnl') {
-    const { data: rows } = await supabase.rpc('pl_report', { p_period: period })
-    data = {
+    const { data: rows, error } = await supabase.rpc('pl_report', { p_period: period })
+    data = error ? unread : {
       kind: 'pnl',
       lines: (rows ?? []).map((r: Record<string, unknown>) => ({
         code: r.code as string,
@@ -64,9 +68,9 @@ export default async function ReportsPage({
   }
 
   if (report.id === 'assets') {
-    const { data: rows } = await supabase.rpc('total_asset_report', { p_as_of: date })
+    const { data: rows, error } = await supabase.rpc('total_asset_report', { p_as_of: date })
     const a = Array.isArray(rows) ? rows[0] : rows
-    data = a ? {
+    data = error ? unread : a ? {
       kind: 'assets',
       inventoryGram: num(a.inventory_gram),
       inventoryValue: num(a.inventory_value),
@@ -79,8 +83,8 @@ export default async function ReportsPage({
   }
 
   if (report.id === 'trial') {
-    const { data: rows } = await supabase.rpc('trial_balance', { p_period: period })
-    data = {
+    const { data: rows, error } = await supabase.rpc('trial_balance', { p_period: period })
+    data = error ? unread : {
       kind: 'trial',
       rows: (rows ?? []).map((r: Record<string, unknown>) => ({
         code: r.account_code as string,
@@ -95,13 +99,13 @@ export default async function ReportsPage({
   }
 
   if (report.id === 'ledger') {
-    const { data: accounts } = await supabase.from('account')
+    const { data: accounts, error: accountError } = await supabase.from('account')
       .select('code, name_vi, name_en').eq('is_active', true).order('sort_order')
     const account = params.account ?? accounts?.[0]?.code ?? '1111'
-    const { data: rows } = await supabase.rpc('general_ledger', {
+    const { data: rows, error: rowError } = await supabase.rpc('general_ledger', {
       p_account: account, p_from: from, p_to: to,
     })
-    data = {
+    data = accountError || rowError ? unread : {
       kind: 'ledger',
       account,
       accounts: (accounts ?? []).map((a: { code: string; name_vi: string; name_en: string }) => ({
@@ -120,10 +124,10 @@ export default async function ReportsPage({
   }
 
   if (report.id === 'stock') {
-    const { data: rows } = await supabase.rpc('stock_movement_report', {
+    const { data: rows, error } = await supabase.rpc('stock_movement_report', {
       p_period: period, p_owner: 'PC49',
     })
-    data = {
+    data = error ? unread : {
       kind: 'stock',
       rows: (rows ?? []).map((r: Record<string, unknown>) => ({
         code: r.gold_type_code as string,
@@ -138,10 +142,10 @@ export default async function ReportsPage({
   }
 
   if (report.id === 'deposits') {
-    const { data: rows } = await supabase.from('v_deposit_status')
+    const { data: rows, error } = await supabase.from('v_deposit_status')
       .select('txn_date, partner_code, gold_type_code, uom, qty, qty_gram, deposit_amount, order_amount, paid_amount, remaining_amount, settled_by, settled_date')
       .order('txn_date', { ascending: false }).limit(300)
-    data = {
+    data = error ? unread : {
       kind: 'deposits',
       rows: (rows ?? []).map((r: Record<string, unknown>) => ({
         date: r.txn_date as string,
@@ -160,8 +164,8 @@ export default async function ReportsPage({
   }
 
   if (report.id === 'apar') {
-    const { data: rows } = await supabase.rpc('apar_report', { p_period: period })
-    data = {
+    const { data: rows, error } = await supabase.rpc('apar_report', { p_period: period })
+    data = error ? unread : {
       kind: 'apar',
       rows: (rows ?? []).map((r: Record<string, unknown>) => ({
         partner: r.partner_code as string,
@@ -175,10 +179,10 @@ export default async function ReportsPage({
   }
 
   if (report.id === 'vendor') {
-    const { data: rows } = await supabase.from('v_vendor_payable')
+    const { data: rows, error } = await supabase.from('v_vendor_payable')
       .select('partner_code, gold_type_code, qty, purchased_value, outstanding')
       .order('outstanding', { ascending: false }).limit(300)
-    data = {
+    data = error ? unread : {
       kind: 'vendor',
       rows: (rows ?? []).map((r: Record<string, unknown>) => ({
         partner: (r.partner_code as string) ?? '(unknown)',

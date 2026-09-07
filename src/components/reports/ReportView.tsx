@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useLocale } from '@/lib/i18n/provider'
 import {
-  Page, Section, Empty, Frame, Signed, Grams, money, weight, ledger,
+  Page, Section, Empty, Frame, Signed, Grams, money, weight, ledger, LoadFailed,
 } from '@/components/ledger/Ledger'
 import type { ReportDefinition } from '@/lib/domain/reports'
 import styles from './Reports.module.css'
@@ -41,6 +41,15 @@ export type AccountOption = { code: string; nameVi: string; nameEn: string }
 
 export type ReportData =
   | { kind: 'empty' }
+  /**
+   * The report could not be read.
+   *
+   * Distinct from `empty`, which is the answer when the query worked and the
+   * period genuinely holds nothing. The distinction matters most here: a
+   * report is the thing people take decisions from, and a profit and loss of
+   * all zeros is a conclusion, not a blank.
+   */
+  | { kind: 'failed' }
   | { kind: 'pnl'; lines: PnlLine[] }
   | {
       kind: 'assets'; inventoryGram: number; inventoryValue: number
@@ -127,6 +136,7 @@ export function ReportView({
       {controls}
 
       {data.kind === 'empty' && <Empty />}
+      {data.kind === 'failed' && <LoadFailed />}
 
       {data.kind === 'pnl' && (
         <Section>

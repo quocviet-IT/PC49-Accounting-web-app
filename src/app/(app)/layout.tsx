@@ -33,9 +33,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect(stillSignedIn ? '/auth/closed' : '/login')
   }
 
-  const { data } = await supabase
-    .from('app_user').select('must_change_password').eq('id', user.id).single()
-  if (data?.must_change_password) redirect('/password')
+  // Read with the role, in one query whose failure means no user rather than
+  // a flag that quietly reads false.
+  if (user.mustChangePassword) redirect('/password')
 
   return (
     <AppShell role={user.role} email={user.email}>
