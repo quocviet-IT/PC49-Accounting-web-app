@@ -24,6 +24,9 @@ const salesShareSchema = z.object({
 })
 
 const rowSchema = z.object({
+  // Stable for the life of one row on screen, so that a retry after a lost
+  // answer is recognised as the same intention rather than a second one.
+  requestKey: z.string().uuid(),
   txnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   txnType: z.enum([
     'PO', 'PO_VENDOR', 'SALE', 'DEPOSIT', 'PICKUP',
@@ -59,15 +62,37 @@ const rowSchema = z.object({
 })
 
 export type TxnRowInput = z.infer<typeof rowSchema>
-export type SaveResult = { ok: true; id: string } | { ok: false; message: string }
+
+/**
+ * What came back from a save.
+ *
+ * `warning` is not an error. The financial part either committed or it did
+ * not; a warning means it committed and something beside it did not, which is
+ * a different sentence and deserves a different one on screen. The handoff of
+ * 05-09-2026 asked for exactly this: never report "could not save" after the
+ * money has been recorded, only because a telephone number would not file.
+ */
+export type SaveResult =
+  | { ok: true; id: string; repeated: boolean; warning?: string }
+  | { ok: false; message: string }
 
 /**
  * Saves one transaction and posts the ledger entries it implies.
  *
- * The accountant types a row at a time, so this saves a row at a time: a failure
- * on row nine must not throw away rows one to eight. The database refuses
- * anything that breaks a flow rule or the sign convention, and the message it
- * returns is what the accountant sees.
+ * One call, and it is one database transaction. It used to be five separate
+ * requests — the row, the customer, the sales split, the payments, the posting
+ * — each committing on its own, so a failure at the fourth left a transaction
+ * on the books with no payments and no journal entry while the screen said it
+ * had not saved. Pressing the button again then wrote a second one.
+ *
+ * The request key makes retrying safe. When the answer is lost on the way back
+ * the accountant cannot know whether the money was recorded, and the only
+ * thing they can do is try again; with the key, trying again returns the first
+ * answer instead of writing the day twice.
+ *
+ * The amount is no longer sent as fact. The database works it out from the
+ * quantity and the price and refuses a figure that disagrees, because the
+ * number that reaches the ledger should not be one a screen can choose.
  */
 export async function saveTransaction(input: unknown): Promise<SaveResult> {
   const parsed = rowSchema.safeParse(input)
@@ -77,78 +102,100 @@ export async function saveTransaction(input: unknown): Promise<SaveResult> {
   const row = parsed.data
   const supabase = await createServerSupabase()
 
-  const { data: txn, error } = await supabase
-    .from('gold_txn')
-    .insert({
-      txn_date: row.txnDate,
-      txn_type: row.txnType,
-      gold_type_code: row.goldTypeCode,
+  const { data, error } = await supabase.rpc('save_gold_transaction', {
+    p_request_key: row.requestKey,
+    p_payload: {
+      txnDate: row.txnDate,
+      txnType: row.txnType,
+      goldTypeCode: row.goldTypeCode,
       uom: row.uom,
       qty: row.qty,
-      unit_price: row.unitPrice,
+      unitPrice: row.unitPrice,
       amount: row.amount,
-      partner_code: row.partnerCode,
-      // Left for the trigger to fill from the shares below, so the column and
-      // the split cannot say different things about who sold this.
-      sales_person_code: null,
-      scrap_detail: row.scrapDetail,
-      gold_pct: row.goldPct,
+      partnerCode: row.partnerCode,
+      scrapDetail: row.scrapDetail,
+      goldPct: row.goldPct,
       remarks: row.remarks,
-    })
-    .select('id')
-    .single()
-
+      payments: row.payments,
+      salesPeople: row.salesPeople,
+    },
+  })
   if (error) return { ok: false, message: error.message }
 
-  // Naming a customer on a row is what puts them in the catalogue: nobody has
-  // to enter a list before they can trade. A number given here is written
-  // against the customer, so it is there next time whoever serves them opens
-  // the screen. A blank leaves whatever is on file alone — this records a
-  // number, it does not delete one, and an empty box is far more often "I did
-  // not type it" than "she no longer has a telephone".
+  const result = data as { txnId: string; repeated: boolean }
+
+  // Beside the money, not inside it. Filing the customer is worth doing and is
+  // not worth throwing away a purchase for, so its failure is carried back as
+  // a warning against a row that did save.
+  let warning: string | undefined
   if (row.partnerCode) {
     const partner: { code: string; phone?: string } = { code: row.partnerCode }
     if (row.partnerPhone) partner.phone = row.partnerPhone
     const { error: partnerError } = await supabase
-      .from('partner')
-      .upsert(partner, { onConflict: 'code' })
-    // Not fatal. A transaction that posted correctly must not be reported as
-    // failed because the address book could not be updated.
-    if (partnerError) console.error('partner not recorded:', partnerError.message)
+      .from('partner').upsert(partner, { onConflict: 'code' })
+    if (partnerError) warning = partnerError.message
   }
-
-  // In one statement, so the deferred check that the shares come to a hundred
-  // sees the whole split rather than the first name on its own.
-  if (row.salesPeople.length > 0) {
-    const { error: whoError } = await supabase.from('gold_txn_sales_person').insert(
-      row.salesPeople.map((p) => ({
-        txn_id: txn.id,
-        sales_person_code: p.code,
-        share_pct: p.sharePct,
-      })),
-    )
-    if (whoError) return { ok: false, message: whoError.message }
-  }
-
-  if (row.payments.length > 0) {
-    const direction = row.amount >= 0 ? 'AR' : 'AP'
-    const { error: payError } = await supabase.from('gold_txn_payment').insert(
-      row.payments.map((p, i) => ({
-        txn_id: txn.id,
-        seq: i + 1,
-        direction,
-        amount: p.amount,
-        method: p.method,
-      })),
-    )
-    if (payError) return { ok: false, message: payError.message }
-  }
-
-  const { error: postError } = await supabase.rpc('post_gold_txn', { p_txn_id: txn.id })
-  if (postError) return { ok: false, message: postError.message }
 
   revalidatePath('/gold-transactions')
-  return { ok: true, id: txn.id }
+  return { ok: true, id: result.txnId, repeated: result.repeated, warning }
+}
+
+
+const correctionSchema = rowSchema.extend({
+  originalId: z.string().uuid(),
+  expectedRevision: z.number().int(),
+  reason: z.string().trim().min(3, 'say why in a few words'),
+  reversalDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
+})
+
+/**
+ * Replaces a posted transaction with a corrected one.
+ *
+ * Nothing is written until this is called. Pressing Sửa used to reverse the
+ * original immediately and only then offer a draft to type, so closing the tab
+ * between the two left the books with the old row cancelled and nothing in its
+ * place. Now the original stays live and posted while the correction is being
+ * typed, and the reversal and the replacement happen together or not at all.
+ *
+ * The revision is the one the screen was showing. If somebody else has changed
+ * the row since, the database says CONFLICT rather than quietly overwriting
+ * work this screen never saw.
+ */
+export async function correctTransaction(input: unknown): Promise<SaveResult> {
+  const parsed = correctionSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Invalid correction' }
+  }
+  const row = parsed.data
+  const supabase = await createServerSupabase()
+
+  const { data, error } = await supabase.rpc('correct_gold_transaction', {
+    p_request_key: row.requestKey,
+    p_original_id: row.originalId,
+    p_expected_revision: row.expectedRevision,
+    p_reason: row.reason,
+    p_reversal_date: row.reversalDate,
+    p_payload: {
+      txnDate: row.txnDate,
+      txnType: row.txnType,
+      goldTypeCode: row.goldTypeCode,
+      uom: row.uom,
+      qty: row.qty,
+      unitPrice: row.unitPrice,
+      amount: row.amount,
+      partnerCode: row.partnerCode,
+      scrapDetail: row.scrapDetail,
+      goldPct: row.goldPct,
+      remarks: row.remarks,
+      payments: row.payments,
+      salesPeople: row.salesPeople,
+    },
+  })
+  if (error) return { ok: false, message: error.message }
+
+  const result = data as { txnId: string; repeated: boolean }
+  revalidatePath('/gold-transactions')
+  return { ok: true, id: result.txnId, repeated: result.repeated }
 }
 
 const voidSchema = z.object({

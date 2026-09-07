@@ -287,3 +287,57 @@
 .sharePct {
   max-width: 56px;
 }
+
+/* The row saved; something beside the money did not. Distinct from an error,
+   because the difference matters: one means try again, the other means the
+   purchase is on the books and a phone number is not. */
+.rowWarning {
+  font-size: 11px;
+  color: var(--pc-text-faint);
+  padding: 2px 8px 6px;
+}
+
+/* A note is prose, so it wraps rather than being cut off with an ellipsis the
+   way a figure never should be. Bounded, or one long note stretches the row. */
+.remarks {
+  padding: 6px 8px;
+  max-width: 22rem;
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* Asked before the day changes, because changing it is what throws the typing
+   away. Modal on purpose: this is a question with consequences, not a hint. */
+.guard {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--pc-text-default) 35%, transparent);
+  padding: 16px;
+}
+
+.guardBox {
+  max-width: 30rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 10px;
+  background: var(--pc-surface-card);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guardText {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.guardActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

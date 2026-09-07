@@ -89,6 +89,12 @@ html, body {
   font-variant-numeric: tabular-nums;
   font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   white-space: nowrap;
+  /* Wide enough for what this business writes: money into the millions and
+     weight to four decimals. Never clipped — a shortened figure reads as a
+     smaller one and there is no way to tell them apart. */
+  min-width: 8.5rem;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .pc-in { color: var(--pc-money-positive); }
@@ -252,7 +258,9 @@ html, body {
 /* The ledger table. Dense rows, hairline rules, figures in tabular numerals so
    a column of digits can be scanned down. It is a table of record, not a list
    of cards, and it is read the way a printed ledger is read. */
-.pc-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+/* Sized by contents, like the ledger tables — a figure that does not fit makes
+   the frame scroll rather than being shortened into a different number. */
+.pc-table { min-width: 100%; border-collapse: collapse; font-size: 13px; table-layout: auto; }
 
 .pc-table th {
   text-align: left;
@@ -271,8 +279,6 @@ html, body {
   padding: 8px 12px;
   border-bottom: 1px solid var(--pc-border-subtle);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .pc-table tbody tr:last-child td { border-bottom: 0; }

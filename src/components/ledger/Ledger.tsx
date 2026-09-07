@@ -1,6 +1,7 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useTransition, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 import { useLocale } from '@/lib/i18n/provider'
 import type { MessageKey } from '@/lib/i18n'
 import { PageHeader } from '@/components/PageHeader'
@@ -67,6 +68,37 @@ export function Stat({
 
 export function Stats({ children }: { children: ReactNode }) {
   return <div className={styles.stats}>{children}</div>
+}
+
+/**
+ * What a screen shows instead of figures it could not read.
+ *
+ * Supabase does not reject a failed query — it hands back an object carrying
+ * an error — so a loader that reads `data ?? []` turns a failure into an empty
+ * table, and an empty table of holdings reads as "we hold nothing". This is
+ * the alternative: say the read failed, and offer the one action that helps.
+ *
+ * Retrying refreshes the route, so it comes back with the same day and the
+ * same filters. A retry that quietly moved somebody to different figures would
+ * be worse than none.
+ */
+export function LoadFailed() {
+  const { t } = useLocale()
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  return (
+    <div className={styles.loadFailed} role="alert">
+      <p className={styles.loadFailedText}>{t('common.loadFailed')}</p>
+      <button
+        type="button"
+        className={styles.loadFailedRetry}
+        disabled={pending}
+        onClick={() => startTransition(() => router.refresh())}
+      >
+        {pending ? t('common.reloading') : t('common.retry')}
+      </button>
+    </div>
+  )
 }
 
 export function Empty() {

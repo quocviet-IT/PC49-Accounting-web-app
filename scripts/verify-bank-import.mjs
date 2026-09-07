@@ -11,6 +11,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import pg from 'pg'
+import { until } from './support/until.mjs'
 import { passwordFor } from './support/accounts.mjs'
 
 /** Resolved before anything is launched, so a missing password is
@@ -72,7 +73,12 @@ try {
     (await page.locator('text=Nhập sao kê').count()) > 0)
 
   await page.locator('input[type="file"]').setInputFiles(path)
-  await page.waitForTimeout(4000)
+  // Waited for rather than slept through. Uploading a statement is a file
+  // going up, rows being judged and the screen being redrawn, and four seconds
+  // is generous until the day it is not — at which point the check goes red
+  // for how long it waited rather than for what it found.
+  await until(async () =>
+    ((await page.locator('body').textContent()) ?? '').includes('dòng đã ghi'))
 
   const said = (await page.locator('body').textContent()) ?? ''
   check('it says what it recorded and what it could not place',
@@ -139,7 +145,8 @@ try {
   const wrong = join(dir, 'working-sheet.csv')
   writeFileSync(wrong, 'DATA,Note\n121 - PC49 BoA CK 3388,something\n', 'utf8')
   await page.locator('input[type="file"]').setInputFiles(wrong)
-  await page.waitForTimeout(2500)
+  await until(async () =>
+    ((await page.locator('body').textContent()) ?? '').includes('working sheet'))
   const refused = (await page.locator('body').textContent()) ?? ''
   check('the wrong sheet is refused by name, not as "invalid format"',
     refused.includes('Date') && refused.includes('working sheet'))

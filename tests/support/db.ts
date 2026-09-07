@@ -37,6 +37,16 @@ const SUPABASE_STUB = `
     CREATE ROLE authenticator;
   EXCEPTION WHEN duplicate_object THEN NULL; END $do$;
 
+  -- Supabase grants this and the stub did not, which made every SECURITY
+  -- INVOKER function that calls auth.uid() fail here and work in production —
+  -- the worst way round for a test to be wrong. void_gold_txn had been one of
+  -- those since 0034 and nothing noticed, because nothing had called it from
+  -- another invoker function until 0055 did.
+  --
+  -- Checked against the client's own database before being written down:
+  --   has_schema_privilege of authenticated on schema auth for USAGE is true.
+  GRANT USAGE ON SCHEMA auth TO authenticated, anon;
+
   -- Supabase Storage is a service, not part of PostgreSQL, but the two tables
   -- its policies are written against are ordinary ones. Stubbed to the columns
   -- the migrations touch, so a bucket definition and a storage policy are

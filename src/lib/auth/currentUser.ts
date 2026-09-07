@@ -18,11 +18,19 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
   const { data } = await supabase
     .from('app_user')
-    .select('id, full_name, role, locale')
+    .select('id, full_name, role, locale, suspended_at')
     .eq('id', user.id)
     .single()
 
   if (!data) return null
+
+  // A closed account is not a role that may do less. It is no role at all —
+  // which is what `pc49.effective_role()` has always said, and what every
+  // policy in the database reads. Reading `role` here without asking whether
+  // the account is open put the two out of step: the database returned nothing
+  // to somebody the screens still let in, so they reached the entry grid and
+  // found it empty rather than being turned round at the door.
+  if (data.suspended_at) return null
   return {
     id: data.id as string,
     email: user.email ?? '',

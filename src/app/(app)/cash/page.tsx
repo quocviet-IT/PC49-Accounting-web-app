@@ -106,6 +106,7 @@ export default async function CashPage({
 
   return (
     <CashView
+        balancesFailed={Boolean(flow.error)}
       period={period}
       rows={rows}
       unmatched={queue.count ?? 0}

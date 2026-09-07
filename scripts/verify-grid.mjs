@@ -104,6 +104,79 @@ check('and the day you entered is still there when you go back',
 check('with the row on it, not just the total',
   (await page.locator('tbody tr').filter({ hasText: 'HPAREZ' }).count()) === 1)
 
+// ---- Changing the day with unsaved work on screen ---------------------------
+//
+// Reported as PC49-04. The grid is keyed by the day, which is what stops a row
+// typed for one day being saved against another — and is also what threw the
+// typing away without asking. The three answers the handoff asks for are Stay,
+// Save and continue, and Discard.
+await page.click('text=Thêm dòng')
+const typed = page.locator('tbody tr').last()
+await typed.getByLabel('Khách / NCC', { exact: true }).fill('DRAFTGUARD')
+await typed.getByLabel('Loại vàng', { exact: true }).selectOption('SG')
+
+await page.getByLabel('Ngày', { exact: true }).fill('2026-03-18')
+await page.waitForTimeout(600)
+check('typing then changing the day asks first',
+  (await page.locator('[role="alertdialog"]').count()) === 1)
+
+// Staying keeps both the day and what was typed.
+await page.locator('button', { hasText: 'Ở lại' }).click()
+await page.waitForTimeout(400)
+check('and staying keeps the day it was on', page.url().includes(DAY), page.url().slice(-24))
+check('and keeps what was typed',
+  (await typed.getByLabel('Khách / NCC', { exact: true }).inputValue()) === 'DRAFTGUARD')
+
+// Discarding leaves, and writes nothing.
+await page.getByLabel('Ngày', { exact: true }).fill('2026-03-18')
+await page.waitForTimeout(600)
+await page.locator('button', { hasText: 'Bỏ thay đổi' }).click()
+await page.waitForURL('**/gold-transactions?date=2026-03-18', { timeout: 30000 })
+await page.waitForLoadState('networkidle')
+check('discarding changes the day', page.url().includes('2026-03-18'))
+
+const wrote = await (async () => {
+  const dbUrl2 = process.env.SUPABASE_DB_URL
+  if (!dbUrl2) return 0
+  const c = new pg.Client({ connectionString: dbUrl2, ssl: { rejectUnauthorized: false } })
+  await c.connect()
+  const r = await c.query(
+    `SELECT count(*)::int AS n FROM pc49.gold_txn WHERE partner_code = 'DRAFTGUARD'`)
+  await c.end()
+  return r.rows[0].n
+})()
+check('and discarding wrote nothing to the books', wrote === 0, `${wrote} row(s)`)
+
+// Back to the day the rest of this check works on.
+await page.goto(`${BASE}/gold-transactions?date=${DAY}`, { waitUntil: 'networkidle' })
+
+// "Save and continue" with a row that will not save must not continue. Leaving
+// would put the accountant on a different day with no idea a row of theirs
+// never landed — the same fault as showing a failed read as a zero.
+await page.click('text=Thêm dòng')
+const doomed = page.locator('tbody tr').last()
+await doomed.getByLabel('Loại', { exact: true }).selectOption('PO')
+await doomed.getByLabel('Loại vàng', { exact: true }).selectOption('SG')
+await doomed.getByLabel('Khách / NCC', { exact: true }).fill('WONTSAVE')
+await doomed.getByLabel('Số lượng', { exact: true }).fill('1')
+await doomed.getByLabel('Đơn giá', { exact: true }).fill('50')
+await doomed.getByLabel('Sales', { exact: true }).fill('L.Thanh')
+await doomed.getByLabel('Sales 2', { exact: true }).fill('P.Minh')
+await doomed.getByLabel('Tỷ lệ 1', { exact: true }).fill('60')
+await doomed.getByLabel('Tỷ lệ 2', { exact: true }).fill('30')
+
+await page.getByLabel('Ngày', { exact: true }).fill('2026-03-19')
+await page.waitForTimeout(600)
+await page.locator('button', { hasText: 'Lưu rồi chuyển' }).click()
+await page.waitForTimeout(2500)
+check('saving on the way out keeps you here when a row will not save',
+  page.url().includes(DAY), page.url().slice(-24))
+check('and says so rather than leaving quietly',
+  ((await page.locator('body').textContent()) ?? '').includes('vẫn ở lại ngày này'))
+
+await page.locator('button', { hasText: 'Ở lại' }).click()
+await page.waitForTimeout(300)
+
 // A row that breaks a seeded flow rule must be refused, with the reason shown.
 await page.click('text=Thêm dòng')
 const rows = page.locator('tbody tr')
@@ -116,8 +189,12 @@ await last.getByLabel('Ghi chú', { exact: true }).fill('should be refused')
 await last.getByLabel('Ghi chú', { exact: true }).press('Enter')
 await until(async () => (await page.locator('[class*="rowError"]').count()) > 0)
 
-const refusal = await page.locator('[class*="rowError"]').first().textContent()
-check('a movement the Link sheet forbids is refused', (refusal ?? '').length > 0, refusal ?? '')
+// Read off the row that was just typed, and matched against what the Link
+// sheet actually says. "Some error is on screen somewhere" was satisfied by an
+// unrelated one from a row above the moment this file grew another case.
+const refusal = await last.locator('[class*="rowError"]').first().textContent()
+check('a movement the Link sheet forbids is refused',
+  /not a valid movement/.test(refusal ?? ''), refusal ?? '(no refusal)')
 
 // ---- Two people on one order ------------------------------------------------
 //

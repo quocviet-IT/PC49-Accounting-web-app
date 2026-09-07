@@ -26,7 +26,7 @@ export default async function GoldTransactionsPage({
   const supabase = await createServerSupabase()
 
   const [goldTypesResult, salesResult, partnerResult, existingResult, paymentsResult,
-         sharesResult] = await Promise.all([
+         sharesResult, correctableResult] = await Promise.all([
     supabase.from('gold_type')
       .select('code, name_vi, name_en, native_uom')
       .eq('is_active', true)
@@ -52,6 +52,12 @@ export default async function GoldTransactionsPage({
     supabase.from('gold_txn_sales_person')
       .select('txn_id, sales_person_code, share_pct')
       .order('share_pct', { ascending: false }),
+    // Whether each row may be corrected here, and the revision the screen is
+    // showing — so Sửa can be greyed out with a reason rather than refused
+    // after the fact, and so a correction can tell if the row has moved.
+    supabase.from('v_gold_txn_correctable')
+      .select('id, revision, blocked_reason')
+      .eq('txn_date', txnDate),
   ])
 
   const paidByTxn = new Map<string, { seq: number; amount: number; method: string }[]>()
@@ -70,6 +76,12 @@ export default async function GoldTransactionsPage({
     soldByTxn.set(p.txn_id, list)
   }
 
+  const stateById = new Map<string, { revision: number; blockedReason: string | null }>(
+    ((correctableResult.data ?? []) as Record<string, unknown>[]).map((r) => [
+      r.id as string,
+      { revision: Number(r.revision ?? 1), blockedReason: (r.blocked_reason as string) ?? null },
+    ]))
+
   return (
     // Keyed by the day so changing the date starts the grid over. A change of
     // `?date=` alone keeps the same route segment mounted, which would carry
@@ -81,11 +93,14 @@ export default async function GoldTransactionsPage({
         goldTypes={(goldTypesResult.data ?? []) as GoldTypeOption[]}
         salesPeople={(salesResult.data ?? []).map((s: { code: string }) => s.code)}
         partners={(partnerResult.data ?? []) as { code: string; phone: string | null }[]}
-        existing={((existingResult.data ?? []) as Omit<SavedRow, 'payments' | 'soldBy'>[])
+        existing={((existingResult.data ?? []) as
+                   Omit<SavedRow, 'payments' | 'soldBy' | 'revision' | 'blockedReason'>[])
           .map((r) => ({
             ...r,
             payments: paidByTxn.get(r.id) ?? [],
             soldBy: soldByTxn.get(r.id) ?? [],
+            revision: stateById.get(r.id)?.revision ?? 1,
+            blockedReason: stateById.get(r.id)?.blockedReason ?? null,
           }))}
       />
   )

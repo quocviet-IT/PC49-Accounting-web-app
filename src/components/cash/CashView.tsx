@@ -1,7 +1,9 @@
 'use client'
 
 import { useLocale } from '@/lib/i18n/provider'
-import { Page, Section, Empty, Signed, money, ledger, Frame } from '@/components/ledger/Ledger'
+import {
+  Page, Section, Empty, Signed, money, ledger, Frame, LoadFailed,
+} from '@/components/ledger/Ledger'
 import { StatementImport } from './StatementImport'
 import { Reconcile } from './Reconcile'
 
@@ -55,9 +57,12 @@ export type AccountRow = {
 
 export function CashView({
   period, rows, unmatched, movements, unplaced, recon, loans, monthEnd,
+  balancesFailed = false,
 }: {
   period: string
   rows: AccountRow[]
+  /** The balances query failed, so no figure here is known. */
+  balancesFailed?: boolean
   unmatched: number
   movements: CashTxnRow[]
   unplaced: QueueRow[]
@@ -104,6 +109,14 @@ export function CashView({
       </tr>
     </thead>
   )
+
+  if (balancesFailed) {
+    return (
+      <Page titleKey="cash.title">
+        <Section><LoadFailed /></Section>
+      </Page>
+    )
+  }
 
   return (
     <Page titleKey="cash.title">

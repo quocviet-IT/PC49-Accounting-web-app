@@ -73,11 +73,25 @@
   overflow-x: auto;
 }
 
+/*
+ * Columns sized by what is in them, not by an equal share of whatever width
+ * the window happens to have.
+ *
+ * This was `table-layout: fixed` with percentage columns and every cell
+ * clipped to an ellipsis, which meant a narrow screen did not scroll — it
+ * quietly shortened the figures. `1,234,567.89` became `1,234…`, in a set of
+ * books. A number that does not fit must make the frame scroll; it must never
+ * be abbreviated, because there is no way to tell a shortened figure from a
+ * small one.
+ *
+ * `min-width: 100%` keeps a narrow table filling the card as it did before;
+ * anything wider overflows into the frame's own scrolling.
+ */
 .table {
-  width: 100%;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 13px;
-  table-layout: fixed;
+  table-layout: auto;
 }
 
 .table th {
@@ -100,8 +114,6 @@
   padding: 8px 12px;
   border-bottom: 1px solid var(--rule);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* A cell holding prose rather than a figure. Written as `.table td.wrap` on
@@ -124,10 +136,19 @@
   background: var(--pc-surface-subtle);
 }
 
+/*
+ * Room for the figures this business actually writes. Gold is priced per ounce
+ * in the thousands and weighed to four decimal places, so a money column has
+ * to hold `1,234,567.89` and a weight column `1,234.5678` without the header
+ * above them squeezing the column narrower than its contents.
+ */
 .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
   font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  min-width: 8.5rem;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .in { color: var(--in); }
@@ -191,3 +212,41 @@
   color: var(--muted);
   background: var(--pc-surface-muted);
 }
+
+/* A read that failed. Deliberately unlike an empty state: "nothing here" and
+   "we could not find out" are different sentences, and a set of books must not
+   say the first when it means the second. */
+.loadFailed {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px;
+  border: 1px solid var(--pc-money-negative);
+  border-radius: 8px;
+  background: var(--pc-surface-card);
+}
+
+.loadFailedText {
+  margin: 0;
+  font-size: 13px;
+  color: var(--pc-money-negative);
+}
+
+.loadFailedRetry {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 12px;
+  border: 1px solid var(--pc-border-default);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.loadFailedRetry:focus-visible {
+  outline: 2px solid var(--pc-intent-primary);
+  outline-offset: 1px;
+}
+
+.loadFailedRetry:disabled { opacity: 0.5; cursor: default; }

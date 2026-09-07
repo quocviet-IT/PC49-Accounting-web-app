@@ -1,0 +1,129 @@
+/*
+ * Managing people. A short list read once in a while, not a grid typed into
+ * all day — so it breathes more than the transaction screen does, and the
+ * destructive actions stay quiet rather than competing for the eye.
+ */
+.form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.field {
+  border: 1px solid var(--pc-border-default);
+  border-radius: 4px;
+  background: var(--pc-surface-card);
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+}
+
+.inlineField {
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+  max-width: 15rem;
+}
+
+.inlineField:hover:not(:disabled) {
+  border-color: var(--pc-border-subtle);
+}
+
+.field:focus,
+.inlineField:focus {
+  background: var(--pc-accent-wash);
+  outline: 2px solid var(--pc-intent-primary);
+  outline-offset: -1px;
+}
+
+.primary {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+  border: 1px solid var(--pc-intent-primary);
+  border-radius: 4px;
+  background: var(--pc-intent-primary);
+  color: var(--pc-surface-card);
+  cursor: pointer;
+}
+
+.primary:disabled { opacity: 0.5; cursor: default; }
+
+.quiet {
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 9px;
+  border: 1px solid var(--pc-border-default);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--pc-text-faint);
+  cursor: pointer;
+}
+
+.quiet:hover:not(:disabled) { color: var(--pc-text-default); }
+.quiet:disabled { opacity: 0.45; cursor: default; }
+
+.quiet:focus-visible,
+.primary:focus-visible {
+  outline: 2px solid var(--pc-intent-primary);
+  outline-offset: 1px;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.failed {
+  font-size: 12px;
+  color: var(--pc-money-negative);
+}
+
+.pending {
+  font-size: 11px;
+  color: var(--pc-text-faint);
+  margin-left: 6px;
+}
+
+/*
+ * The one-time password. Loud on purpose: it is the only moment this string
+ * exists, and somebody who closes it expecting to find it again later has
+ * locked a colleague out.
+ */
+.secret {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--pc-intent-primary);
+  border-radius: 6px;
+  background: var(--pc-accent-wash);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.secretValue {
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  font-size: 17px;
+  letter-spacing: 0.04em;
+  margin-left: 10px;
+  user-select: all;
+}
+
+.secretNote {
+  margin: 0;
+  font-size: 12px;
+  color: var(--pc-text-faint);
+}
