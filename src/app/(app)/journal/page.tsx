@@ -25,7 +25,7 @@ export default async function JournalPage({
     : new Date().toISOString().slice(0, 7)
 
   const supabase = await createServerSupabase()
-  const { data: heads } = await supabase
+  const { data: heads, error: headError } = await supabase
     .from('journal_entry')
     .select('id, entry_date, memo, posted_at')
     .eq('period', period)
@@ -34,11 +34,11 @@ export default async function JournalPage({
     .limit(300)
 
   const ids = (heads ?? []).map((h: { id: string }) => h.id)
-  const { data: lines } = ids.length
+  const { data: lines, error: lineError } = ids.length
     ? await supabase.from('journal_line')
         .select('entry_id, seq, debit_account, credit_account, amount_usd, gold_type_code, qty_gram')
         .in('entry_id', ids).order('seq')
-    : { data: [] as LineRow[] }
+    : { data: [] as LineRow[], error: null }
 
   const byEntry = new Map<string, LineRow[]>()
   for (const l of (lines ?? []) as LineRow[]) {
@@ -62,5 +62,14 @@ export default async function JournalPage({
     })),
   }))
 
-  return <JournalView period={period} entries={entries} />
+  // Both of these errors used to be discarded. A month whose entries did not
+  // arrive drew as a month with no entries, which on a set of books is the
+  // statement that nothing was recorded.
+  return (
+    <JournalView
+      period={period}
+      entries={entries}
+      loadFailed={Boolean(headError || lineError)}
+    />
+  )
 }

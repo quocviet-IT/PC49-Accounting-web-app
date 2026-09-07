@@ -109,6 +109,21 @@ describe('inventory: a month that could not be read has not got no movements', a
   })
 })
 
+describe('journal: an unread month is not a month with no entries', async () => {
+  const { JournalView } = await import('@/components/journal/JournalView')
+
+  it('says the read failed rather than drawing an empty set of books', () => {
+    expect(text(render(<JournalView period="2026-09" entries={[]} loadFailed />)))
+      .toContain(FAILED)
+  })
+
+  it('and a month with genuinely nothing in it still reads as empty', () => {
+    const html = text(render(<JournalView period="2026-09" entries={[]} />))
+    expect(html).toContain(EMPTY)
+    expect(html).not.toContain(FAILED)
+  })
+})
+
 describe('refining: a failed list must not invite a second lot', async () => {
   const { RefiningView } = await import('@/components/refining/RefiningView')
   const base = {

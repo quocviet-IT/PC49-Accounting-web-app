@@ -21,7 +21,15 @@ describe('what each role is offered', () => {
     // Reporting a problem is on the list because it is not a privilege: the
     // owner is the likeliest person to notice a figure is wrong and the least
     // likely to have anywhere else to say so.
-    expect(paths('OC').sort()).toEqual(['/', '/feedback', '/inventory', '/reports'])
+    //
+    // The cash book and the journal are here because the owner may read both
+    // — the pages have always admitted `report.read`, and the menu used to
+    // ask for a write right instead, so the owner could reach them by typing
+    // the URL but was never shown them. Neither offers a control that writes:
+    // importing and reconciling are hidden by capability on the cash page,
+    // and the journal screen has no control on it at all.
+    expect(paths('OC').sort()).toEqual(
+      ['/', '/cash', '/feedback', '/inventory', '/journal', '/reports'])
   })
 
   it('lets every role report a problem', () => {
@@ -29,7 +37,15 @@ describe('what each role is offered', () => {
   })
 
   it('does not offer the owner anything that writes', () => {
-    for (const forbidden of ['/gold-transactions', '/prices', '/cash', '/journal', '/settings']) {
+    // Every screen whose purpose is to change something. The cash book and
+    // the journal are deliberately not on this list: they are readers for
+    // this role, and hiding a page somebody may read does not make the system
+    // safer — it makes the menu disagree with the page, which is how the
+    // owner ended up reaching one by URL.
+    for (const forbidden of [
+      '/gold-transactions', '/prices', '/settings', '/import',
+      '/bank-conversion', '/refining',
+    ]) {
       expect(paths('OC')).not.toContain(forbidden)
     }
   })

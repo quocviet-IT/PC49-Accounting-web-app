@@ -1,7 +1,7 @@
 'use client'
 
 import { useLocale } from '@/lib/i18n/provider'
-import { Page, Section, Empty, Grams, money, ledger, Frame } from '@/components/ledger/Ledger'
+import { Page, Section, Empty, Grams, money, ledger, Frame, LoadFailed } from '@/components/ledger/Ledger'
 
 export type EntryRow = {
   id: string
@@ -18,8 +18,18 @@ export type EntryRow = {
   }[]
 }
 
-export function JournalView({ period, entries }: { period: string; entries: EntryRow[] }) {
+export function JournalView({ period, entries, loadFailed = false }: {
+  period: string
+  entries: EntryRow[]
+  /**
+   * The month's entries did not arrive. On a set of books an empty month is
+   * the statement that nothing was recorded in it, which is not something a
+   * query that failed is entitled to say.
+   */
+  loadFailed?: boolean
+}) {
   const { t } = useLocale()
+  if (loadFailed) return <Page titleKey="journal.title"><LoadFailed /></Page>
   if (entries.length === 0) return <Page titleKey="journal.title"><Empty /></Page>
 
   const totalDebit = entries.flatMap((e) => e.lines)

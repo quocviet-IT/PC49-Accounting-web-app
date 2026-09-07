@@ -9,6 +9,7 @@ import { passwordFor } from './support/accounts.mjs'
 const PASSWORD = {
   KT: passwordFor('KT'),
   OC: passwordFor('OC'),
+  GS_US: passwordFor('GS_US'),
 }
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
@@ -88,6 +89,38 @@ const browser = await chromium.launch()
 
   check('OC is refused the data import', imp.includes('không có quyền'),
     imp.slice(0, 60).replace(/\s+/g, ' '))
+
+  // PC49-09, second half: the journal is now in this role's menu, because the
+  // page has always admitted report.read. It has to be a reader and nothing
+  // more — a menu entry is only safe to add if the screen behind it offers
+  // the role no control that writes.
+  await page.goto(`${BASE}/journal`, { waitUntil: 'networkidle' })
+  const journalTitle = (await page.locator('h1').first().textContent()) ?? ''
+  check('OC may read the journal', journalTitle.includes('Sổ nhật ký'))
+  const journalButtons = await page.locator('main button, main form, main input').count()
+  check('and the journal offers them nothing to change',
+    journalButtons === 0, `${journalButtons} control(s)`)
+  await ctx.close()
+}
+
+{
+  // The supervisor reaches the cash book from the menu now too, and holds a
+  // different set of rights from the owner — so the same question has to be
+  // asked separately rather than assumed to carry over.
+  const ctx = await browser.newContext()
+  const page = await openPage(ctx)
+  await signIn(page, 'gsus@pc49.test', PASSWORD.GS_US)
+
+  await page.goto(`${BASE}/cash`, { waitUntil: 'networkidle' })
+  const cash = (await page.locator('body').textContent()) ?? ''
+  check('GS_US may read the cash book', cash.includes('Tiền mặt & Ngân hàng'))
+  check('but is not offered the statement import', !cash.includes('Nhập sao kê'))
+  check('nor a Reconcile button',
+    (await page.locator('button', { hasText: 'Đối chiếu' }).count()) === 0)
+
+  await page.goto(`${BASE}/bank-conversion`, { waitUntil: 'networkidle' })
+  const conv = (await page.locator('body').textContent()) ?? ''
+  check('and the conversion screen is still refused', conv.includes('không có quyền'))
   await ctx.close()
 }
 

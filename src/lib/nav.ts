@@ -38,7 +38,8 @@ const ALL: NavItem[] = [
     children: [
       { key: '/gold-transactions', labelKey: 'nav.goldTxn', requires: 'goldTxn.write' },
       { key: '/prices', labelKey: 'nav.prices', requires: 'goldTxn.write' },
-      { key: '/refining', labelKey: 'nav.refining', requires: 'refining.write' },
+      { key: '/refining', labelKey: 'nav.refining',
+        requires: ['refining.write', 'refining.approve'] },
       { key: '/inventory', labelKey: 'nav.inventory', requires: 'report.read' },
       // Reachable from the settings hub since it was built, and nowhere else,
       // which is how somebody with the spreadsheet open in front of them
@@ -51,7 +52,13 @@ const ALL: NavItem[] = [
     key: 'money',
     labelKey: 'nav.group.money',
     children: [
-      { key: '/cash', labelKey: 'nav.cash', requires: 'bankImport.run' },
+      // Reading the cash book and changing it are different rights. This
+      // asked for the right to import a statement, which meant the two roles
+      // that may read the book could open it by typing the URL but were never
+      // shown it — a menu that disagreed with the page behind it. Importing
+      // and reconciling are hidden on the page itself, by capability, so
+      // nothing here grants anybody a write they did not have.
+      { key: '/cash', labelKey: 'nav.cash', requires: 'report.read' },
       { key: '/bank-conversion', labelKey: 'nav.bankGold', requires: 'goldTxn.write' },
     ],
   },
@@ -59,7 +66,10 @@ const ALL: NavItem[] = [
     key: 'books',
     labelKey: 'nav.group.books',
     children: [
-      { key: '/journal', labelKey: 'nav.journal', requires: 'journal.post' },
+      // The same disagreement, and the same fix: the journal screen is a
+      // reader — it has no control on it that writes anything.
+      { key: '/journal', labelKey: 'nav.journal',
+        requires: ['journal.post', 'report.read'] },
       { key: '/reports', labelKey: 'nav.reports', requires: 'report.read' },
     ],
   },
