@@ -73,6 +73,19 @@ const browser = await chromium.launch()
   // Loading history rewrites the books, so it is not an owner's screen.
   await page.goto(`${BASE}/import`, { waitUntil: 'networkidle' })
   const imp = (await page.locator('body').textContent()) ?? ''
+  // PC49-09: the cash screen asks for report.read and then drew the statement
+  // import and a Reconcile button on every account. The database refused both,
+  // so nothing was at risk — the owner was simply handed a screen of controls
+  // that could only fail.
+  await page.goto(`${BASE}/cash`, { waitUntil: 'networkidle' })
+  const cash = (await page.locator('body').textContent()) ?? ''
+  check('OC may read the cash book', cash.includes('Tiền mặt & Ngân hàng'))
+  check('but is not offered the statement import', !cash.includes('Nhập sao kê'))
+  // The button, not the words: "Đối chiếu" is also the heading of the section
+  // the button sits in, so matching the page text passed for the wrong reason.
+  check('nor a Reconcile button on accounts they cannot reconcile',
+    (await page.locator('button', { hasText: 'Đối chiếu' }).count()) === 0)
+
   check('OC is refused the data import', imp.includes('không có quyền'),
     imp.slice(0, 60).replace(/\s+/g, ' '))
   await ctx.close()

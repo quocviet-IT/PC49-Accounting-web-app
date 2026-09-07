@@ -25,8 +25,8 @@ export default async function GoldTransactionsPage({
 
   const supabase = await createServerSupabase()
 
-  const [goldTypesResult, salesResult, partnerResult, existingResult, paymentsResult,
-         sharesResult, correctableResult] = await Promise.all([
+  const [goldTypesResult, salesResult, partnerResult, existingResult,
+         correctableResult] = await Promise.all([
     supabase.from('gold_type')
       .select('code, name_vi, name_en, native_uom')
       .eq('is_active', true)
@@ -35,23 +35,21 @@ export default async function GoldTransactionsPage({
     // Who has been traded with, and how to reach them. Offered as suggestions
     // on the row so the codes converge on one spelling instead of drifting.
     supabase.from('partner').select('code, phone').eq('is_active', true).order('code'),
+    // Payments and shares come nested rather than as two unfiltered reads of
+    // their own. Fetched flat they had no filter at all — every payment ever
+    // recorded, to draw one day — which grows without bound and, worse, meets
+    // whatever row cap the API is configured with and stops returning the rest
+    // without saying so. A day would quietly lose its payments.
     supabase.from('gold_txn')
-      .select('id, txn_type, partner_code, sales_person_code, gold_type_code, scrap_detail, gold_pct, uom, qty, unit_price, amount, remarks')
+      .select(`id, txn_type, partner_code, sales_person_code, gold_type_code,
+               scrap_detail, gold_pct, uom, qty, unit_price, amount, remarks,
+               gold_txn_payment(seq, amount, method),
+               gold_txn_sales_person(sales_person_code, share_pct)`)
       .eq('txn_date', txnDate)
       .is('voided_at', null)
+      .order('seq', { referencedTable: 'gold_txn_payment', ascending: true })
+      .order('share_pct', { referencedTable: 'gold_txn_sales_person', ascending: false })
       .order('created_at'),
-    // How each one was settled. Without this the payment columns on a saved row
-    // were drawn empty, so an accountant who had just typed "4,300 CASH" saw it
-    // vanish on save and had no way to tell whether it had been recorded.
-    supabase.from('gold_txn_payment')
-      .select('txn_id, seq, amount, method')
-      .order('seq'),
-    // Who is credited with each order, and for what part of it. An order may
-    // be worked by two people; the column on the row holds only the leading
-    // name, so the split has to be read from its own table.
-    supabase.from('gold_txn_sales_person')
-      .select('txn_id, sales_person_code, share_pct')
-      .order('share_pct', { ascending: false }),
     // Whether each row may be corrected here, and the revision the screen is
     // showing — so Sửa can be greyed out with a reason rather than refused
     // after the fact, and so a correction can tell if the row has moved.
@@ -60,20 +58,10 @@ export default async function GoldTransactionsPage({
       .eq('txn_date', txnDate),
   ])
 
-  const paidByTxn = new Map<string, { seq: number; amount: number; method: string }[]>()
-  for (const p of (paymentsResult.data ?? []) as
-       { txn_id: string; seq: number; amount: number; method: string }[]) {
-    const list = paidByTxn.get(p.txn_id) ?? []
-    list.push({ seq: p.seq, amount: Number(p.amount), method: p.method })
-    paidByTxn.set(p.txn_id, list)
-  }
-
-  const soldByTxn = new Map<string, { code: string; sharePct: number }[]>()
-  for (const p of (sharesResult.data ?? []) as
-       { txn_id: string; sales_person_code: string; share_pct: number }[]) {
-    const list = soldByTxn.get(p.txn_id) ?? []
-    list.push({ code: p.sales_person_code, sharePct: Number(p.share_pct) })
-    soldByTxn.set(p.txn_id, list)
+  /** One row as it arrives, with its payments and its staff already attached. */
+  type Nested = Omit<SavedRow, 'payments' | 'soldBy' | 'revision' | 'blockedReason'> & {
+    gold_txn_payment: { seq: number; amount: number; method: string }[] | null
+    gold_txn_sales_person: { sales_person_code: string; share_pct: number }[] | null
   }
 
   const stateById = new Map<string, { revision: number; blockedReason: string | null }>(
@@ -93,12 +81,15 @@ export default async function GoldTransactionsPage({
         goldTypes={(goldTypesResult.data ?? []) as GoldTypeOption[]}
         salesPeople={(salesResult.data ?? []).map((s: { code: string }) => s.code)}
         partners={(partnerResult.data ?? []) as { code: string; phone: string | null }[]}
-        existing={((existingResult.data ?? []) as
-                   Omit<SavedRow, 'payments' | 'soldBy' | 'revision' | 'blockedReason'>[])
+        existing={((existingResult.data ?? []) as Nested[])
           .map((r) => ({
             ...r,
-            payments: paidByTxn.get(r.id) ?? [],
-            soldBy: soldByTxn.get(r.id) ?? [],
+            payments: (r.gold_txn_payment ?? []).map((p) => ({
+              seq: p.seq, amount: Number(p.amount), method: p.method,
+            })),
+            soldBy: (r.gold_txn_sales_person ?? []).map((p) => ({
+              code: p.sales_person_code, sharePct: Number(p.share_pct),
+            })),
             revision: stateById.get(r.id)?.revision ?? 1,
             blockedReason: stateById.get(r.id)?.blockedReason ?? null,
           }))}

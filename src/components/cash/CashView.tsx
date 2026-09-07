@@ -57,12 +57,17 @@ export type AccountRow = {
 
 export function CashView({
   period, rows, unmatched, movements, unplaced, recon, loans, monthEnd,
-  balancesFailed = false,
+  balancesFailed = false, mayWrite = false,
 }: {
   period: string
   rows: AccountRow[]
   /** The balances query failed, so no figure here is known. */
   balancesFailed?: boolean
+  /**
+   * Whether this reader may change the cash book, not merely read it. The
+   * database has always refused the rest; this stops them being offered.
+   */
+  mayWrite?: boolean
   unmatched: number
   movements: CashTxnRow[]
   unplaced: QueueRow[]
@@ -120,7 +125,7 @@ export function CashView({
 
   return (
     <Page titleKey="cash.title">
-      <StatementImport />
+      {mayWrite && <StatementImport />}
       <Section>
         <p className={ledger.note}>{t('common.period')}: {period}</p>
         {rows.length === 0 ? <Empty /> : (
@@ -231,13 +236,17 @@ export function CashView({
                           <span className={ledger.badge}>{t(`cash.rec.${r.status}` as never)}</span>
                           {r.reason && <span className={ledger.muted}> {r.reason}</span>}
                         </>
-                      ) : (
+                      ) : mayWrite ? (
                         <Reconcile
                           accountCode={a.code}
                           accountName={a.displayName}
                           ourClosing={a.closing}
                           recDate={monthEnd}
                         />
+                      ) : (
+                        // Not reconciled, and not this reader's to reconcile.
+                        // A dash says so; a button that refuses does not.
+                        <span className={ledger.muted}>—</span>
                       )}
                     </td>
                   </tr>

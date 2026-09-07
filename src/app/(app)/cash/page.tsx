@@ -14,6 +14,13 @@ export default async function CashPage({
   if (!can(role, 'report.read')) {
     return <Forbidden locale={user?.locale} />
   }
+  // Reading the cash book and changing it are different permissions, and this
+  // screen was only checking the first. The owner reaches it legitimately —
+  // report.read is what it asks for — and was then shown the statement import
+  // and a Reconcile button on every account. The database refuses both, so
+  // nothing was ever at risk; what they got was a screen full of controls that
+  // could only fail, which is its own kind of wrong.
+  const mayWrite = can(role, 'bankImport.run')
 
   const params = await searchParams
   const period = /^\d{4}-\d{2}$/.test(params.period ?? '')
@@ -106,6 +113,7 @@ export default async function CashPage({
 
   return (
     <CashView
+        mayWrite={mayWrite}
         balancesFailed={Boolean(flow.error)}
       period={period}
       rows={rows}

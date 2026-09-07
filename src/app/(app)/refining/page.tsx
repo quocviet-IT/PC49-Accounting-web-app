@@ -15,7 +15,7 @@ export default async function RefiningPage() {
   }
 
   const supabase = await createServerSupabase()
-  const [summary, share, types, availableResult, sourceResult, bandResult, txnResult,
+  const [summary, share, types, availableResult, sourceResult, bandResult,
          lineResult] = await Promise.all([
     supabase.from('v_refining_lot_summary')
       .select('lot_id, lot_code, status, sent_date, assay_date, received_date, total_gross_gram, total_assay_gram, spot_variance_per_gram, spot_variance_value')
@@ -29,13 +29,16 @@ export default async function RefiningPage() {
     supabase.from('v_refining_available_purchase')
       .select('id, txn_date, partner_code, scrap_detail, gold_pct, grade_band, qty_gram, amount')
       .order('txn_date'),
-    supabase.from('refining_lot_source').select('lot_id, txn_id'),
+    // The picked purchases, read through the link that scopes them. Reading
+    // them as "every transaction, then look some up" fetched the whole history
+    // to draw a handful of rows, and would have started losing them silently
+    // the moment the table outgrew the API's row cap.
+    supabase.from('refining_lot_source')
+      .select(`lot_id,
+               gold_txn(id, txn_date, partner_code, scrap_detail, gold_pct,
+                        qty_gram, amount, voided_at)`),
     supabase.from('v_refining_lot_source_summary')
       .select('lot_id, grade_band, purchase_count, gross_weight_gram, pure_weight_gram, avg_gold_pct, total_cost'),
-    // Picked rows are no longer "available", so they are read as themselves.
-    supabase.from('gold_txn')
-      .select('id, txn_date, partner_code, scrap_detail, gold_pct, qty_gram, amount')
-      .is('voided_at', null),
     // A lot read the way sheet 3.3 reads it: send, assay, and the difference.
     supabase.from('v_refining_lot_line_value')
       .select('lot_id, seq, owner_code, source_desc, gross_weight_gram, gold_pct, pure_weight_gram, estimated_value, assay_pct, assay_weight_gram, assay_pure_weight_gram, assay_value, purity_variance, weight_variance, value_variance')
@@ -81,15 +84,22 @@ export default async function RefiningPage() {
 
   const available: AvailablePurchase[] = (availableResult.data ?? []).map(toPurchase)
 
-  const txnById = new Map<string, Record<string, unknown>>(
-    (txnResult.data ?? []).map((r: Record<string, unknown>) => [r.id as string, r]))
-
   const pickedByLot = new Map<string, AvailablePurchase[]>()
-  for (const link of (sourceResult.data ?? []) as { lot_id: string; txn_id: string }[]) {
-    const txn = txnById.get(link.txn_id)
-    if (!txn) continue
+  // Cast through `unknown` because the generated types call the embedded
+  // transaction an array and it is not one. `refining_lot_source.txn_id` is a
+  // plain many-to-one reference, and PostgREST returns a single object for it
+  // — checked against the client's own API rather than assumed, because
+  // guessing wrong here would silently drop every picked purchase.
+  for (const link of (sourceResult.data ?? []) as unknown as {
+    lot_id: string
+    gold_txn: Record<string, unknown> | null
+  }[]) {
+    // A cancelled purchase is still linked to the lot it was picked into, and
+    // still belongs on the list — taking it out silently would make a lot's
+    // totals disagree with the rows it says they came from.
+    if (!link.gold_txn) continue
     const list = pickedByLot.get(link.lot_id) ?? []
-    list.push(toPurchase(txn))
+    list.push(toPurchase(link.gold_txn))
     pickedByLot.set(link.lot_id, list)
   }
 
