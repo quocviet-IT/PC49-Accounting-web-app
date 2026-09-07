@@ -1,7 +1,9 @@
 'use client'
 
 import { useLocale } from '@/lib/i18n/provider'
-import { Page, Section, Empty, Grams, money, weight, ledger, Frame } from '@/components/ledger/Ledger'
+import {
+  Page, Section, Empty, Grams, money, weight, ledger, Frame, LoadFailed,
+} from '@/components/ledger/Ledger'
 
 /** Opening, in, out and closing for one gold type over one month. */
 export type MovementRow = {
@@ -27,8 +29,19 @@ export type StockRow = {
 }
 
 export function InventoryView({
-  rows, period, asOf, movements,
-}: { rows: StockRow[]; period: string; asOf: string; movements: MovementRow[] }) {
+  rows, period, asOf, movements, stockFailed = false,
+}: {
+  rows: StockRow[]
+  period: string
+  asOf: string
+  movements: MovementRow[]
+  /**
+   * The holdings query failed. Not the same as holding nothing, and the
+   * difference is the whole of PC49-02: an empty table of stock reads as an
+   * empty vault.
+   */
+  stockFailed?: boolean
+}) {
   const { locale, t } = useLocale()
   const shown = rows.filter((r) => r.book !== 0 || r.physical !== 0 || r.total !== 0)
   const sum = (k: 'book' | 'physical' | 'total') => shown.reduce((s, r) => s + r[k], 0)
@@ -39,6 +52,15 @@ export function InventoryView({
   // A gold type that neither moved nor was held is noise on a monthly report.
   const moved = movements.filter(
     (m) => m.opening !== 0 || m.receipt !== 0 || m.issue !== 0 || m.closing !== 0)
+
+  // Said once, at the top, instead of drawing a table of zeros underneath it.
+  if (stockFailed) {
+    return (
+      <Page titleKey="inv.title" noteKey="inv.explain">
+        <Section><LoadFailed /></Section>
+      </Page>
+    )
+  }
 
   return (
     <Page titleKey="inv.title" noteKey="inv.explain">

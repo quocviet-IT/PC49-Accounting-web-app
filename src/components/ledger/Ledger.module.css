@@ -212,3 +212,41 @@
   color: var(--muted);
   background: var(--pc-surface-muted);
 }
+
+/* A read that failed. Deliberately unlike an empty state: "nothing here" and
+   "we could not find out" are different sentences, and a set of books must not
+   say the first when it means the second. */
+.loadFailed {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px;
+  border: 1px solid var(--pc-money-negative);
+  border-radius: 8px;
+  background: var(--pc-surface-card);
+}
+
+.loadFailedText {
+  margin: 0;
+  font-size: 13px;
+  color: var(--pc-money-negative);
+}
+
+.loadFailedRetry {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 12px;
+  border: 1px solid var(--pc-border-default);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.loadFailedRetry:focus-visible {
+  outline: 2px solid var(--pc-intent-primary);
+  outline-offset: 1px;
+}
+
+.loadFailedRetry:disabled { opacity: 0.5; cursor: default; }

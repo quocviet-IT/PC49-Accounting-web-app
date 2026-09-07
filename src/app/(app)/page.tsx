@@ -1,6 +1,7 @@
 import { Overview } from '@/components/home/Overview'
 import { getCurrentUser } from '@/lib/auth/currentUser'
 import { createServerSupabase } from '@/lib/supabase/server'
+import { combine, readState, type DataState } from '@/lib/data/result'
 
 export default async function HomePage() {
   // The layout has already refused anyone who is not signed in; this guard is
@@ -13,7 +14,7 @@ export default async function HomePage() {
 
   const [totalAsset, spot, cash, deposits, refinery] = await Promise.all([
     supabase.from('v_inventory_total_asset').select('qty_gram').eq('owner_code', 'PC49'),
-    supabase.from('spot_price_daily').select('spot_per_gram')
+    supabase.from('spot_price_daily').select('spot_per_gram, price_date')
       .eq('metal', 'GOLD').lte('price_date', today)
       .order('price_date', { ascending: false }).limit(1).maybeSingle(),
     // Cash still goes through `cash_balance`, so the dashboard and the Cash
@@ -25,22 +26,36 @@ export default async function HomePage() {
       .eq('bucket', 'AT_REFINERY').eq('owner_code', 'PC49'),
   ])
 
-  const gram = (totalAsset.data ?? []).reduce(
-    (s: number, r: { qty_gram: number }) => s + Number(r.qty_gram), 0)
-  const spotPerGram = spot.data ? Number(spot.data.spot_per_gram) : null
+  const sumGrams = (rows: { qty_gram: number }[]) =>
+    rows.reduce((s, r) => s + Number(r.qty_gram), 0)
 
-  const cashTotal = Number(cash.data ?? 0)
+  const gram = readState(totalAsset, sumGrams, () => 0)
 
-  const atRefinery = (refinery.data ?? []).reduce(
-    (s: number, r: { qty_gram: number }) => s + Number(r.qty_gram), 0)
+  // A missing spot price is not a failure to read anything — the read worked
+  // and there is no price for the day. So it is `unavailable` with a reason
+  // somebody can act on, not an error and certainly not a valuation of zero.
+  const spotPerGram: DataState<number> = spot.error
+    ? { state: 'error', messageKey: 'common.loadFailed', detail: spot.error.message }
+    : spot.data
+      ? { state: 'ready', value: Number(spot.data.spot_per_gram),
+          fetchedAt: new Date().toISOString() }
+      : { state: 'unavailable', reasonKey: 'home.noSpot' }
+
+  const priceDate = spot.data?.price_date as string | undefined
 
   return (
     <Overview
-        inventoryValue={spotPerGram === null ? null : gram * spotPerGram}
-        cashTotal={cashTotal}
-        openDeposits={deposits.count ?? 0}
-        atRefineryGram={atRefinery}
-        spotMissing={spotPerGram === null}
+        inventoryValue={combine(gram, spotPerGram, (g, p) => g * p)}
+        cashTotal={readState(cash, (v) => Number(v), () => 0)}
+        openDeposits={
+          deposits.error
+            ? { state: 'error', messageKey: 'common.loadFailed',
+                detail: deposits.error.message }
+            : { state: 'ready', value: deposits.count ?? 0,
+                fetchedAt: new Date().toISOString() }
+        }
+        atRefineryGram={readState(refinery, sumGrams, () => 0)}
+        priceDate={priceDate ?? null}
       />
   )
 }

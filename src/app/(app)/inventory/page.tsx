@@ -66,5 +66,13 @@ export default async function InventoryPage({
     adjustment: Number(r.adjustment ?? 0),
   }))
 
-  return <InventoryView rows={rows} period={period} asOf={asOf} movements={movements} />
+  return (
+    <InventoryView
+        rows={rows}
+        period={period}
+        asOf={asOf}
+        movements={movements}
+        stockFailed={Boolean(stock.error)}
+    />
+  )
 }
