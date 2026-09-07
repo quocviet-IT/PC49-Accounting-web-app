@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale } from '@/lib/i18n/provider'
 import { toGrams, type Uom } from '@/lib/domain/units'
@@ -124,6 +124,30 @@ function amountOf(qty: number, price: number): number {
   return Math.round(-qty * price * 100) / 100
 }
 
+/**
+ * Whether this row holds work somebody would mind losing.
+ *
+ * The blank row waiting at the foot of the grid is not work — the screen puts
+ * it there, nobody typed it — and warning about it would train people to
+ * dismiss the warning that matters. A correction draft counts even when empty,
+ * because it stands for an intention to reverse something.
+ *
+ * An unresolved error counts too. Changing the day is how a failure stops
+ * being visible, and the handoff is explicit that it must not be a way out.
+ */
+function isDirty(d: Draft): boolean {
+  if (d.savedId) return false
+  if (d.correcting) return true
+  if (d.error) return true
+  return Boolean(
+    d.partnerCode.trim() || d.partnerPhone.trim() || d.goldTypeCode
+    || d.qty.trim() || d.unitPrice.trim() || d.scrapDetail.trim()
+    || d.goldPct.trim() || d.remarks.trim()
+    || d.salesPeople.some((p) => p.code.trim())
+    || d.payments.some((p) => p.amount.trim()),
+  )
+}
+
 export function TxnGrid({
   txnDate,
   goldTypes,
@@ -144,10 +168,24 @@ export function TxnGrid({
   const [voidError, setVoidError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [nextKey, setNextKey] = useState(1)
+  /** The day somebody asked for while unsaved work was on screen. */
+  const [pendingDate, setPendingDate] = useState<string | null>(null)
+  const [guardError, setGuardError] = useState<string | null>(null)
   // Enter commits the row, and so does leaving the last field. Without a guard
   // both fire and the transaction is written twice, which silently doubles the
   // day. Held in a ref because the guard has to be set before React re-renders.
   const inFlight = useRef<Set<number>>(new Set())
+
+  // Registered only while there is unsaved work, so the browser does not ask
+  // about a page nobody typed into. What the browser then shows is its own
+  // wording and it may refuse entirely on some phones — a limit worth writing
+  // in the release note rather than pretending away.
+  useEffect(() => {
+    if (!drafts.some(isDirty)) return
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault() }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [drafts])
 
   const goldName = (g: GoldTypeOption) => (locale === 'vi' ? g.name_vi : g.name_en)
   const uomOf = (code: string) => goldTypes.find((g) => g.code === code)?.native_uom ?? ''
@@ -229,14 +267,59 @@ export function TxnGrid({
    */
   function goToDate(next: string) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(next) || next === txnDate) return
+    // Changing the day remounts the grid, which is right — it is what stops a
+    // row typed for one day being saved against another — and it is also what
+    // throws the typing away. So the day does not change until whoever typed
+    // it has said what should happen to it.
+    if (drafts.some((d) => isDirty(d) && !settled.has(d.savedId ?? ''))) {
+      setPendingDate(next)
+      return
+    }
     router.push(`/gold-transactions?date=${next}`)
   }
 
-  function commit(row: Draft) {
+  /** Leaves for the day that was asked for, discarding what was typed. */
+  function discardAndGo() {
+    const next = pendingDate
+    setPendingDate(null)
+    if (next) router.push(`/gold-transactions?date=${next}`)
+  }
+
+  /**
+   * Saves everything unsaved, and only then changes the day.
+   *
+   * One row that will not save keeps everybody here. Going anyway would leave
+   * the accountant on a different day with no idea that a row of theirs never
+   * landed — which is the same fault as showing a failed read as zero, wearing
+   * different clothes.
+   */
+  function saveAllAndGo() {
+    setGuardError(null)
+    startTransition(async () => {
+      const rows = drafts.filter((d) => isDirty(d) && !d.savedId)
+      const results = await Promise.all(rows.map((r) => commitRow(r)))
+      if (results.every(Boolean)) {
+        const next = pendingDate
+        setPendingDate(null)
+        if (next) router.push(`/gold-transactions?date=${next}`)
+      } else {
+        setGuardError(t('txn.draft.someFailed'))
+      }
+    })
+  }
+
+  /**
+   * Commits one row and says whether it worked.
+   *
+   * Separate from `commit` below because "save these and then change the day"
+   * has to know: the handoff is explicit that one row in error means staying
+   * put. Navigating away from a failure is how a failure becomes invisible.
+   */
+  async function commitRow(row: Draft): Promise<boolean> {
     const qty = Number(row.qty)
     const price = Number(row.unitPrice)
-    if (!row.goldTypeCode || !qty || !price) return
-    if (row.savedId || inFlight.current.has(row.key)) return
+    if (!row.goldTypeCode || !qty || !price) return false
+    if (row.savedId || inFlight.current.has(row.key)) return false
     inFlight.current.add(row.key)
 
     const amount = amountOf(qty, price)
@@ -260,7 +343,7 @@ export function TxnGrid({
         setDrafts((rows) => rows.map((r) => (r.key === row.key
           ? { ...r, error: t('txn.shareBad') }
           : r)))
-        return
+        return false
       }
     }
 
@@ -282,32 +365,36 @@ export function TxnGrid({
         payments,
     }
 
-    startTransition(async () => {
-      // A correction and a fresh row are the same shape with a different
-      // destination: one writes a transaction, the other reverses one and
-      // writes its replacement in the same breath.
-      const result: SaveResult = row.correcting
-        ? await correctTransaction({
-            ...body,
-            originalId: row.correcting.originalId,
-            expectedRevision: row.correcting.revision,
-            reason: row.correcting.reason,
-          })
-        : await saveTransaction(body)
-
-      if (result.ok) {
-        setDrafts((rows) => {
-          const cleared = rows.map((r) => (r.key === row.key
-            ? { ...r, savedId: result.id, warning: result.warning }
-            : r))
-          return cleared.some((r) => !r.savedId) ? cleared : [...cleared, blankDraft(nextKey)]
+    // A correction and a fresh row are the same shape with a different
+    // destination: one writes a transaction, the other reverses one and
+    // writes its replacement in the same breath.
+    const result: SaveResult = row.correcting
+      ? await correctTransaction({
+          ...body,
+          originalId: row.correcting.originalId,
+          expectedRevision: row.correcting.revision,
+          reason: row.correcting.reason,
         })
-        setNextKey((k) => k + 1)
-      } else {
-        setDrafts((rows) => rows.map((r) => (r.key === row.key ? { ...r, error: result.message } : r)))
-      }
-      inFlight.current.delete(row.key)
-    })
+      : await saveTransaction(body)
+
+    if (result.ok) {
+      setDrafts((rows) => {
+        const cleared = rows.map((r) => (r.key === row.key
+          ? { ...r, savedId: result.id, warning: result.warning, error: undefined }
+          : r))
+        return cleared.some((r) => !r.savedId) ? cleared : [...cleared, blankDraft(nextKey)]
+      })
+      setNextKey((k) => k + 1)
+    } else {
+      setDrafts((rows) => rows.map((r) => (r.key === row.key ? { ...r, error: result.message } : r)))
+    }
+    inFlight.current.delete(row.key)
+    return result.ok
+  }
+
+  /** Typing Enter, or leaving the last field: fire and forget. */
+  function commit(row: Draft) {
+    startTransition(async () => { await commitRow(row) })
   }
 
   // Once a row is saved, revalidation brings it back from the server in
@@ -418,6 +505,36 @@ export function TxnGrid({
 
   return (
     <div className={styles.wrap}>
+      {pendingDate && (
+        <div className={styles.guard} role="alertdialog" aria-modal="true"
+             aria-label={t('txn.draft.title')}>
+          <div className={styles.guardBox}>
+            <p className={styles.guardText}>{t('txn.draft.body')}</p>
+            {guardError && <p className={styles.rowError}>{guardError}</p>}
+            <div className={styles.guardActions}>
+              {/* Ordered by how much they cost if chosen by mistake: the safe
+                  one first, the irreversible one last. */}
+              <button type="button" className={styles.select}
+                      style={{ width: 'auto', border: '1px solid var(--rule-strong)' }}
+                      disabled={pending}
+                      onClick={() => { setPendingDate(null); setGuardError(null) }}>
+                {t('txn.draft.stay')}
+              </button>
+              <button type="button" className={styles.select}
+                      style={{ width: 'auto', border: '1px solid var(--rule-strong)' }}
+                      disabled={pending}
+                      onClick={saveAllAndGo}>
+                {t('txn.draft.saveAndLeave')}
+              </button>
+              <button type="button" className={styles.voidButton}
+                      disabled={pending}
+                      onClick={discardAndGo}>
+                {t('txn.draft.discard')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className={styles.head}>
         <h1 className={styles.title}>{t('txn.title')} · {txnDate}</h1>
         {/* The day being entered, and the only way to reach any other one.
