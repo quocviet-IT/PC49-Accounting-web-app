@@ -29,7 +29,7 @@ export type StockRow = {
 }
 
 export function InventoryView({
-  rows, period, asOf, movements, stockFailed = false,
+  rows, period, asOf, movements, stockFailed = false, movementFailed = false,
 }: {
   rows: StockRow[]
   period: string
@@ -41,6 +41,13 @@ export function InventoryView({
    * empty vault.
    */
   stockFailed?: boolean
+  /**
+   * The month's movement report did not arrive. The stock figures above it may
+   * be perfectly good, so the page stays — but an empty movement table under a
+   * closing balance would read as "nothing moved this month", which is a claim
+   * about the business, not about a query.
+   */
+  movementFailed?: boolean
 }) {
   const { locale, t } = useLocale()
   const shown = rows.filter((r) => r.book !== 0 || r.physical !== 0 || r.total !== 0)
@@ -115,7 +122,7 @@ export function InventoryView({
           <button type="submit">{t('inv.show')}</button>
         </form>
         <p className={ledger.note}>{t('inv.movementNote')}</p>
-        {moved.length === 0 ? <Empty /> : (
+        {movementFailed ? <LoadFailed /> : moved.length === 0 ? <Empty /> : (
           <Frame>
             <table className={ledger.table}>
               <colgroup>

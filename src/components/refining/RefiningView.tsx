@@ -1,7 +1,7 @@
 'use client'
 
 import { useLocale } from '@/lib/i18n/provider'
-import { Page, Section, Empty, Signed, weight, ledger, Frame } from '@/components/ledger/Ledger'
+import { Page, Section, Empty, Signed, weight, ledger, Frame, LoadFailed } from '@/components/ledger/Ledger'
 import { ReceiveRow } from './ReceiveRow'
 import { AddLine, AdvanceLot, NewLot, type GoldOption } from './LotLifecycle'
 import { PurchasePicker, type AvailablePurchase, type PickedBand } from './PurchasePicker'
@@ -48,7 +48,7 @@ export function RefiningView({
   pickedByLot,
   bandsByLot,
   linesByLot,
-  lots, shares, goldTypes,
+  lots, shares, goldTypes, lotsFailed = false, detailFailed = false,
 }: {
   lots: LotRow[]
   shares: ShareRow[]
@@ -57,12 +57,34 @@ export function RefiningView({
   pickedByLot: Record<string, AvailablePurchase[]>
   bandsByLot: Record<string, PickedBand[]>
   linesByLot: Record<string, LotLineValue[]>
+  /**
+   * The lot list did not arrive. This is not "there are no lots": offering to
+   * open a new one on the strength of a read that failed is how a lot already
+   * at the refinery gets opened a second time.
+   */
+  lotsFailed?: boolean
+  /**
+   * The per-lot detail — the assay lines, the purchases picked into a lot, the
+   * purchases still available to pick. The lot list itself may be perfectly
+   * good, so the page stays; but an empty assay table says the refinery
+   * reported nothing, and an empty picker says there is nothing left to
+   * refine. Neither is something a query that failed may assert.
+   */
+  detailFailed?: boolean
 }) {
   const { t } = useLocale()
 
   // An empty screen still has to offer the way in. This used to return early
   // with nothing but "no data", which meant a system with no lots yet could
   // never open its first one.
+  if (lotsFailed) {
+    return (
+      <Page titleKey="refining.title">
+        <LoadFailed />
+      </Page>
+    )
+  }
+
   if (lots.length === 0) {
     return (
       <Page titleKey="refining.title">
@@ -132,14 +154,18 @@ export function RefiningView({
                 bag is a matter of record. */}
             {/* Once the refinery has weighed it, what the lot is actually
                 worth is the thing to read — so the lines come out then. */}
-            {l.status !== 'DRAFT' && <LotLines lines={linesByLot[l.lotId] ?? []} />}
-            {l.status === 'DRAFT' && (
-              <PurchasePicker
-                  lotId={l.lotId}
-                  available={available}
-                  picked={picked}
-                  pickedTotals={bandsByLot[l.lotId] ?? []}
-              />
+            {detailFailed ? <LoadFailed /> : (
+              <>
+                {l.status !== 'DRAFT' && <LotLines lines={linesByLot[l.lotId] ?? []} />}
+                {l.status === 'DRAFT' && (
+                  <PurchasePicker
+                      lotId={l.lotId}
+                      available={available}
+                      picked={picked}
+                      pickedTotals={bandsByLot[l.lotId] ?? []}
+                  />
+                )}
+              </>
             )}
             <Frame>
 <table className={ledger.table}>

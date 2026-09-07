@@ -148,6 +148,12 @@ export default async function RefiningPage() {
   return (
     <RefiningView
         lots={lots}
+        // The lot list, and the ownership split that decides which lots are
+        // shown at all. Either failing means the page cannot say what exists.
+        lotsFailed={Boolean(summary.error || share.error)}
+        detailFailed={Boolean(
+          types.error || availableResult.error || sourceResult.error
+          || bandResult.error || lineResult.error)}
         shares={shares}
         goldTypes={goldTypes}
         available={available}

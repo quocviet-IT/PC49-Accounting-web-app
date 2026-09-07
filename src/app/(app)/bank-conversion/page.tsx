@@ -42,6 +42,9 @@ export default async function BankConversionPage() {
         transactions={transactions}
         goldTypes={goldTypes}
         tolerance={Number(param.data?.value ?? 100)}
+        // The tolerance is a rule, not a preference. If it could not be read,
+        // the screen does not quietly apply 100 USD in its place.
+        loadFailed={Boolean(allocation.error || types.error || param.error)}
       />
   )
 }

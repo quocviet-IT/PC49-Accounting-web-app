@@ -115,6 +115,12 @@ export default async function CashPage({
     <CashView
         mayWrite={mayWrite}
         balancesFailed={Boolean(flow.error)}
+        failed={{
+          movements: Boolean(txns.error),
+          queue: Boolean(held.error || queue.error),
+          recon: Boolean(recon.error),
+          loans: Boolean(loans.error),
+        }}
       period={period}
       rows={rows}
       unmatched={queue.count ?? 0}

@@ -76,6 +76,11 @@ export default async function PricesPage({
       rows={rows}
       spot={spot}
       uncosted={uncosted}
+      failed={{
+        grid: Boolean(gridResult.error),
+        spot: Boolean(spotResult.error),
+        uncosted: Boolean(uncostedResult.error),
+      }}
     />
   )
 }

@@ -43,13 +43,18 @@ export default async function ImportPage({
     ?? null
 
   let rejected: RejectedRow[] = []
+  let rejectedFailed = false
   if (selected) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('import_row')
       .select('row_no, reason, reason_code, reason_value, payload')
       .eq('batch_id', selected.id)
       .eq('status', 'REJECTED')
       .order('row_no')
+    // This error used to be discarded. An empty list here is the statement
+    // that every row in the batch went in, which is exactly what somebody
+    // opens this screen to check.
+    rejectedFailed = Boolean(error)
     rejected = (data ?? []).map((r: Record<string, unknown>) => ({
       rowNo: Number(r.row_no ?? 0),
       reason: (r.reason as string) ?? '',
@@ -75,6 +80,11 @@ export default async function ImportPage({
         selected={selected}
         rejected={rejected}
         recon={recon}
+        loadFailed={{
+          batches: Boolean(batchResult.error),
+          rejected: rejectedFailed,
+          recon: Boolean(reconResult.error),
+        }}
       />
   )
 }

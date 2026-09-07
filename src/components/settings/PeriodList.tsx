@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale } from '@/lib/i18n/provider'
-import { Page, Section, ledger, Frame } from '@/components/ledger/Ledger'
+import { Page, Section, ledger, Frame, LoadFailed } from '@/components/ledger/Ledger'
 import { setPeriodStatus } from '@/app/(app)/settings/actions'
 import styles from './Settings.module.css'
 
@@ -16,7 +16,18 @@ export type PeriodRow = {
   draft: number
 }
 
-export function PeriodList({ rows }: { rows: PeriodRow[] }) {
+export function PeriodList({ rows, loadFailed = false }: {
+  rows: PeriodRow[]
+  /**
+   * The period states, or the entry counts, did not arrive.
+   *
+   * A month with no row is open — which is true when the read worked, and a
+   * plain falsehood when it did not. Drawing every month as open, each with a
+   * Close button beside a count of zero, would tell somebody the books are
+   * untouched and safe to sign off.
+   */
+  loadFailed?: boolean
+}) {
   const { t } = useLocale()
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
@@ -32,6 +43,14 @@ export function PeriodList({ rows }: { rows: PeriodRow[] }) {
       if (result.ok) router.refresh()
       else setError(`${row.period}: ${result.message}`)
     })
+  }
+
+  if (loadFailed) {
+    return (
+      <Page titleKey="period.title" noteKey="period.note">
+        <Section><LoadFailed /></Section>
+      </Page>
+    )
   }
 
   return (

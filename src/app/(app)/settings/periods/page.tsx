@@ -57,6 +57,9 @@ export default async function PeriodsPage() {
   })
 
   return (
-    <PeriodList rows={rows} />
+    <PeriodList
+      rows={rows}
+      loadFailed={Boolean(stateResult.error || entryResult.error)}
+    />
   )
 }

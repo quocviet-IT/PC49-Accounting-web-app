@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useLocale } from '@/lib/i18n/provider'
 import type { MessageKey } from '@/lib/i18n'
-import { Page, Section, Empty, money, weight, ledger, Frame } from '@/components/ledger/Ledger'
+import { Page, Section, Empty, money, weight, ledger, Frame, LoadFailed } from '@/components/ledger/Ledger'
 import { commitBatch, withdrawBatch } from '@/app/(app)/import/actions'
 import { StageFile } from './StageFile'
 import { StateFigure } from './StateFigure'
@@ -59,13 +59,20 @@ function figure(metric: string, value: number): string {
 }
 
 export function ImportView({
-  asOf, batches, selected, rejected, recon,
+  asOf, batches, selected, rejected, recon, loadFailed = {},
 }: {
   asOf: string
   batches: Batch[]
   selected: Batch | null
   rejected: RejectedRow[]
   recon: ReconLine[]
+  /**
+   * Which reads did not arrive. Two of these say something specific when
+   * empty: no rejected rows means the batch went in clean, and no
+   * reconciliation lines mean there is nothing to disagree about. Neither is a
+   * thing a failed query is allowed to claim.
+   */
+  loadFailed?: { batches?: boolean; rejected?: boolean; recon?: boolean }
 }) {
   const { t } = useLocale()
   const [message, setMessage] = useState<string | null>(null)
@@ -87,7 +94,7 @@ export function ImportView({
     <Page titleKey="imp.title" noteKey="imp.note">
       <StageFile />
       <Section titleKey="imp.batches">
-        {batches.length === 0 ? <Empty /> : (
+        {loadFailed.batches ? <LoadFailed /> : batches.length === 0 ? <Empty /> : (
           <Frame>
 <table className={ledger.table}>
               <colgroup>
@@ -139,7 +146,7 @@ export function ImportView({
 
       {selected && (
         <Section titleKey="imp.rejectedRows">
-          {rejected.length === 0 ? (
+          {loadFailed.rejected ? <LoadFailed /> : rejected.length === 0 ? (
             <p className={ledger.note}>{t('imp.noRejected')}</p>
           ) : (
             <Frame>
@@ -223,7 +230,7 @@ export function ImportView({
           <StateFigure asOf={asOf} />
         </form>
 
-        {recon.length === 0 ? (
+        {loadFailed.recon ? <LoadFailed /> : recon.length === 0 ? (
           <p className={ledger.note}>{t('imp.noExpected')}</p>
         ) : (
           <>

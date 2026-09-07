@@ -2,7 +2,7 @@
 
 import { useLocale } from '@/lib/i18n/provider'
 import {
-  Page, Section, Empty, Signed, money, ledger, Frame, LoadFailed,
+  Page, Section, Empty, Signed, money, ledger, Frame, LoadFailed, Body,
 } from '@/components/ledger/Ledger'
 import { StatementImport } from './StatementImport'
 import { Reconcile } from './Reconcile'
@@ -57,12 +57,19 @@ export type AccountRow = {
 
 export function CashView({
   period, rows, unmatched, movements, unplaced, recon, loans, monthEnd,
-  balancesFailed = false, mayWrite = false,
+  balancesFailed = false, mayWrite = false, failed = {},
 }: {
   period: string
   rows: AccountRow[]
   /** The balances query failed, so no figure here is known. */
   balancesFailed?: boolean
+  /**
+   * Which of the other reads did not arrive. Each section says so for itself:
+   * the balances loading while the movements did not is a real outcome, and
+   * showing a closing figure above an empty list of transactions would be the
+   * screen contradicting itself.
+   */
+  failed?: { movements?: boolean; queue?: boolean; recon?: boolean; loans?: boolean }
   /**
    * Whether this reader may change the cash book, not merely read it. The
    * database has always refused the rest; this stops them being offered.
@@ -159,11 +166,12 @@ export function CashView({
         </Section>
       )}
 
-      {unmatched > 0 && (
+      {(unmatched > 0 || unplaced.length > 0 || failed.queue) && (
         <Section titleKey="cash.unmatched">
           {/* A count alone is not actionable. What the line said, and why it
               could not be placed, is what somebody needs to fix it. */}
           <p className={ledger.note}>{t('cash.unmatchedNote')}</p>
+          <Body failed={failed.queue} empty={unplaced.length === 0}>
           <Frame>
             <table className={ledger.table}>
               <colgroup>
@@ -195,11 +203,13 @@ export function CashView({
               </tbody>
             </table>
           </Frame>
+          </Body>
         </Section>
       )}
 
       <Section titleKey="cash.reconciliation">
         <p className={ledger.note}>{t('cash.reconciliationNote')}</p>
+        {failed.recon ? <LoadFailed /> : (
         <Frame>
           <table className={ledger.table}>
             <colgroup>
@@ -255,11 +265,13 @@ export function CashView({
             </tbody>
           </table>
         </Frame>
+        )}
       </Section>
 
-      {loans.length > 0 && (
+      {(loans.length > 0 || failed.loans) && (
         <Section titleKey="cash.loans">
           <p className={ledger.note}>{t('cash.loansNote')}</p>
+          <Body failed={failed.loans} empty={loans.length === 0}>
           <Frame>
             <table className={ledger.table}>
               <colgroup><col style={{ width: '60%' }} /><col style={{ width: '40%' }} /></colgroup>
@@ -279,11 +291,12 @@ export function CashView({
               </tbody>
             </table>
           </Frame>
+          </Body>
         </Section>
       )}
 
       <Section titleKey="cash.movements">
-        {movements.length === 0 ? <Empty /> : (
+        <Body failed={failed.movements} empty={movements.length === 0}>
           <Frame>
             <table className={ledger.table}>
               <colgroup>
@@ -317,7 +330,7 @@ export function CashView({
               </tbody>
             </table>
           </Frame>
-        )}
+        </Body>
       </Section>
     </Page>
   )

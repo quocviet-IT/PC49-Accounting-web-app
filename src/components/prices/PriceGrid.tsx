@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale } from '@/lib/i18n/provider'
-import { Page, Section, money, weight, ledger, Frame } from '@/components/ledger/Ledger'
+import { Page, Section, money, weight, ledger, Frame, LoadFailed } from '@/components/ledger/Ledger'
 import { saveGoldPrice, saveSpotPrice, carryPricesForward } from '@/app/(app)/settings/actions'
 import styles from './PriceGrid.module.css'
 
@@ -36,13 +36,19 @@ function show(value: number | null): string {
 }
 
 export function PriceGrid({
-  date, previous, rows, spot, uncosted,
+  date, previous, rows, spot, uncosted, failed = {},
 }: {
   date: string
   previous: string
   rows: PriceRow[]
   spot: SpotRow[]
   uncosted: Uncosted[]
+  /**
+   * Which reads did not arrive. An empty "sales with no cost price" table is
+   * the statement that every sale has one — the exact thing this screen exists
+   * to disprove — so it must not be what a failed query looks like.
+   */
+  failed?: { grid?: boolean; spot?: boolean; uncosted?: boolean }
 }) {
   const { locale, t } = useLocale()
   const router = useRouter()
@@ -143,6 +149,7 @@ export function PriceGrid({
       )}
 
       <Section titleKey="price.gold">
+        {failed.grid ? <LoadFailed /> : (
         <Frame>
 <table className={ledger.table}>
             <colgroup>
@@ -205,9 +212,14 @@ export function PriceGrid({
             </tbody>
           </table>
         </Frame>
+        )}
       </Section>
 
       <Section titleKey="price.spot">
+        {/* A dash here already means "no price". If the read failed it would
+            mean that too, and somebody would go and set a price that is
+            already set. */}
+        {failed.spot ? <LoadFailed /> : (
         <Frame>
 <table className={ledger.table}>
             <colgroup>
@@ -247,11 +259,13 @@ export function PriceGrid({
             </tbody>
           </table>
         </Frame>
+        )}
       </Section>
 
-      {uncosted.length > 0 && (
+      {(uncosted.length > 0 || failed.uncosted) && (
         <Section titleKey="price.uncosted">
           <p className={ledger.note}>{t('price.uncostedNote')}</p>
+          {failed.uncosted ? <LoadFailed /> : (
           <Frame>
 <table className={ledger.table}>
               <colgroup>
@@ -280,6 +294,7 @@ export function PriceGrid({
               </tbody>
             </table>
           </Frame>
+          )}
         </Section>
       )}
     </Page>

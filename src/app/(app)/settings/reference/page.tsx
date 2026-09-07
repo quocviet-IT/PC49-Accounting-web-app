@@ -81,6 +81,13 @@ export default async function ReferencePage() {
         salesPeople={salesPeople}
         partners={partners}
         accountCount={accountResult.data?.length ?? 0}
+        failed={{
+          params: Boolean(paramResult.error),
+          goldTypes: Boolean(goldResult.error),
+          cashAccounts: Boolean(cashResult.error),
+          salesPeople: Boolean(salesResult.error),
+          partners: Boolean(partnerResult.error),
+        }}
       />
   )
 }

@@ -107,6 +107,25 @@ export function Empty() {
 }
 
 /**
+ * What one section of a page has to show: the read failed, there is genuinely
+ * nothing, or here it is.
+ *
+ * These are three different facts and they must not share a rendering. "No
+ * transactions this month" is a claim about the business; a read that never
+ * arrived cannot support it, and an empty table underneath a closing balance
+ * says two contradictory things on the same screen.
+ */
+export function Body({ failed, empty, children }: {
+  failed?: boolean
+  empty: boolean
+  children: ReactNode
+}) {
+  if (failed) return <LoadFailed />
+  if (empty) return <Empty />
+  return <>{children}</>
+}
+
+/**
  * Negative zero prints as -0.00, which on an accounting screen reads like a
  * rounding artefact hiding something. Nothing is ever minus nothing.
  */

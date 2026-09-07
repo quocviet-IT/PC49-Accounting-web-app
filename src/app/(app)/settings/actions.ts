@@ -117,6 +117,17 @@ export async function carryPricesForward(input: unknown): Promise<ActionResult> 
     supabase.from('spot_price_daily').select('metal').eq('price_date', to),
   ])
 
+  // Carrying prices forward is decided by what the target day already has. If
+  // that read did not arrive, the primary key would still refuse the duplicate
+  // — but the answer somebody gets should be "we could not check", not a raw
+  // constraint violation from a write that should never have been attempted.
+  if (gold.error || spot.error || already.error || spotAlready.error) {
+    return {
+      ok: false,
+      message: (gold.error ?? spot.error ?? already.error ?? spotAlready.error)!.message,
+    }
+  }
+
   const held = new Set((already.data ?? []).map((r: { gold_type_code: string }) => r.gold_type_code))
   const rows = (gold.data ?? [])
     .filter((r: { gold_type_code: string }) => !held.has(r.gold_type_code))

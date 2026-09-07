@@ -3,6 +3,7 @@ import { Forbidden } from '@/components/Forbidden'
 import { getCurrentUser } from '@/lib/auth/currentUser'
 import { can } from '@/lib/auth/roles'
 import { createServerSupabase } from '@/lib/supabase/server'
+import { t } from '@/lib/i18n'
 
 export default async function GoldTransactionsPage({
   searchParams,
@@ -64,6 +65,13 @@ export default async function GoldTransactionsPage({
     gold_txn_sales_person: { sales_person_code: string; share_pct: number }[] | null
   }
 
+  // Without this read the screen cannot tell a row that may be corrected from
+  // one the books have closed over. Offering Sửa on all of them would be a
+  // button that can only be refused, so the reason it cannot be judged is
+  // shown instead.
+  const correctableFailed = Boolean(correctableResult.error)
+  const unknownReason = t(user?.locale ?? 'vi', 'common.loadFailed')
+
   const stateById = new Map<string, { revision: number; blockedReason: string | null }>(
     ((correctableResult.data ?? []) as Record<string, unknown>[]).map((r) => [
       r.id as string,
@@ -78,7 +86,15 @@ export default async function GoldTransactionsPage({
     <TxnGrid
         key={txnDate}
         txnDate={txnDate}
+        // A day whose rows did not arrive must not be offered as a blank
+        // grid: that is how the same purchase gets typed in twice.
+        loadFailed={Boolean(existingResult.error || goldTypesResult.error)}
         goldTypes={(goldTypesResult.data ?? []) as GoldTypeOption[]}
+        // These two are suggestions, not facts on the screen: both fields are
+        // free text, and an empty phone is never written back over a stored
+        // one (see actions.ts — the upsert omits the key when it is blank). So
+        // a catalogue that did not load degrades the typing aid and asserts
+        // nothing false, which is why it does not stop the day being entered.
         salesPeople={(salesResult.data ?? []).map((s: { code: string }) => s.code)}
         partners={(partnerResult.data ?? []) as { code: string; phone: string | null }[]}
         existing={((existingResult.data ?? []) as Nested[])
@@ -91,7 +107,9 @@ export default async function GoldTransactionsPage({
               code: p.sales_person_code, sharePct: Number(p.share_pct),
             })),
             revision: stateById.get(r.id)?.revision ?? 1,
-            blockedReason: stateById.get(r.id)?.blockedReason ?? null,
+            blockedReason: correctableFailed
+              ? unknownReason
+              : stateById.get(r.id)?.blockedReason ?? null,
           }))}
       />
   )

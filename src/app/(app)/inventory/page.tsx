@@ -72,7 +72,10 @@ export default async function InventoryPage({
         period={period}
         asOf={asOf}
         movements={movements}
-        stockFailed={Boolean(stock.error)}
+        // Without the catalogue there is no row to hang a figure on, so a
+        // failure to read it is a failure to show stock at all.
+        stockFailed={Boolean(stock.error || types.error)}
+        movementFailed={Boolean(movement.error)}
     />
   )
 }

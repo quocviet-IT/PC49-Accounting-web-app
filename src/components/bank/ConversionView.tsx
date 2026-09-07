@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { useLocale } from '@/lib/i18n/provider'
-import { Page, Stat, money, ledger } from '@/components/ledger/Ledger'
+import { Page, Stat, money, ledger, Section, LoadFailed } from '@/components/ledger/Ledger'
 import { saveAllocation, suggestAllocation } from '@/app/(app)/bank-conversion/actions'
 import styles from './ConversionView.module.css'
 
@@ -35,8 +35,20 @@ function blank(key: number): Line {
 }
 
 export function ConversionView({
-  transactions, goldTypes, tolerance,
-}: { transactions: BankTxn[]; goldTypes: GoldOption[]; tolerance: number }) {
+  transactions, goldTypes, tolerance, loadFailed = false,
+}: {
+  transactions: BankTxn[]
+  goldTypes: GoldOption[]
+  tolerance: number
+  /**
+   * The bank lines, the gold catalogue, or the tolerance did not arrive.
+   *
+   * The tolerance matters as much as the rows: it is the figure that decides
+   * whether a conversion is accepted, and falling back to a default when the
+   * real one could not be read would apply a rule nobody set.
+   */
+  loadFailed?: boolean
+}) {
   const { locale, t } = useLocale()
   const [selectedId, setSelectedId] = useState<string | null>(transactions[0]?.id ?? null)
   const [lines, setLines] = useState<Line[]>([blank(0)])
@@ -116,6 +128,14 @@ export function ConversionView({
       if (!result.ok) setError(result.message)
       else setError(null)
     })
+  }
+
+  if (loadFailed) {
+    return (
+      <Page titleKey="conv.title" noteKey="conv.note">
+        <Section><LoadFailed /></Section>
+      </Page>
+    )
   }
 
   return (

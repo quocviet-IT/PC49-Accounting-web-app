@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale } from '@/lib/i18n/provider'
-import { Page, Section, ledger, Frame } from '@/components/ledger/Ledger'
+import { Page, Section, ledger, Frame, LoadFailed } from '@/components/ledger/Ledger'
 import { saveSystemParam } from '@/app/(app)/settings/actions'
 import styles from './Settings.module.css'
 
@@ -29,7 +29,7 @@ export type PartnerRow = {
 }
 
 export function ReferenceView({
-  params, goldTypes, cashAccounts, salesPeople, partners, accountCount,
+  params, goldTypes, cashAccounts, salesPeople, partners, accountCount, failed = {},
 }: {
   params: Param[]
   goldTypes: GoldTypeRow[]
@@ -37,6 +37,15 @@ export function ReferenceView({
   salesPeople: SalesPersonRow[]
   partners: PartnerRow[]
   accountCount: number
+  /**
+   * Which catalogue did not arrive. A catalogue is the list of what exists;
+   * showing an empty one says nothing exists, and on this screen that is the
+   * difference between "there are no sales people" and "we could not ask".
+   */
+  failed?: {
+    params?: boolean; goldTypes?: boolean; cashAccounts?: boolean
+    salesPeople?: boolean; partners?: boolean
+  }
 }) {
   const { locale, t } = useLocale()
   const router = useRouter()
@@ -66,6 +75,8 @@ export function ReferenceView({
   return (
     <Page titleKey="ref.title" noteKey="ref.note">
       <Section titleKey="ref.params">
+        {failed.params ? <LoadFailed /> : (
+          <>
         {/* These are the numbers every calculation in the system leans on. They
             are editable because the source treats them as settings, and shown
             with their description because 31.1 and 31.105 are one keystroke
@@ -108,6 +119,8 @@ export function ReferenceView({
           </table>
         </Frame>
         {error && <p className={styles.failed}>{error}</p>}
+          </>
+        )}
       </Section>
 
       {/* The rest is shown, not edited. A gold type carries the accounts every
@@ -116,6 +129,8 @@ export function ReferenceView({
           already exist. Whoever needs to change one does it as a migration, in
           the open, with the rest of the schema. */}
       <Section titleKey="ref.goldTypes">
+        {failed.goldTypes ? <LoadFailed /> : (
+          <>
         <Frame>
 <table className={ledger.table}>
             <colgroup>
@@ -151,9 +166,13 @@ export function ReferenceView({
             </tbody>
           </table>
         </Frame>
+          </>
+        )}
       </Section>
 
       <Section titleKey="ref.cashAccounts">
+        {failed.cashAccounts ? <LoadFailed /> : (
+          <>
         <Frame>
 <table className={ledger.table}>
             <colgroup>
@@ -183,9 +202,13 @@ export function ReferenceView({
             </tbody>
           </table>
         </Frame>
+          </>
+        )}
       </Section>
 
       <Section titleKey="ref.salesPeople">
+        {failed.salesPeople ? <LoadFailed /> : (
+          <>
         <Frame>
 <table className={ledger.table}>
             <colgroup>
@@ -214,9 +237,13 @@ export function ReferenceView({
             </tbody>
           </table>
         </Frame>
+          </>
+        )}
       </Section>
 
       <Section titleKey="ref.partners">
+        {failed.partners ? <LoadFailed /> : (
+          <>
         <Frame>
           <table className={ledger.table}>
             <colgroup>
@@ -250,6 +277,8 @@ export function ReferenceView({
         {/* The list fills itself from the entry screen, so it starts empty on
             a fresh database rather than being wrong. */}
         <p className={ledger.note}>{t('ref.partnersNote')}</p>
+          </>
+        )}
       </Section>
 
       <p className={ledger.note}>{t('ref.chartNote')}: {accountCount}</p>

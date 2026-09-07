@@ -7,6 +7,7 @@ import { toGrams, type Uom } from '@/lib/domain/units'
 import {
   correctTransaction, saveTransaction, voidTransaction, type SaveResult,
 } from '@/app/(app)/gold-transactions/actions'
+import { LoadFailed } from '@/components/ledger/Ledger'
 import styles from './TxnGrid.module.css'
 
 export type GoldTypeOption = {
@@ -154,12 +155,22 @@ export function TxnGrid({
   salesPeople,
   partners,
   existing,
+  loadFailed = false,
 }: {
   txnDate: string
   goldTypes: GoldTypeOption[]
   salesPeople: string[]
   partners: { code: string; phone: string | null }[]
   existing: SavedRow[]
+  /**
+   * The day's rows, or the gold types, did not arrive.
+   *
+   * The grid is not shown at all in that case. An empty grid on a day that
+   * actually has transactions invites somebody to type them in again, and a
+   * duplicated purchase is a real loss of money — this is the one screen where
+   * an unread query has to stop the work rather than degrade it.
+   */
+  loadFailed?: boolean
 }) {
   const { locale, t } = useLocale()
   const router = useRouter()
@@ -501,6 +512,29 @@ export function TxnGrid({
       remarks: r.remarks ?? '',
     }])
     setNextKey((k) => k + 1)
+  }
+
+  if (loadFailed) {
+    // The heading and the date picker stay: somebody has to be able to see
+    // which day failed and to go to another one without a reload.
+    return (
+      <div className={styles.wrap}>
+        <div className={styles.head}>
+          <h1 className={styles.title}>{t('txn.title')} · {txnDate}</h1>
+          <label className={styles.dateField}>
+            <span className={styles.dateLabel}>{t('txn.date')}</span>
+            <input
+              type="date"
+              className={styles.dateInput}
+              value={txnDate}
+              aria-label={t('txn.date')}
+              onChange={(e) => router.push(`/gold-transactions?date=${e.target.value}`)}
+            />
+          </label>
+        </div>
+        <LoadFailed />
+      </div>
+    )
   }
 
   return (
