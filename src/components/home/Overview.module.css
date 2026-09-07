@@ -1,4 +1,24 @@
 /*
+ * The dashboard answers three questions: what is held, whether the figures are
+ * complete, and what is waiting to be dealt with. No charts — there is no
+ * comparable history to draw one from, and an empty area is more honest than a
+ * line that means nothing.
+ */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--pc-space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--pc-space-4);
+}
+
+.meta {
+  font-size: var(--pc-font-label);
+  line-height: var(--pc-line-label);
+  color: var(--pc-text-faint);
+}
+
+/*
  * A figure that could not be read sits in the row with the ones that could, so
  * it has to carry its own difference: the dash and the note say there is no
  * number, and Retry is right there rather than being a page reload somebody
@@ -8,29 +28,120 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
+  gap: var(--pc-space-2);
+}
+
+.failedText {
+  margin: 0;
+  font-size: var(--pc-font-label);
+  line-height: var(--pc-line-label);
+  color: var(--pc-money-negative);
 }
 
 .retry {
   font: inherit;
-  font-size: 12px;
-  padding: 3px 10px;
+  font-size: var(--pc-font-label);
+  padding: var(--pc-space-1) var(--pc-space-3);
   border: 1px solid var(--pc-border-default);
-  border-radius: 4px;
+  border-radius: var(--pc-radius-control);
   background: transparent;
   color: var(--pc-text-secondary);
   cursor: pointer;
 }
 
-.retry:hover { color: var(--pc-text-default); }
+.retry:hover:not(:disabled) { color: var(--pc-text-default); }
+.retry:disabled { opacity: 0.5; cursor: default; }
 
-.retry:focus-visible {
+.retry:focus-visible,
+.kpiLink:focus-visible,
+.quickAction:focus-visible,
+.attentionLink:focus-visible {
   outline: 2px solid var(--pc-intent-primary);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
-.meta {
-  margin: 12px 0 0;
-  font-size: 12px;
-  color: var(--pc-text-faint);
+/* A KPI that opens the page behind it. Underline only on hover, so a row of
+   four does not read as a row of links first and figures second. */
+.kpiLink {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--pc-radius-frame);
+}
+
+.kpiLink:hover { background: var(--pc-surface-subtle); }
+
+.quick {
+  display: flex;
+  gap: var(--pc-space-2);
+  flex-wrap: wrap;
+  margin: var(--pc-space-4) 0;
+}
+
+.quickAction {
+  font-size: var(--pc-font-body);
+  line-height: var(--pc-line-body);
+  padding: var(--pc-space-2) var(--pc-space-4);
+  border: 1px solid var(--pc-border-default);
+  border-radius: var(--pc-radius-control);
+  background: var(--pc-surface-card);
+  color: var(--pc-text-default);
+  text-decoration: none;
+  min-height: var(--pc-control-height);
+  display: inline-flex;
+  align-items: center;
+}
+
+.quickAction:hover { border-color: var(--pc-intent-primary); }
+
+/*
+ * Two thirds for what happened, one third for what is waiting. Attention is
+ * first in the markup and the grid puts it second on a wide screen, so a phone
+ * meets the shorter, more urgent list before scrolling past ten rows.
+ */
+.columns {
+  display: grid;
+  gap: var(--pc-space-5);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 900px) {
+  .columns {
+    grid-template-columns: 1fr 2fr;
+  }
+}
+
+.attention {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.attentionRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--pc-space-3);
+  padding: var(--pc-space-3) 0;
+  border-bottom: 1px solid var(--pc-border-subtle);
+}
+
+.attentionRow:last-child { border-bottom: 0; }
+
+.attentionLink {
+  flex: 1;
+  font-size: var(--pc-font-body);
+  line-height: var(--pc-line-body);
+  color: var(--pc-text-default);
+  text-decoration: none;
+}
+
+.attentionLink:hover { color: var(--pc-intent-primary); }
+
+.attentionCount {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  font-size: var(--pc-font-body);
+  font-weight: 600;
 }
