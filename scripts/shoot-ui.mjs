@@ -90,7 +90,7 @@ for (const theme of ['light', 'dark']) {
     await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
     await page.screenshot({ path: `${OUT}/${prefix}${theme}-login.png` })
 
-    await signIn(page, BASE, 'admin@pc49.test', PASSWORD.ADMIN)
+    await signIn(page, BASE, 'admin@ctyhp.vn', PASSWORD.ADMIN)
 
     for (const [name, path] of PAGES) {
       await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' })

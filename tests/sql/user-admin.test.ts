@@ -15,10 +15,10 @@ beforeAll(async () => {
   db = await createTestDb()
   await db.exec(`
     INSERT INTO auth.users (id, email) VALUES
-      ('${BOSS}',   'boss@pc49.test'),
-      ('${SECOND}', 'second@pc49.test'),
-      ('${CLERK}',  'clerk@pc49.test'),
-      ('${OWNER}',  'owner@pc49.test');
+      ('${BOSS}',   'boss@ctyhp.vn'),
+      ('${SECOND}', 'second@ctyhp.vn'),
+      ('${CLERK}',  'clerk@ctyhp.vn'),
+      ('${OWNER}',  'owner@ctyhp.vn');
     INSERT INTO pc49.app_user (id, full_name, role) VALUES
       ('${BOSS}',   'Boss',   'ADMIN'),
       ('${SECOND}', 'Second', 'ADMIN'),
@@ -52,7 +52,7 @@ describe('only an administrator may administer', () => {
     expect(rows.rows).toHaveLength(4)
     // The address comes from auth.users and is not copied into app_user, so
     // this is also the proof that the join is the only place it lives.
-    expect(rows.rows.map((r) => r.email)).toContain('clerk@pc49.test')
+    expect(rows.rows.map((r) => r.email)).toContain('clerk@ctyhp.vn')
   })
 
   it('refuses every change to somebody who is not an administrator', async () => {

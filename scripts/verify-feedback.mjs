@@ -50,7 +50,7 @@ try {
   // ---- The accountant hits something and says so ---------------------------
   const ktCtx = await browser.newContext()
   const kt = await openPage(ktCtx)
-  await signIn(kt, BASE, 'kt@pc49.test', PASSWORD.KT)
+  await signIn(kt, BASE, 'accountant@ctyhp.vn', PASSWORD.KT)
 
   // From a real screen, with a real query string on it — that is the part that
   // makes a report reproducible.
@@ -161,7 +161,7 @@ try {
   // ---- The administrator triages -------------------------------------------
   const adCtx = await browser.newContext()
   const ad = await openPage(adCtx)
-  await signIn(ad, BASE, 'admin@pc49.test', PASSWORD.ADMIN)
+  await signIn(ad, BASE, 'admin@ctyhp.vn', PASSWORD.ADMIN)
   await ad.goto(`${BASE}/feedback`, { waitUntil: 'networkidle' })
 
   const queue = (await ad.locator('body').textContent()) ?? ''

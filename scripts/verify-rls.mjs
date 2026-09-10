@@ -20,10 +20,10 @@ const pub = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT
 const secret = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 const USERS = [
-  { email: 'kt@pc49.test',    password: PASSWORD.KT,    role: 'KT' },
-  { email: 'gsus@pc49.test',  password: PASSWORD.GS_US,  role: 'GS_US' },
-  { email: 'oc@pc49.test',    password: PASSWORD.OC,    role: 'OC' },
-  { email: 'admin@pc49.test', password: PASSWORD.ADMIN, role: 'ADMIN' },
+  { email: 'accountant@ctyhp.vn',    password: PASSWORD.KT,    role: 'KT' },
+  { email: 'supervisor@ctyhp.vn',  password: PASSWORD.GS_US,  role: 'GS_US' },
+  { email: 'owner@ctyhp.vn',    password: PASSWORD.OC,    role: 'OC' },
+  { email: 'admin@ctyhp.vn', password: PASSWORD.ADMIN, role: 'ADMIN' },
 ]
 
 let failures = 0
@@ -102,11 +102,11 @@ await admin49.end()
   await db.connect()
   const admin = createClient(url, secret, { auth: { persistSession: false } })
   const { data } = await admin.auth.admin.listUsers({ perPage: 200 })
-  const kt = data.users.find((x) => x.email === 'kt@pc49.test')
+  const kt = data.users.find((x) => x.email === 'accountant@ctyhp.vn')
   await db.query('UPDATE pc49.app_user SET suspended_at = now() WHERE id = $1', [kt.id])
 
   const sb = createClient(url, pub, { auth: { persistSession: false } })
-  await sb.auth.signInWithPassword({ email: 'kt@pc49.test', password: PASSWORD.KT })
+  await sb.auth.signInWithPassword({ email: 'accountant@ctyhp.vn', password: PASSWORD.KT })
   const gold = await sb.schema('pc49').from('gold_type').select('code')
   check('a suspended user loses access to reference data',
     !gold.error && (gold.data?.length ?? 0) === 0,

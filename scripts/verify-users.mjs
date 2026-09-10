@@ -25,7 +25,7 @@ if (!url || !apiUrl || !serviceKey) {
   process.exit(1)
 }
 
-const NEW_EMAIL = 'verify-newcomer@pc49.test'
+const NEW_EMAIL = 'verify-newcomer@ctyhp.vn'
 const NEW_NAME = 'Verify Newcomer'
 const CHOSEN = 'chinh-toi-chon-mat-khau-nay'
 

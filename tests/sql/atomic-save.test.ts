@@ -8,7 +8,7 @@ const KT = '11111111-1111-1111-1111-111111111111'
 beforeAll(async () => {
   db = await createTestDb()
   await db.exec(`
-    INSERT INTO auth.users (id, email) VALUES ('${KT}', 'kt@pc49.test');
+    INSERT INTO auth.users (id, email) VALUES ('${KT}', 'accountant@ctyhp.vn');
     INSERT INTO pc49.app_user (id, full_name, role) VALUES ('${KT}', 'Ke toan', 'KT');
     INSERT INTO pc49.gold_price_daily (price_date, gold_type_code, market_price)
       VALUES ('2026-06-01', 'SG', 60.00)
@@ -149,7 +149,7 @@ describe('asking twice', () => {
   it('keeps one person’s keys clear of another’s', async () => {
     const other = '22222222-2222-2222-2222-222222222222'
     await db.exec(`
-      INSERT INTO auth.users (id, email) VALUES ('${other}', 'other@pc49.test');
+      INSERT INTO auth.users (id, email) VALUES ('${other}', 'other@ctyhp.vn');
       INSERT INTO pc49.app_user (id, full_name, role) VALUES ('${other}', 'Nguoi khac', 'KT');
     `)
     const r = await asRole(db, other, () =>

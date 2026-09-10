@@ -33,7 +33,7 @@ const browser = await chromium.launch()
 {
   const ctx = await browser.newContext()
   const page = await openPage(ctx)
-  await signIn(page, 'kt@pc49.test', PASSWORD.KT)
+  await signIn(page, 'accountant@ctyhp.vn', PASSWORD.KT)
 
   for (const [path, heading] of [
     ['/', 'Tổng quan'],
@@ -60,7 +60,7 @@ const browser = await chromium.launch()
 {
   const ctx = await browser.newContext()
   const page = await openPage(ctx)
-  await signIn(page, 'oc@pc49.test', PASSWORD.OC)
+  await signIn(page, 'owner@ctyhp.vn', PASSWORD.OC)
 
   await page.goto(`${BASE}/inventory`, { waitUntil: 'networkidle' })
   const invOk = ((await page.locator('h1').first().textContent()) ?? '').includes('Tồn kho')
@@ -109,7 +109,7 @@ const browser = await chromium.launch()
   // asked separately rather than assumed to carry over.
   const ctx = await browser.newContext()
   const page = await openPage(ctx)
-  await signIn(page, 'gsus@pc49.test', PASSWORD.GS_US)
+  await signIn(page, 'supervisor@ctyhp.vn', PASSWORD.GS_US)
 
   await page.goto(`${BASE}/cash`, { waitUntil: 'networkidle' })
   const cash = (await page.locator('body').textContent()) ?? ''

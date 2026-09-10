@@ -22,7 +22,7 @@ const page = await openPage(context)
 const problems = []
 page.on('pageerror', (e) => problems.push(String(e)))
 
-await signIn(page, BASE, 'kt@pc49.test', passwordFor('KT'))
+await signIn(page, BASE, 'accountant@ctyhp.vn', passwordFor('KT'))
 
 for (const [name, path] of SCREENS) {
   await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' })

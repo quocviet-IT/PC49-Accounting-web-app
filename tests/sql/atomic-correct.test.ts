@@ -8,7 +8,7 @@ const KT = '11111111-1111-1111-1111-111111111111'
 beforeAll(async () => {
   db = await createTestDb()
   await db.exec(`
-    INSERT INTO auth.users (id, email) VALUES ('${KT}', 'kt@pc49.test');
+    INSERT INTO auth.users (id, email) VALUES ('${KT}', 'accountant@ctyhp.vn');
     INSERT INTO pc49.app_user (id, full_name, role) VALUES ('${KT}', 'Ke toan', 'KT');
     INSERT INTO pc49.gold_price_daily (price_date, gold_type_code, market_price)
       VALUES ('2026-07-01', 'SG', 60.00)

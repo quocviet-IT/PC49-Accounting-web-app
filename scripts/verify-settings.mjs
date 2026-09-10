@@ -63,7 +63,7 @@ try {
   // ---- The accountant types the day's prices -------------------------------
   const ctx = await browser.newContext()
   const page = await openPage(ctx)
-  await signIn(page, 'kt@pc49.test', PASSWORD.KT)
+  await signIn(page, 'accountant@ctyhp.vn', PASSWORD.KT)
 
   // The navigation is the sidebar now, not the header bar; the header carries
   // only the name of the page you are on. A group is closed until it is opened
@@ -158,7 +158,7 @@ try {
   // ---- The supervisor closes a month --------------------------------------
   const gsCtx = await browser.newContext()
   const gs = await openPage(gsCtx)
-  await signIn(gs, 'gsus@pc49.test', PASSWORD.GS_US)
+  await signIn(gs, 'supervisor@ctyhp.vn', PASSWORD.GS_US)
 
   const gsMenu = (await gs.locator('aside').first().textContent()) ?? ''
   check('the supervisor is offered settings', gsMenu.includes('Cấu hình'))
@@ -219,7 +219,7 @@ try {
   // ---- The owner is offered none of it -------------------------------------
   const ocCtx = await browser.newContext()
   const oc = await openPage(ocCtx)
-  await signIn(oc, 'oc@pc49.test', PASSWORD.OC)
+  await signIn(oc, 'owner@ctyhp.vn', PASSWORD.OC)
   for (const path of ['/prices', '/settings', '/settings/periods', '/settings/reference']) {
     await oc.goto(`${BASE}${path}`, { waitUntil: 'networkidle' })
     const body = (await oc.locator('body').textContent()) ?? ''
@@ -230,7 +230,7 @@ try {
   // ---- Reference data is the administrator's -------------------------------
   const adCtx = await browser.newContext()
   const ad = await openPage(adCtx)
-  await signIn(ad, 'admin@pc49.test', PASSWORD.ADMIN)
+  await signIn(ad, 'admin@ctyhp.vn', PASSWORD.ADMIN)
   const adHub = await ad.goto(`${BASE}/settings`, { waitUntil: 'networkidle' })
   const adText = (await ad.locator('body').textContent()) ?? ''
   check('the administrator is offered all three cards',

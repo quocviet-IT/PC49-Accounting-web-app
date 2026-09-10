@@ -912,7 +912,7 @@ describe('what the accountant may do to a bag', () => {
   const KT = '00000000-0000-4000-8000-00000000c0de'
   beforeAll(async () => {
     await db.exec(`
-      INSERT INTO auth.users (id, email) VALUES ('${KT}', 'kt-bags@pc49.test');
+      INSERT INTO auth.users (id, email) VALUES ('${KT}', 'kt-bags@ctyhp.vn');
       INSERT INTO pc49.app_user (id, full_name, role) VALUES ('${KT}', 'Ke toan', 'KT');
     `)
   })

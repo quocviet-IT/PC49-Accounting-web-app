@@ -55,7 +55,7 @@ try {
   await post('2019-02-20', '642', '1111', 250, 'verify-reports fee')
 
   const page = await openPage(browser)
-  await signIn(page, BASE, 'kt@pc49.test', PASSWORD.KT)
+  await signIn(page, BASE, 'accountant@ctyhp.vn', PASSWORD.KT)
 
   // ---- The catalogue -------------------------------------------------------
   await page.goto(`${BASE}/reports`, { waitUntil: 'networkidle' })

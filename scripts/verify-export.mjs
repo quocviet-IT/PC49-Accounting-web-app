@@ -55,7 +55,7 @@ try {
   const ctx = await browser.newContext({ acceptDownloads: true })
   const page = await openPage(ctx)
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
-  await page.fill('input[autocomplete="email"]', 'kt@pc49.test')
+  await page.fill('input[autocomplete="email"]', 'accountant@ctyhp.vn')
   await page.fill('input[autocomplete="current-password"]', PASSWORD.KT)
   await page.click('button[type="submit"]')
   await page.waitForURL(`${BASE}/`, { timeout: 60000 })

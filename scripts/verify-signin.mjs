@@ -16,23 +16,23 @@ const PASSWORD = {
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const USERS = [
-  { email: 'kt@pc49.test',    password: PASSWORD.KT,    role: 'KT',
+  { email: 'accountant@ctyhp.vn',    password: PASSWORD.KT,    role: 'KT',
     expect: ['Tổng quan', 'Vàng', 'Dòng tiền', 'Sổ sách', 'Báo lỗi', 'Cấu hình'] },
-  { email: 'gsus@pc49.test',  password: PASSWORD.GS_US,  role: 'GS_US',
+  { email: 'supervisor@ctyhp.vn',  password: PASSWORD.GS_US,  role: 'GS_US',
     // The money group is here for the cash book, which the supervisor may
     // read — not for the conversion screen, which stays hidden. The menu now
     // matches what the page admits; before this it asked for the right to
     // import a statement, so the group was hidden from somebody who could
     // reach the book by typing the URL.
     expect: ['Tổng quan', 'Vàng', 'Dòng tiền', 'Sổ sách', 'Báo lỗi', 'Cấu hình'] },
-  { email: 'oc@pc49.test',    password: PASSWORD.OC,    role: 'OC',
+  { email: 'owner@ctyhp.vn',    password: PASSWORD.OC,    role: 'OC',
     // Three groups, each holding only the read-only screens the owner may
     // open — stock, the cash book, the journal and the reports — plus
     // reporting a problem, which every role gets. Nothing here writes: the
     // import and reconcile controls are hidden on the cash page itself, which
     // the screen checks below assert separately.
     expect: ['Tổng quan', 'Vàng', 'Dòng tiền', 'Sổ sách', 'Báo lỗi'] },
-  { email: 'admin@pc49.test', password: PASSWORD.ADMIN, role: 'ADMIN',
+  { email: 'admin@ctyhp.vn', password: PASSWORD.ADMIN, role: 'ADMIN',
     expect: ['Tổng quan', 'Vàng', 'Dòng tiền', 'Sổ sách', 'Báo lỗi', 'Cấu hình'] },
 ]
 

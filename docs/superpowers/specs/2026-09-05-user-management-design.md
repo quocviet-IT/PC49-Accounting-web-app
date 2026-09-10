@@ -135,7 +135,7 @@ danh sách người dùng của khách sẽ mọc thêm một cái tên giả sa
 
 ## Một việc để lại, không gộp vào đây
 
-Trên hệ thống thật đang có bốn tài khoản test — `kt@pc49.test`, `gsus@`, `oc@`,
+Trên hệ thống thật đang có bốn tài khoản test — `accountant@ctyhp.vn`, `gsus@`, `oc@`,
 `admin@` — và một trong số đó là quản trị. Khi người dùng thật vào thì nên khoá chúng.
 Nhưng toàn bộ các script kiểm tra đang đăng nhập bằng chính chúng, nên khoá đi là mất
 khả năng tự kiểm tra. Đây là một quyết định riêng cần cân nhắc, không phải một dòng

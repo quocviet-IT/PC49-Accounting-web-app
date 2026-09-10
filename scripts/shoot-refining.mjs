@@ -26,7 +26,7 @@ const problems = []
 page.on('pageerror', (e) => problems.push(String(e)))
 page.on('console', (m) => { if (m.type() === 'error') problems.push(m.text()) })
 
-await signIn(page, BASE, 'kt@pc49.test', passwordFor('KT'))
+await signIn(page, BASE, 'accountant@ctyhp.vn', passwordFor('KT'))
 
 await page.goto(`${BASE}/refining`, { waitUntil: 'networkidle' })
 await page.waitForTimeout(600)

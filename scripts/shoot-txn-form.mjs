@@ -16,7 +16,7 @@ const browser = await chromium.launch()
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
 const page = await openPage(context)
 
-await signIn(page, BASE, 'kt@pc49.test', passwordFor('KT'))
+await signIn(page, BASE, 'accountant@ctyhp.vn', passwordFor('KT'))
 
 const problems = []
 page.on('console', (m) => { if (m.type() === 'error') problems.push(m.text()) })

@@ -13,10 +13,10 @@
  */
 
 export const TEST_ACCOUNTS = [
-  { email: 'kt@pc49.test', role: 'KT', fullName: 'Ke toan VN', env: 'PC49_TEST_PASSWORD_KT' },
-  { email: 'gsus@pc49.test', role: 'GS_US', fullName: 'US Supervisor', env: 'PC49_TEST_PASSWORD_GSUS' },
-  { email: 'oc@pc49.test', role: 'OC', fullName: 'Owner', env: 'PC49_TEST_PASSWORD_OC' },
-  { email: 'admin@pc49.test', role: 'ADMIN', fullName: 'Administrator', env: 'PC49_TEST_PASSWORD_ADMIN' },
+  { email: 'accountant@ctyhp.vn', role: 'KT', fullName: 'Ke toan VN', env: 'PC49_TEST_PASSWORD_KT' },
+  { email: 'supervisor@ctyhp.vn', role: 'GS_US', fullName: 'US Supervisor', env: 'PC49_TEST_PASSWORD_GSUS' },
+  { email: 'owner@ctyhp.vn', role: 'OC', fullName: 'Owner', env: 'PC49_TEST_PASSWORD_OC' },
+  { email: 'admin@ctyhp.vn', role: 'ADMIN', fullName: 'Administrator', env: 'PC49_TEST_PASSWORD_ADMIN' },
 ]
 
 /**
