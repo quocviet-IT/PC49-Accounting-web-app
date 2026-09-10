@@ -57,7 +57,6 @@
 
 .itemAmount {
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   font-size: 13px;
 }
 
@@ -85,8 +84,6 @@
 .lineGrid th {
   text-align: left;
   font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--muted);
   font-weight: 600;
   /* Matches the cell padding below, so a heading sits over its own column
@@ -129,7 +126,6 @@
 .numField {
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
 }
 
 /* An out-of-band price is not an error to be hidden. It is a decision to be

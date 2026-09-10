@@ -595,3 +595,169 @@ describe('a lot assembled from the purchases that go into it', () => {
     expect(r.rows[0].band).toBeNull()
   })
 })
+
+describe('sending a lot takes the metal out of the vault', () => {
+  /** A draft lot with one weighed line, ready to be sent. */
+  async function lotWithLine(code: string, gram = 130.39, pct = 0.693) {
+    const id = await newLot(code)
+    await db.query(
+      `INSERT INTO pc49.refining_lot_line
+         (lot_id, seq, owner_code, metal, gold_type_code, source_desc,
+          gross_weight_gram, gold_pct)
+       VALUES ($1, 1, 'PC49', 'GOLD', 'SG', '10-18k/grs', $2, $3)`, [id, gram, pct])
+    return id
+  }
+
+  it('books nothing while the lot is still a draft', async () => {
+    const id = await lotWithLine('S26.DRAFT')
+    const r = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pc49.gold_txn WHERE refining_lot_id = $1`, [id])
+    expect(Number(r.rows[0].n)).toBe(0)
+  })
+
+  it('books a transfer out for every weighed line when the lot is sent', async () => {
+    const id = await lotWithLine('S26.SEND1')
+    await send(id)
+    const r = await db.query<{ type: string; qty: string; code: string }>(
+      `SELECT txn_type::text AS type, qty::text AS qty, gold_type_code AS code
+         FROM pc49.gold_txn WHERE refining_lot_id = $1`, [id])
+    expect(r.rows).toHaveLength(1)
+    expect(r.rows[0].type).toBe('TRANSFER_OUT')
+    expect(r.rows[0].code).toBe('SG')
+    // Gold leaving carries a negative quantity, as "Send to assay" does in the
+    // source journal.
+    expect(Number(r.rows[0].qty)).toBeCloseTo(-130.39, 4)
+  })
+
+  it('takes the weight off the shelf and puts it at the refinery', async () => {
+    const id = await lotWithLine('S26.SEND2', 200)
+    await send(id)
+    const r = await db.query<{ bucket: string; gram: string }>(
+      `SELECT m.bucket::text AS bucket, m.qty_gram::text AS gram
+         FROM pc49.inventory_movement m
+         JOIN pc49.gold_txn t ON t.id = m.source_id
+        WHERE t.refining_lot_id = $1 ORDER BY m.bucket`, [id])
+    const byBucket = Object.fromEntries(r.rows.map((x) => [x.bucket, Number(x.gram)]))
+    expect(byBucket.AT_REFINERY).toBeCloseTo(200, 4)
+    expect(byBucket.ON_HAND).toBeCloseTo(-200, 4)
+  })
+
+  it('posts the send to the journal, so stock and ledger agree', async () => {
+    const id = await lotWithLine('S26.SEND3')
+    await send(id)
+    const r = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pc49.gold_txn
+        WHERE refining_lot_id = $1 AND journal_entry_id IS NOT NULL`, [id])
+    expect(Number(r.rows[0].n)).toBe(1)
+  })
+
+  it('cannot send a weight nobody recorded', async () => {
+    const id = await newLot('S26.NOWEIGHT')
+    await db.query(
+      `INSERT INTO pc49.refining_lot_line
+         (lot_id, seq, owner_code, metal, gold_type_code, source_desc, gold_pct)
+       VALUES ($1, 1, 'PC49', 'GOLD', 'SG', '18CS', 0.9999)`, [id])
+    await send(id)
+    const r = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pc49.gold_txn WHERE refining_lot_id = $1`, [id])
+    expect(Number(r.rows[0].n)).toBe(0)
+  })
+})
+
+describe('receiving settles the lot back into the vault', () => {
+  async function sentLot(code: string) {
+    const id = await newLot(code)
+    await db.query(
+      `INSERT INTO pc49.refining_lot_line
+         (lot_id, seq, owner_code, metal, gold_type_code, source_desc,
+          gross_weight_gram, gold_pct, assay_pct, assay_weight_gram)
+       VALUES ($1, 1, 'PC49', 'GOLD', 'SG', '10-18k/grs', 200, 0.70, 0.70, 200)`, [id])
+    await send(id)
+    await db.query(
+      `UPDATE pc49.refining_lot SET status = 'ASSAYED', assay_date = '2026-01-30'
+        WHERE id = $1`, [id])
+    return id
+  }
+
+  it('books a transfer in for the Grain that comes back', async () => {
+    const id = await sentLot('S26.RECV1')
+    await db.query(`SELECT pc49.receive_refining($1, '2026-02-05', 'PC49', 140, 100)`, [id])
+    const r = await db.query<{ type: string; qty: string; code: string }>(
+      `SELECT txn_type::text AS type, qty::text AS qty, gold_type_code AS code
+         FROM pc49.gold_txn
+        WHERE refining_lot_id = $1 AND txn_type = 'TRANSFER_IN'`, [id])
+    expect(r.rows).toHaveLength(1)
+    expect(r.rows[0].code).toBe('GRAIN')
+    expect(Number(r.rows[0].qty)).toBeCloseTo(140, 4)
+  })
+
+  it('links the receipt to the transaction it created', async () => {
+    const id = await sentLot('S26.RECV2')
+    await db.query(`SELECT pc49.receive_refining($1, '2026-02-05', 'PC49', 140, 100)`, [id])
+    const r = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pc49.refining_receipt
+        WHERE lot_id = $1 AND gold_txn_id IS NOT NULL`, [id])
+    expect(Number(r.rows[0].n)).toBe(1)
+  })
+
+  it('puts the Grain on the shelf', async () => {
+    const id = await sentLot('S26.RECV3')
+    await db.query(`SELECT pc49.receive_refining($1, '2026-02-05', 'PC49', 140, 100)`, [id])
+    const r = await db.query<{ gram: string }>(
+      `SELECT m.qty_gram::text AS gram FROM pc49.inventory_movement m
+         JOIN pc49.gold_txn t ON t.id = m.source_id
+        WHERE t.refining_lot_id = $1 AND t.txn_type = 'TRANSFER_IN'
+          AND m.bucket = 'ON_HAND'`, [id])
+    expect(Number(r.rows[0].gram)).toBeCloseTo(140, 4)
+  })
+
+  it('books no metal for a settlement taken in cash', async () => {
+    const id = await sentLot('S26.RECVCASH')
+    await db.query(
+      `INSERT INTO pc49.refining_receipt
+         (lot_id, receive_date, gold_type_code, owner_code, settle_kind, amount_usd)
+       VALUES ($1, '2026-02-05', 'GRAIN', 'PC49', 'CASH', 9000)`, [id])
+    const r = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pc49.gold_txn
+        WHERE refining_lot_id = $1 AND txn_type = 'TRANSFER_IN'`, [id])
+    expect(Number(r.rows[0].n)).toBe(0)
+  })
+})
+
+describe("a pooling partner's metal stays off PC49's books", () => {
+  /** A lot carrying one PC49 line and one belonging to MH. */
+  async function pooled(code: string) {
+    const id = await newLot(code)
+    await db.query(
+      `INSERT INTO pc49.refining_lot_line
+         (lot_id, seq, owner_code, metal, gold_type_code, source_desc,
+          gross_weight_gram, gold_pct)
+       VALUES ($1, 1, 'PC49', 'GOLD', 'SG', 'SCRAP 520.44GR 98.93%', 520.44, 0.9893),
+              ($1, 2, 'MH',   'GOLD', 'SG', 'SCRAP 706.4GR 73.51%',  706.40, 0.7351)`, [id])
+    return id
+  }
+
+  it('sends only the house line to the vault door', async () => {
+    const id = await pooled('S26.POOL1')
+    await send(id)
+    const r = await db.query<{ qty: string }>(
+      `SELECT qty::text AS qty FROM pc49.gold_txn WHERE refining_lot_id = $1`, [id])
+    expect(r.rows).toHaveLength(1)
+    // PC49's 520.44 g leaves. MH's 706.4 g travels in the same bag and was
+    // never PC49's stock to move.
+    expect(Number(r.rows[0].qty)).toBeCloseTo(-520.44, 4)
+  })
+
+  it("does not take in the partner's share when it comes back", async () => {
+    const id = await pooled('S26.POOL2')
+    await send(id)
+    await db.query(
+      `UPDATE pc49.refining_lot SET status = 'ASSAYED', assay_date = '2026-01-30'
+        WHERE id = $1`, [id])
+    await db.query(`SELECT pc49.receive_refining($1, '2026-02-05', 'MH', 500, 100)`, [id])
+    const r = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pc49.gold_txn
+        WHERE refining_lot_id = $1 AND txn_type = 'TRANSFER_IN'`, [id])
+    expect(Number(r.rows[0].n)).toBe(0)
+  })
+})

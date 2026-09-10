@@ -10,8 +10,6 @@
 
 .legend {
   font-size: 11px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: var(--pc-text-faint);
   font-weight: 600;
   padding: 0;
