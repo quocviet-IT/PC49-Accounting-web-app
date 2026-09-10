@@ -73,8 +73,16 @@ export type TxnRowInput = z.infer<typeof rowSchema>
  * money has been recorded, only because a telephone number would not file.
  */
 export type SaveResult =
-  | { ok: true; id: string; repeated: boolean; warning?: string }
+  | { ok: true; id: string; docNo: string | null; repeated: boolean; warning?: string }
   | { ok: false; message: string }
+
+/** The number the database gave the row (0057), read back once it exists. */
+async function docNoOf(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>, id: string,
+): Promise<string | null> {
+  const { data } = await supabase.from('gold_txn').select('doc_no').eq('id', id).maybeSingle()
+  return (data?.doc_no as string | null) ?? null
+}
 
 /**
  * Saves one transaction and posts the ledger entries it implies.
@@ -137,7 +145,10 @@ export async function saveTransaction(input: unknown): Promise<SaveResult> {
   }
 
   revalidatePath('/gold-transactions')
-  return { ok: true, id: result.txnId, repeated: result.repeated, warning }
+  return {
+    ok: true, id: result.txnId, docNo: await docNoOf(supabase, result.txnId),
+    repeated: result.repeated, warning,
+  }
 }
 
 
@@ -195,7 +206,10 @@ export async function correctTransaction(input: unknown): Promise<SaveResult> {
 
   const result = data as { txnId: string; repeated: boolean }
   revalidatePath('/gold-transactions')
-  return { ok: true, id: result.txnId, repeated: result.repeated }
+  return {
+    ok: true, id: result.txnId, docNo: await docNoOf(supabase, result.txnId),
+    repeated: result.repeated,
+  }
 }
 
 const voidSchema = z.object({

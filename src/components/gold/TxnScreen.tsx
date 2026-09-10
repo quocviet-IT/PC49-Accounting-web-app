@@ -59,6 +59,7 @@ export function TxnScreen({
   const [voidReason, setVoidReason] = useState('')
   const [voiding, setVoiding] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
 
   const goldName = (code: string) => {
     const g = goldTypes.find((x) => x.code === code)
@@ -152,6 +153,10 @@ export function TxnScreen({
    */
   const columns: ColumnsType<SavedRow> = [
     {
+      title: t('txn.col.doc'), dataIndex: 'doc_no', width: 132,
+      render: (v: string | null) => v ?? '—',
+    },
+    {
       title: t('txn.col.type'), dataIndex: 'txn_type', width: 84,
       render: (v: string) => <Tag>{v}</Tag>,
     },
@@ -242,8 +247,12 @@ export function TxnScreen({
   return (
     <Page titleKey="txn.title" actions={newButton}>
       {notice && (
-        <Alert type="error" showIcon closable message={notice}
+        <Alert type="error" showIcon closable title={notice}
                onClose={() => setNotice(null)} style={{ marginBottom: 16 }} />
+      )}
+      {toast && (
+        <Alert type="success" showIcon closable title={toast}
+               onClose={() => setToast(null)} style={{ marginBottom: 16 }} />
       )}
 
       <FilterBar
@@ -287,7 +296,11 @@ export function TxnScreen({
           partners={partners}
           correcting={editing.correcting}
           onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); router.refresh() }}
+          onSaved={(docNo, stayOpen) => {
+            setToast(docNo ? `${t('txn.form.savedAs')} ${docNo}` : t('txn.saved'))
+            if (!stayOpen) setEditing(null)
+            router.refresh()
+          }}
         />
       )}
 

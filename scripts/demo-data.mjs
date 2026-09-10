@@ -52,10 +52,8 @@ async function clear() {
   }
 
   await db.query(`DELETE FROM pc49.cash_txn WHERE kt_note = 'DEMO'`)
-  await db.query(`DELETE FROM pc49.refining_lot_line WHERE lot_id IN (
-                    SELECT id FROM pc49.refining_lot WHERE lot_code LIKE 'DEMO-%')`)
-  await db.query(`DELETE FROM pc49.refining_receipt WHERE lot_id IN (
-                    SELECT id FROM pc49.refining_lot WHERE lot_code LIKE 'DEMO-%')`)
+  // The lot goes and its bags, receipts and ticks follow it (ON DELETE CASCADE).
+  // Not bag by bag first: 0061 refuses a bag leaving a lot that has been sent.
   await db.query(`DELETE FROM pc49.refining_lot WHERE lot_code LIKE 'DEMO-%'`)
   await db.query(`DELETE FROM pc49.feedback_report WHERE description LIKE 'Demo:%'`)
 

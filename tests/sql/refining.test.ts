@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
-import { createTestDb } from '../support/db'
+import { createTestDb, asRole } from '../support/db'
 
 let db: PGlite
 beforeAll(async () => { db = await createTestDb() }, 60_000)
@@ -501,12 +501,13 @@ describe('taking the money instead of the metal', () => {
 })
 
 describe('a lot assembled from the purchases that go into it', () => {
-  async function buy(day: string, gram: number, pct: number | null, amount: number) {
+  async function buy(day: string, gram: number, pct: number | null, amount: number,
+                     detail: string | null = '10-18k/grs') {
     const r = await db.query<{ id: string }>(
       `INSERT INTO pc49.gold_txn
-         (txn_date, txn_type, gold_type_code, uom, qty, unit_price, amount, gold_pct)
-       VALUES ($1, 'PO', 'SG', 'GRAM', $2, 50, $3, $4) RETURNING id`,
-      [day, gram, amount, pct])
+         (txn_date, txn_type, gold_type_code, uom, qty, unit_price, amount, gold_pct, scrap_detail)
+       VALUES ($1, 'PO', 'SG', 'GRAM', $2, 50, $3, $4, $5) RETURNING id`,
+      [day, gram, amount, pct, detail])
     return r.rows[0].id
   }
 
@@ -517,23 +518,63 @@ describe('a lot assembled from the purchases that go into it', () => {
     expect(Number(r.rows[0].n)).toBe(1)
   })
 
-  it('sorts a purchase into the bag its purity puts it in', async () => {
-    const low = await buy('2026-05-02', 10, 0.583, -500)
-    const high = await buy('2026-05-02', 10, 0.9893, -900)
+  it('shows the picker the document number the purchase was given', async () => {
+    // The picker is where the accountant matches what she ticked in the sheet
+    // to what she is sending; without the number every row reads the same.
+    const id = await buy('2026-05-01', 10, 0.583, -500)
+    const r = await db.query<{ doc_no: string }>(
+      `SELECT doc_no FROM pc49.v_refining_available_purchase WHERE id = $1`, [id])
+    expect(r.rows[0].doc_no).toMatch(/^PC49-2605-\d{3}$/)
+  })
+
+  it('lists what was ticked with the band and number the picker shows', async () => {
+    // The ticked list read straight off gold_txn and so knew neither — every
+    // band came up red and every number came up "—".
+    const lot = await newLot('S26.TICK')
+    const t = await buy('2026-05-01', 10, null, -500, '10K')
+    await db.query(
+      `INSERT INTO pc49.refining_lot_source (lot_id, txn_id) VALUES ($1, $2)`, [lot, t])
+    const r = await db.query<{ grade_band: string; doc_no: string }>(
+      `SELECT grade_band, doc_no FROM pc49.v_refining_lot_source_purchase WHERE lot_id = $1`, [lot])
+    expect(r.rows).toHaveLength(1)
+    expect(r.rows[0].grade_band).toBe('10-18k/grs')
+    expect(r.rows[0].doc_no).toMatch(/^PC49-2605-\d{3}$/)
+  })
+
+  it('sorts a purchase into the bag the counter wrote on it, not by its purity', async () => {
+    // B5 + H4 from the accountant: "tuoi vang" is the karat stamped on the
+    // piece, "% ham luong" is measured content, and the two bags go by the
+    // first. A 90% piece stamped 18k goes in the 10-18k bag. Eight of the
+    // fifty priced rows in the source disagree with the 0.75 rule this used.
+    const low  = await buy('2026-05-02', 10, 0.90, -500, '10-18k/grs')
+    const high = await buy('2026-05-02', 10, 0.70, -900, '19-24k/grs')
     const r = await db.query<{ id: string; band: string }>(
       `SELECT id, grade_band AS band FROM pc49.v_refining_available_purchase
         WHERE id = ANY($1)`, [[low, high]])
     const byId = Object.fromEntries(r.rows.map((x) => [x.id, x.band]))
-    // Eighteen carat is 0.75, which is where the sheet's two bags divide.
     expect(byId[low]).toBe('10-18k/grs')
     expect(byId[high]).toBe('19-24k/grs')
+  })
+
+  it('reads the four grades used before June 2026 as the two bags they became', async () => {
+    const a = await buy('2026-01-10', 5, null, -300, '10k/grs')
+    const b = await buy('2026-01-10', 5, null, -300, '14k/grs')
+    const c = await buy('2026-01-10', 5, null, -300, '16-18k/grs')
+    const d = await buy('2026-01-10', 5, null, -300, '23-24k/grs')
+    const r = await db.query<{ id: string; band: string }>(
+      `SELECT id, grade_band AS band FROM pc49.v_refining_available_purchase WHERE id = ANY($1)`,
+      [[a, b, c, d]])
+    const byId = Object.fromEntries(r.rows.map((x) => [x.id, x.band]))
+    expect([byId[a], byId[b], byId[c]]).toEqual(['10-18k/grs', '10-18k/grs', '10-18k/grs'])
+    expect(byId[d]).toBe('19-24k/grs')
   })
 
   it('totals the picked purchases per bag, the way the batch tab does', async () => {
     const lot = await newLot('S26.PICK')
     const a = await buy('2026-05-03', 100, 0.60, -3000)
     const b = await buy('2026-05-03', 100, 0.70, -4000)
-    const c = await buy('2026-05-03', 50, 0.99, -5000)
+    // The bag is what was written on it (0058); this one is labelled high.
+    const c = await buy('2026-05-03', 50, 0.99, -5000, '19-24k/grs')
     for (const t of [a, b, c]) {
       await db.query(
         `INSERT INTO pc49.refining_lot_source (lot_id, txn_id) VALUES ($1, $2)`, [lot, t])
@@ -586,13 +627,39 @@ describe('a lot assembled from the purchases that go into it', () => {
     ).rejects.toThrow()
   })
 
-  it('will not guess a bag for scrap nobody recorded a purity for', async () => {
-    // Counting it as low grade would understate the 24k the lot is estimated
-    // on, which is the figure the send is priced against.
-    const t = await buy('2026-05-06', 30, null, -1200)
+  it('keeps a purchase with a grade but no measured purity in its bag', async () => {
+    // 304 of the 354 scrap purchases in the source carry no percentage.
+    // Dropping them would leave 81% of the weight out of every lot.
+    const t = await buy('2026-05-06', 30, null, -1200, '10-18k/grs')
+    const r = await db.query<{ band: string | null }>(
+      `SELECT grade_band AS band FROM pc49.v_refining_available_purchase WHERE id = $1`, [t])
+    expect(r.rows[0].band).toBe('10-18k/grs')
+  })
+
+  it('has no bag for scrap with nothing written on it at all', async () => {
+    const t = await buy('2026-05-06', 30, null, -1200, null)
     const r = await db.query<{ band: string | null }>(
       `SELECT grade_band AS band FROM pc49.v_refining_available_purchase WHERE id = $1`, [t])
     expect(r.rows[0].band).toBeNull()
+  })
+
+  it('averages purity over the purchases that have one, weighted by their grams', async () => {
+    const lot = await newLot('S26.AVG')
+    const a = await buy('2026-05-07', 100, 0.60, -3000, '10-18k/grs')
+    const b = await buy('2026-05-07', 100, null, -3500, '10-18k/grs')
+    const c = await buy('2026-05-07', 300, 0.70, -9000, '10-18k/grs')
+    for (const t of [a, b, c]) {
+      await db.query(`INSERT INTO pc49.refining_lot_source (lot_id, txn_id) VALUES ($1, $2)`, [lot, t])
+    }
+    const r = await db.query<{ gross: string; avg: string; n: string }>(
+      `SELECT gross_weight_gram::text AS gross, round(avg_gold_pct, 4)::text AS avg,
+              purchase_count::text AS n
+         FROM pc49.v_refining_lot_source_summary WHERE lot_id = $1`, [lot])
+    expect(r.rows).toHaveLength(1)
+    expect(Number(r.rows[0].n)).toBe(3)
+    // All 500 g go in the bag; the average is over the 400 g that were measured.
+    expect(Number(r.rows[0].gross)).toBe(500)
+    expect(Number(r.rows[0].avg)).toBeCloseTo((100 * 0.60 + 300 * 0.70) / 400, 4)
   })
 })
 
@@ -759,5 +826,143 @@ describe("a pooling partner's metal stays off PC49's books", () => {
       `SELECT count(*)::text AS n FROM pc49.gold_txn
         WHERE refining_lot_id = $1 AND txn_type = 'TRANSFER_IN'`, [id])
     expect(Number(r.rows[0].n)).toBe(0)
+  })
+})
+
+describe('a lot gets its own code', () => {
+  it('mints S<YY>.<NN> when none is written, counting within the year', async () => {
+    const r = await db.query<{ code: string }>(
+      `INSERT INTO pc49.refining_lot (lot_code, sent_date) VALUES ('', '2028-02-01')
+       RETURNING lot_code AS code`)
+    const s = await db.query<{ code: string }>(
+      `INSERT INTO pc49.refining_lot (lot_code, sent_date) VALUES ('', '2028-05-01')
+       RETURNING lot_code AS code`)
+    expect(r.rows[0].code).toBe('S28.01')
+    expect(s.rows[0].code).toBe('S28.02')
+  })
+
+  it('keeps a code somebody wrote', async () => {
+    const r = await db.query<{ code: string }>(
+      `INSERT INTO pc49.refining_lot (lot_code) VALUES ('MANUAL-1') RETURNING lot_code AS code`)
+    expect(r.rows[0].code).toBe('MANUAL-1')
+  })
+})
+
+describe('the assay comes back per bag, in one statement', () => {
+  async function sentLotWithBags(code: string) {
+    const id = await newLot(code)
+    await db.query(
+      `INSERT INTO pc49.refining_lot_line
+         (lot_id, seq, owner_code, metal, gold_type_code, source_desc, gross_weight_gram, gold_pct)
+       VALUES ($1, 1, 'PC49', 'GOLD', 'SG', '10-18k/grs', 195.09, 0.9999),
+              ($1, 2, 'PC49', 'GOLD', 'SG', '19-24k/grs', 112.77, 0.9999)`, [id])
+    await send(id, '2026-01-06', 2170, 2170)
+    const lines = await db.query<{ id: string; seq: number }>(
+      `SELECT id, seq FROM pc49.refining_lot_line WHERE lot_id = $1 ORDER BY seq`, [id])
+    return { id, lines: lines.rows }
+  }
+
+  it('writes every bag and moves the lot to ASSAYED together', async () => {
+    const { id, lines } = await sentLotWithBags('S26.ASSAY1')
+    await db.query(`SELECT pc49.record_assay($1, '2026-01-14', 2432, NULL, $2::jsonb)`, [id,
+      JSON.stringify([
+        { lineId: lines[0].id, assayWeightGram: 194.93, assayPct: 0.9916 },
+        { lineId: lines[1].id, assayWeightGram: 112.60, assayPct: 0.8583 },
+      ])])
+    const lot = await db.query<{ status: string; d: string; spot: string }>(
+      `SELECT status::text, assay_date::text AS d, spot_gold_per_oz_assay::text AS spot
+         FROM pc49.refining_lot WHERE id = $1`, [id])
+    expect(lot.rows[0]).toEqual({ status: 'ASSAYED', d: '2026-01-14', spot: '2432.000000' })
+    const r = await db.query<{ w: string; p: string }>(
+      `SELECT assay_weight_gram::text AS w, assay_pct::text AS p
+         FROM pc49.refining_lot_line WHERE lot_id = $1 ORDER BY seq`, [id])
+    expect(r.rows.map((x) => [Number(x.w), Number(x.p)])).toEqual([[194.93, 0.9916], [112.6, 0.8583]])
+  })
+
+  it('values the bag at the assay figures once they are in', async () => {
+    // Lot S26.01 line 1 of the source, to the cent: 193.29 x 78.20 x 0.95.
+    const { id, lines } = await sentLotWithBags('S26.ASSAY2')
+    await db.query(`SELECT pc49.record_assay($1, '2026-01-14', 2432, NULL, $2::jsonb)`, [id,
+      JSON.stringify([{ lineId: lines[0].id, assayWeightGram: 194.93, assayPct: 0.9916 }])])
+    const r = await db.query<{ v: string }>(
+      `SELECT round(assay_value, 2)::text AS v FROM pc49.v_refining_lot_line_value
+        WHERE lot_id = $1 AND seq = 1`, [id])
+    // 194.93 x 0.9916 = 193.2926; x 2432/31.1 x (1 - 0.005)
+    expect(Number(r.rows[0].v)).toBeCloseTo(193.2926 * (2432 / 31.1) * 0.995, 2)
+  })
+
+  it('refuses a bag that is not in the lot', async () => {
+    const { id } = await sentLotWithBags('S26.ASSAY3')
+    const other = await sentLotWithBags('S26.ASSAY3b')
+    await expect(
+      db.query(`SELECT pc49.record_assay($1, '2026-01-14', 2432, NULL, $2::jsonb)`, [id,
+        JSON.stringify([{ lineId: other.lines[0].id, assayWeightGram: 1, assayPct: 0.5 }])]),
+    ).rejects.toThrow(/not in lot/i)
+  })
+
+  it('refuses a lot that has not been sent', async () => {
+    const id = await newLot('S26.ASSAY4')
+    await expect(
+      db.query(`SELECT pc49.record_assay($1, '2026-01-14', 2432, NULL, '[]'::jsonb)`, [id]),
+    ).rejects.toThrow(/cannot move from DRAFT to ASSAYED/i)
+  })
+})
+
+describe('what the accountant may do to a bag', () => {
+  const KT = '00000000-0000-4000-8000-00000000c0de'
+  beforeAll(async () => {
+    await db.exec(`
+      INSERT INTO auth.users (id, email) VALUES ('${KT}', 'kt-bags@pc49.test');
+      INSERT INTO pc49.app_user (id, full_name, role) VALUES ('${KT}', 'Ke toan', 'KT');
+    `)
+  })
+
+  async function bag(lotId: string, seq = 1): Promise<string> {
+    const r = await db.query<{ id: string }>(
+      `INSERT INTO pc49.refining_lot_line
+         (lot_id, seq, owner_code, metal, gold_type_code, source_desc, gross_weight_gram, gold_pct)
+       VALUES ($1, $2, 'PC49', 'GOLD', 'SG', '10-18k/grs', 100, 0.6) RETURNING id`, [lotId, seq])
+    return r.rows[0].id
+  }
+
+  it('lets the accountant take a bag back out of a draft lot', async () => {
+    // The first click on "Đóng túi từ phiếu đã chọn" came back "permission
+    // denied for table refining_lot_line": the policy said yes, the grant said
+    // no — 0017 granted SELECT, INSERT, UPDATE and never DELETE.
+    const lot = await newLot('S26.BAG1')
+    const id = await bag(lot)
+    await asRole(db, KT, () =>
+      db.query(`DELETE FROM pc49.refining_lot_line WHERE id = $1`, [id]))
+    const r = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pc49.refining_lot_line WHERE id = $1`, [id])
+    expect(Number(r.rows[0].n)).toBe(0)
+  })
+
+  it('still lets a whole lot be swept away, bags and all', async () => {
+    // The demo sweep and nothing else deletes a lot. It takes the transfer
+    // legs 0056 booked first — a lot with gold on the ledger stays — and then
+    // the lot, whose bags follow by ON DELETE CASCADE: that is not a bag
+    // leaving a lot that was sent.
+    const lot = await newLot('S26.BAG3')
+    const id = await bag(lot)
+    await send(lot)
+    await db.query(`DELETE FROM pc49.inventory_movement WHERE source_id IN
+                      (SELECT id FROM pc49.gold_txn WHERE refining_lot_id = $1)`, [lot])
+    await db.query(`DELETE FROM pc49.gold_txn WHERE refining_lot_id = $1`, [lot])
+    await db.query(`DELETE FROM pc49.refining_lot WHERE id = $1`, [lot])
+    const r = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pc49.refining_lot_line WHERE id = $1`, [id])
+    expect(Number(r.rows[0].n)).toBe(0)
+  })
+
+  it('refuses to take a bag out of a lot that has already gone', async () => {
+    // 0056 booked the TRANSFER_OUT for this bag when the lot went; a bag that
+    // vanishes afterwards would leave the ledger holding gold that no bag has.
+    const lot = await newLot('S26.BAG2')
+    const id = await bag(lot)
+    await send(lot)
+    await expect(
+      db.query(`DELETE FROM pc49.refining_lot_line WHERE id = $1`, [id]),
+    ).rejects.toThrow(/already (been )?sent|not a draft/i)
   })
 })

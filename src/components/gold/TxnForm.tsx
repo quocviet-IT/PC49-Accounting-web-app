@@ -12,7 +12,8 @@ import {
   correctTransaction, saveTransaction, type SaveResult,
 } from '@/app/(app)/gold-transactions/actions'
 import {
-  amountOf, MAX_PAYMENTS, MAX_SALES_PEOPLE, PAYMENT_METHODS, TXN_TYPES,
+  amountOf, MAX_PAYMENTS, MAX_SALES_ON_ORDER, PAYMENT_METHODS, SALES_SPLIT,
+  SCRAP_BANDS, SCRAP_TYPES, TXN_TYPES,
   type GoldTypeOption, type SavedRow,
 } from './types'
 
@@ -21,44 +22,56 @@ const money = new Intl.NumberFormat('en-US', {
 })
 
 type PaymentField = { amount: number | null; method: string | null }
-type ShareField = { code: string | null; sharePct: number | null }
 
 type Values = {
   txnType: string
   goldTypeCode: string
   qty: number | null
   unitPrice: number | null
-  scrapDetail: string
+  /** What is written on the receipt, unsigned. The sign follows the type. */
+  total: number | null
+  scrapDetail: string | null
   goldPct: number | null
   partnerCode: string
   partnerPhone: string
   remarks: string
-  salesPeople: ShareField[]
+  /** In order: the first name is the lead and takes the larger share. */
+  salesPeople: string[]
   payments: PaymentField[]
   reason: string
+}
+
+/** The shares an order divides into, by how many people are on it (B6). */
+function sharesFor(people: string[]): { code: string; sharePct: number }[] {
+  const split = SALES_SPLIT[people.length] ?? []
+  return people.map((code, i) => ({ code, sharePct: split[i] ?? 0 }))
 }
 
 /**
  * One transaction, entered on a form rather than typed across a row.
  *
- * The grid this replaces put every field of every draft on screen at once, so
- * the fields were as wide as the column they lived in and the row scrolled
- * sideways past the end of the screen. A purchase has eleven things to say
- * about it and the accountant is entering one purchase at a time; a form is
- * the shape that fits.
+ * Shaped by the accountant's answers of 10/09:
  *
- * Correcting reuses this form rather than a second one. A correction IS a
- * transaction — the same eleven fields, plus the reason and a destination that
- * reverses the original in the same database transaction. Nothing is written
- * when the form opens: the original stays live and posted until this is saved,
- * so closing the tab half way through leaves the books as they were.
+ *   B2  the document number is minted by the database (0057); the form
+ *       shows it back after saving rather than asking for it
+ *   B3  the receipt sometimes carries a total ("34.98g x 18K … 3200") and
+ *       sometimes a unit price ("1oz ML 3970"), so either may be typed and
+ *       the other follows
+ *   B5  scrap has exactly two bags, chosen not typed
+ *   B6  up to three people on an order, shares fixed by count and position
+ *   B12 correcting is one click — the reason is filled in and may be left
+ *
+ * Correcting reuses this form. Nothing is written when it opens: the original
+ * stays live and posted until this is saved, and the reversal and the
+ * replacement happen in the same database transaction.
  */
 export function TxnForm({
   open, onClose, onSaved, txnDate, goldTypes, salesPeople, partners, correcting,
 }: {
   open: boolean
   onClose: () => void
-  onSaved: () => void
+  /** Called with the number the row was given, and whether the form stays open. */
+  onSaved: (docNo: string | null, stayOpen: boolean) => void
   txnDate: string
   goldTypes: GoldTypeOption[]
   salesPeople: string[]
@@ -70,12 +83,14 @@ export function TxnForm({
   const [form] = Form.useForm<Values>()
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
+  const [lastSaved, setLastSaved] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   /**
-   * Stable for the life of this form, so pressing Save twice — or trying again
-   * after an answer went missing on the way back — is recognised as the same
-   * intention rather than as a second purchase.
+   * Stable for the life of one transaction on this form, so pressing Save
+   * twice — or trying again after an answer went missing — is recognised as
+   * the same intention rather than a second purchase. Renewed only once a
+   * save has succeeded and the form is reused for the next one.
    */
   const requestKey = useRef<string>(crypto.randomUUID())
 
@@ -91,30 +106,31 @@ export function TxnForm({
         goldTypeCode: correcting.gold_type_code,
         qty: correcting.qty,
         unitPrice: correcting.unit_price,
-        scrapDetail: correcting.scrap_detail ?? '',
+        total: Math.abs(correcting.amount),
+        scrapDetail: correcting.scrap_detail,
         goldPct: correcting.gold_pct,
         partnerCode: correcting.partner_code ?? '',
         partnerPhone: phoneOf(correcting.partner_code ?? ''),
         remarks: correcting.remarks ?? '',
-        salesPeople: correcting.soldBy.length
-          ? correcting.soldBy.map((p) => ({ code: p.code, sharePct: p.sharePct }))
-          : [{ code: null, sharePct: 100 }],
+        salesPeople: correcting.soldBy.map((p) => p.code),
         payments: correcting.payments.length
           ? correcting.payments.map((p) => ({ amount: p.amount, method: p.method }))
           : [{ amount: null, method: 'CASH' }],
-        reason: '',
+        // Filled in so correcting is one click (B12). Still editable.
+        reason: t('txn.correctReason'),
       }
     : {
         txnType: 'PO',
         goldTypeCode: '',
         qty: null,
         unitPrice: null,
-        scrapDetail: '',
+        total: null,
+        scrapDetail: null,
         goldPct: null,
         partnerCode: '',
         partnerPhone: '',
         remarks: '',
-        salesPeople: [{ code: null, sharePct: 100 }],
+        salesPeople: [],
         payments: [{ amount: null, method: 'CASH' }],
         reason: '',
       }),
@@ -124,34 +140,41 @@ export function TxnForm({
   const goldTypeCode = Form.useWatch('goldTypeCode', form)
   const qty = Form.useWatch('qty', form)
   const unitPrice = Form.useWatch('unitPrice', form)
-  const shares = Form.useWatch('salesPeople', form)
+  const people = Form.useWatch('salesPeople', form) ?? []
 
   const uom = uomOf(goldTypeCode ?? '')
-  const amount = amountOf(Number(qty ?? 0), unitPrice ?? null)
+  const isScrap = SCRAP_TYPES.has(goldTypeCode ?? '')
+  const signed = amountOf(Number(qty ?? 0), unitPrice ?? null)
+  const shares = sharesFor(people)
 
-  /** Only shown once a second person is on the order — see the note on submit. */
-  const manyPeople = (shares ?? []).filter((p) => p?.code).length > 1
+  /**
+   * Either figure may be typed and the other follows (B3).
+   *
+   * The price is kept to eight decimals because the database recomputes the
+   * amount from quantity and price and refuses one that disagrees by more
+   * than half a cent: 3200 over 34.98 g is 91.480846… and rounding it to
+   * cents would come back as 3199.99.
+   */
+  function priceTyped(price: number | null) {
+    const q = Math.abs(Number(form.getFieldValue('qty') ?? 0))
+    form.setFieldValue('total', price === null || !q ? null : Math.round(q * price * 100) / 100)
+  }
+  function totalTyped(total: number | null) {
+    const q = Math.abs(Number(form.getFieldValue('qty') ?? 0))
+    form.setFieldValue('unitPrice',
+      total === null || !q ? null : Math.round((total / q) * 1e8) / 1e8)
+  }
+  function qtyTyped() {
+    // A quantity typed after the total keeps the total; the price follows.
+    const total = form.getFieldValue('total') as number | null | undefined
+    if (total !== null && total !== undefined) totalTyped(total)
+  }
 
-  async function submit() {
+  async function submit(stayOpen: boolean) {
     setError(null)
     setWarning(null)
+    setLastSaved(null)
     const v = await form.validateFields()
-
-    const named = (v.salesPeople ?? []).filter((p) => p?.code)
-    // One person holds the whole order without having to type a hundred; two
-    // or more have to say how it divides, because nothing else can know. The
-    // database refuses a split that does not come to 100 too — this is here so
-    // the reason is read beside the field rather than as a Postgres message.
-    const soldBy = named.length === 1
-      ? [{ code: String(named[0].code), sharePct: 100 }]
-      : named.map((p) => ({ code: String(p.code), sharePct: Number(p.sharePct ?? 0) }))
-    if (soldBy.length > 1) {
-      const total = Math.round(soldBy.reduce((s, p) => s + p.sharePct, 0) * 100) / 100
-      if (soldBy.some((p) => !(p.sharePct > 0)) || total !== 100) {
-        setError(`${t('txn.shareTotal')} ${total}%`)
-        return
-      }
-    }
 
     const payments = (v.payments ?? [])
       .map((p) => ({ amount: Number(p?.amount ?? 0), method: String(p?.method ?? '') }))
@@ -168,8 +191,8 @@ export function TxnForm({
       amount: amountOf(Number(v.qty), v.unitPrice ?? null),
       partnerCode: v.partnerCode?.trim() || null,
       partnerPhone: v.partnerPhone?.trim() || null,
-      salesPeople: soldBy,
-      scrapDetail: v.scrapDetail?.trim() || null,
+      salesPeople: sharesFor(v.salesPeople ?? []),
+      scrapDetail: SCRAP_TYPES.has(v.goldTypeCode) ? (v.scrapDetail ?? null) : null,
       goldPct: v.goldPct ?? null,
       remarks: v.remarks?.trim() || null,
       payments,
@@ -188,10 +211,20 @@ export function TxnForm({
 
     if (!result.ok) { setError(result.message); return }
     // The money is on the books. Something beside it — filing the customer —
-    // may not be, and that is a different sentence: it is shown against a
+    // may not be, and that is a different sentence: shown against a
     // transaction that saved, never as a failure to save.
-    if (result.warning) { setWarning(result.warning); return }
-    onSaved()
+    if (result.warning) { setWarning(result.warning) }
+
+    if (stayOpen && !correcting) {
+      // The next transaction on the same day: same date, everything else
+      // fresh, and a fresh key so it cannot be mistaken for a retry of this one.
+      requestKey.current = crypto.randomUUID()
+      form.resetFields()
+      setLastSaved(result.docNo)
+      onSaved(result.docNo, true)
+      return
+    }
+    onSaved(result.docNo, false)
   }
 
   return (
@@ -204,12 +237,22 @@ export function TxnForm({
       destroyOnHidden
       footer={[
         <Button key="close" onClick={onClose}>{t('txn.form.close')}</Button>,
-        <Button key="save" type="primary" loading={saving} onClick={submit}>
+        !correcting && (
+          <Button key="more" loading={saving} onClick={() => submit(true)}>
+            {t('txn.form.saveMore')}
+          </Button>
+        ),
+        <Button key="save" type="primary" loading={saving} onClick={() => submit(false)}>
           {t('txn.save')}
         </Button>,
       ]}
     >
       <Form<Values> form={form} layout="vertical" initialValues={initial} preserve={false}>
+        {lastSaved && (
+          <Alert type="success" showIcon style={{ marginBottom: 12 }}
+                 title={`${t('txn.form.savedAs')} ${lastSaved}`} />
+        )}
+
         {correcting && (
           <>
             <Form.Item
@@ -218,7 +261,7 @@ export function TxnForm({
               extra={t('txn.form.reasonHint')}
               rules={[{ required: true, min: 3, message: t('txn.form.required') }]}
             >
-              <Input placeholder={t('txn.correctReason')} />
+              <Input />
             </Form.Item>
             <Divider />
           </>
@@ -243,13 +286,33 @@ export function TxnForm({
           </Col>
           <Col xs={24} sm={6}>
             <Form.Item label={t('txn.col.uom')}>
-              {/* Not a field. The unit belongs to the gold type — luong for
-                  9999, ounce for Maple Leaf, gram for scrap — so choosing it
-                  separately is only an opportunity to disagree with it. */}
+              {/* Not a field. The unit belongs to the gold type. */}
               <Input value={uom} disabled />
             </Form.Item>
           </Col>
         </Row>
+
+        {/* The bag and the measured content are two different things (H4):
+            the first is a choice of two, the second a number nobody has for
+            most rows. Both only make sense for scrap. */}
+        {isScrap && (
+          <Row gutter={12}>
+            <Col xs={24} sm={12}>
+              <Form.Item name="scrapDetail" label={t('txn.form.band')}
+                         extra={t('txn.form.scrapHint')}>
+                <Select allowClear
+                        options={SCRAP_BANDS.map((b) => ({ value: b, label: b }))} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="goldPct" label={t('txn.col.purity')}
+                         rules={[{ type: 'number', min: 0, max: 1, message: t('txn.col.purity') }]}>
+                <InputNumber style={{ width: '100%' }} min={0} max={1} step={0.0001}
+                             controls={false} placeholder="0.7351" />
+              </Form.Item>
+            </Col>
+          </Row>
+        )}
 
         <Divider titlePlacement="start" plain>{t('txn.form.money')}</Divider>
 
@@ -265,37 +328,28 @@ export function TxnForm({
                              : Promise.resolve()),
                          }),
                        ]}>
-              <InputNumber style={{ width: '100%' }} step={0.01} controls={false} />
+              <InputNumber style={{ width: '100%' }} step={0.01} precision={2}
+                           controls={false} onChange={qtyTyped} />
             </Form.Item>
           </Col>
           <Col xs={24} sm={8}>
             <Form.Item name="unitPrice" label={t('txn.col.price')}>
-              <InputNumber style={{ width: '100%' }} min={0} step={0.01} controls={false} />
+              <InputNumber style={{ width: '100%' }} min={0} step={0.01} controls={false}
+                           onChange={priceTyped} />
             </Form.Item>
           </Col>
           <Col xs={24} sm={8}>
-            <Form.Item label={t('txn.col.amount')} extra={t('txn.form.amountAuto')}>
-              <Input readOnly value={money.format(amount)} />
+            <Form.Item name="total" label={t('txn.form.total')} extra={t('txn.form.totalHint')}>
+              <InputNumber style={{ width: '100%' }} min={0} step={1} controls={false}
+                           onChange={totalTyped} />
             </Form.Item>
           </Col>
         </Row>
 
-        <Row gutter={12}>
-          <Col xs={24} sm={12}>
-            <Form.Item name="scrapDetail" label={t('txn.form.scrapDetail')}
-                       extra={t('txn.form.scrapHint')}>
-              <Input placeholder="10-18k/grs" />
-            </Form.Item>
-          </Col>
-          <Col xs={24} sm={12}>
-            <Form.Item name="goldPct" label={t('txn.col.purity')}
-                       rules={[{ type: 'number', min: 0, max: 1,
-                                 message: t('txn.col.purity') }]}>
-              <InputNumber style={{ width: '100%' }} min={0} max={1} step={0.0001}
-                           controls={false} placeholder="0.7351" />
-            </Form.Item>
-          </Col>
-        </Row>
+        <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+          {t('txn.col.amount')}: <strong>{money.format(signed)}</strong>
+          {' · '}{t('txn.form.amountAuto')}
+        </Typography.Paragraph>
 
         <Divider titlePlacement="start" plain>{t('txn.form.who')}</Divider>
 
@@ -322,47 +376,18 @@ export function TxnForm({
           </Col>
         </Row>
 
-        <Form.List name="salesPeople">
-          {(fields, { add, remove }) => (
-            <>
-              {fields.map((field) => (
-                <Row gutter={12} key={field.key} align="middle">
-                  <Col xs={24} sm={manyPeople ? 12 : 20}>
-                    <Form.Item name={[field.name, 'code']} label={t('txn.col.sales')}>
-                      <Select allowClear showSearch
-                              options={salesPeople.map((c) => ({ value: c, label: c }))} />
-                    </Form.Item>
-                  </Col>
-                  {/* The percent stays out of the way while one person has the
-                      order — the single line is the whole of it — and appears
-                      the moment a second name arrives. Two people on an order
-                      did not necessarily do half each, and a system that
-                      assumes they did pays the wrong commission quietly. */}
-                  {manyPeople && (
-                    <Col xs={16} sm={8}>
-                      <Form.Item name={[field.name, 'sharePct']} label={t('txn.col.share')}>
-                        <InputNumber style={{ width: '100%' }} min={0} max={100}
-                                     step={1} controls={false} suffix="%" />
-                      </Form.Item>
-                    </Col>
-                  )}
-                  <Col xs={8} sm={4}>
-                    <Button type="text" danger icon={<DeleteOutlined />}
-                            aria-label={t('txn.form.remove')}
-                            disabled={fields.length === 1}
-                            onClick={() => remove(field.name)} />
-                  </Col>
-                </Row>
-              ))}
-              {fields.length < MAX_SALES_PEOPLE && (
-                <Button type="dashed" block icon={<PlusOutlined />}
-                        onClick={() => add({ code: null, sharePct: null })}>
-                  {t('txn.form.addPerson')}
-                </Button>
-              )}
-            </>
-          )}
-        </Form.List>
+        <Form.Item name="salesPeople" label={t('txn.col.sales')} extra={t('txn.form.split')}>
+          <Select
+            mode="multiple"
+            maxCount={MAX_SALES_ON_ORDER}
+            options={salesPeople.map((c) => ({ value: c, label: c }))}
+          />
+        </Form.Item>
+        {shares.length > 1 && (
+          <Typography.Paragraph type="secondary" style={{ marginTop: -12 }}>
+            {shares.map((s) => `${s.code} ${s.sharePct}%`).join(' · ')}
+          </Typography.Paragraph>
+        )}
 
         <Divider titlePlacement="start" plain>{t('txn.form.settle')}</Divider>
 
@@ -392,7 +417,7 @@ export function TxnForm({
                 </Row>
               ))}
               {/* Half in cash, half by transfer and the rest by check is an
-                  ordinary morning at this counter. */}
+                  ordinary morning at this counter (B11). */}
               {fields.length < MAX_PAYMENTS && (
                 <Button type="dashed" block icon={<PlusOutlined />}
                         onClick={() => add({ amount: null, method: null })}>
@@ -408,16 +433,12 @@ export function TxnForm({
         </Form.Item>
 
         {error && (
-          <Alert type="error" showIcon message={t('txn.rowError')} description={error}
+          <Alert type="error" showIcon title={t('txn.rowError')} description={error}
                  style={{ marginTop: 8 }} />
         )}
         {warning && (
-          <Alert
-            type="warning" showIcon
-            message={t('txn.savedWithWarning')} description={warning}
-            style={{ marginTop: 8 }}
-            action={<Button size="small" onClick={onSaved}>{t('txn.form.close')}</Button>}
-          />
+          <Alert type="warning" showIcon title={t('txn.savedWithWarning')} description={warning}
+                 style={{ marginTop: 8 }} />
         )}
         <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
           {t('txn.date')}: {txnDate}

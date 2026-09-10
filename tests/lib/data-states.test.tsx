@@ -125,22 +125,18 @@ describe('journal: an unread month is not a month with no entries', async () => 
 })
 
 describe('refining: a failed list must not invite a second lot', async () => {
-  const { RefiningView } = await import('@/components/refining/RefiningView')
-  const base = {
-    lots: [], shares: [], goldTypes: [], available: [],
-    pickedByLot: {}, bandsByLot: {}, linesByLot: {},
-  }
+  const { LotList } = await import('@/components/refining/LotList')
 
   it('withholds "open a lot" when it could not read what is already open', () => {
     // This is the one that costs money: a lot already at the refinery, opened
     // a second time because the screen said there were none.
-    const html = render(<RefiningView {...base} lotsFailed />)
+    const html = render(<LotList lots={[]} loadFailed />)
     expect(html).not.toContain('Mở lô mới')
     expect(text(html)).toContain(FAILED)
   })
 
   it('but offers it when there are honestly no lots yet', () => {
-    const html = render(<RefiningView {...base} />)
+    const html = render(<LotList lots={[]} />)
     expect(html).toContain('Mở lô mới')
     expect(text(html)).not.toContain(FAILED)
   })
