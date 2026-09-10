@@ -1,236 +1,135 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Alert, Button, Space, Tag, Typography } from 'antd'
+import type { ColumnsType } from 'antd/es/table'
 import { useLocale } from '@/lib/i18n/provider'
 import { money, weight } from '@/components/ledger/Ledger'
-import {
-  linesFromPicked, pickPurchases, unpickPurchase,
-} from '@/app/(app)/refining/actions'
-import styles from './Refining.module.css'
-
-export type AvailablePurchase = {
-  id: string
-  txnDate: string
-  partnerCode: string | null
-  scrapDetail: string | null
-  goldPct: number | null
-  gradeBand: string | null
-  qtyGram: number
-  amount: number
-}
-
-export type PickedBand = {
-  gradeBand: string | null
-  purchaseCount: number
-  grossWeightGram: number
-  pureWeightGram: number
-  avgGoldPct: number | null
-  totalCost: number
-}
-
-/** A four-figure line, as the spreadsheet's batch tab has it. */
-function Band({ band, label }: { band: PickedBand; label: string }) {
-  const { t } = useLocale()
-  return (
-    <tr>
-      <td>{label}</td>
-      <td className={styles.num}>{band.purchaseCount}</td>
-      <td className={styles.num}>{weight.format(band.grossWeightGram)}</td>
-      <td className={styles.num}>{weight.format(band.pureWeightGram)}</td>
-      <td className={styles.num}>
-        {band.avgGoldPct === null ? '—' : band.avgGoldPct.toFixed(4)}
-      </td>
-      <td className={styles.num}>{money.format(band.totalCost)}</td>
-      <td>{band.gradeBand === null ? t('refining.noBand') : ''}</td>
-    </tr>
-  )
-}
+import { DataTable } from '@/components/ui/DataTable'
+import { bagsFromPicked, pickPurchases, unpickPurchases } from '@/app/(app)/refining/actions'
+import type { BandTotal, Purchase } from './types'
 
 /**
- * Assembling a lot out of the purchases going into it.
+ * The checkbox column of sheet 1.Scrap Gold, as a screen.
  *
- * This is the half of the process the system did not have. In the source
- * workbook the accountant does not retype what is in the bag: sheet
- * `1.Scrap Gold` lists the scrap bought over the counter and column P is a
- * checkbox, and ticking the rows that are physically going to the refinery is
- * what produces the batch. The totals underneath are the same four the
- * spreadsheet's batch tab computes, in the same two grade bands the scrap is
- * sent in.
- *
- * The running total is of what is *already picked*, read back from the
- * database, rather than of the boxes currently ticked on screen. A figure that
- * moves as you tick is pleasant and is not the one that will be sent; this is
- * the number the lot actually holds.
+ * Two lists: the scrap bought and not yet sent anywhere, and what has been
+ * ticked into this lot. Underneath, the ticked purchases totalled per bag —
+ * the four figures the batch tab computes — and the one button that turns
+ * those totals into the bags that go (K1: "phải lấy số từ file Scrap Gold sau
+ * khi tick").
  */
 export function PurchasePicker({
-  lotId, available, picked, pickedTotals,
+  lotId, available, picked, bands,
 }: {
   lotId: string
-  available: AvailablePurchase[]
-  picked: AvailablePurchase[]
-  pickedTotals: PickedBand[]
+  available: Purchase[]
+  picked: Purchase[]
+  bands: BandTotal[]
 }) {
   const { t } = useLocale()
   const router = useRouter()
-  const [chosen, setChosen] = useState<Set<string>>(new Set())
+  const [chosen, setChosen] = useState<React.Key[]>([])
+  const [dropping, setDropping] = useState<React.Key[]>([])
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [pending, startTransition] = useTransition()
 
-  const bandLabel = (b: string | null) => b ?? t('refining.noBand')
-
-  const totals = useMemo(() => {
-    const rows = [...pickedTotals].sort((a, b) =>
-      String(a.gradeBand ?? '￿').localeCompare(String(b.gradeBand ?? '￿')))
-    return rows
-  }, [pickedTotals])
-
-  function toggle(id: string) {
-    setChosen((s) => {
-      const next = new Set(s)
-      if (next.has(id)) next.delete(id); else next.add(id)
-      return next
-    })
+  async function run(fn: () => Promise<{ ok: boolean; message?: string }>) {
+    setBusy(true); setError(null)
+    const r = await fn()
+    setBusy(false)
+    if (!r.ok) { setError(r.message ?? 'failed'); return }
+    setChosen([]); setDropping([])
+    router.refresh()
   }
 
-  function commit() {
-    if (chosen.size === 0) return
-    setError(null)
-    startTransition(async () => {
-      const result = await pickPurchases({ lotId, txnIds: [...chosen] })
-      if (!result.ok) { setError(result.message); return }
-      setChosen(new Set())
-      router.refresh()
-    })
-  }
+  const columns: ColumnsType<Purchase> = [
+    { title: t('txn.col.doc'), dataIndex: 'docNo', width: 128, render: (v: string | null) => v ?? '—' },
+    { title: t('refining.boughtOn'), dataIndex: 'txnDate', width: 108 },
+    { title: t('refining.from'), dataIndex: 'partnerCode', ellipsis: true, render: (v: string | null) => v ?? '—' },
+    { title: t('refining.band'), dataIndex: 'gradeBand', width: 110,
+      render: (v: string | null, p) => (v ? <Tag>{v}</Tag> : <Tag color="red">{p.scrapDetail ?? t('refining.noBand')}</Tag>) },
+    { title: t('refining.pct'), dataIndex: 'goldPct', width: 90, align: 'right',
+      render: (v: number | null) => (v === null ? '—' : v.toFixed(4)) },
+    { title: t('refining.grossGram'), dataIndex: 'qtyGram', width: 110, align: 'right',
+      render: (v: number) => weight.format(v) },
+    { title: t('refining.cost'), dataIndex: 'amount', width: 110, align: 'right',
+      render: (v: number) => money.format(-v) },
+  ]
 
-  /**
-   * Turns the bands into the lines that get sent.
-   *
-   * The last step of the spreadsheet's batch tab: the totals stop being a
-   * calculation and become the rows that leave the vault, one per band, which
-   * is exactly how the journal records a send.
-   */
-  function toLines() {
-    setError(null)
-    startTransition(async () => {
-      const result = await linesFromPicked({ lotId })
-      if (!result.ok) { setError(result.message); return }
-      router.refresh()
-    })
-  }
-
-  function drop(txnId: string) {
-    setError(null)
-    startTransition(async () => {
-      const result = await unpickPurchase({ lotId, txnId })
-      if (!result.ok) { setError(result.message); return }
-      router.refresh()
-    })
-  }
+  const bandColumns: ColumnsType<BandTotal> = [
+    { title: t('refining.band'), dataIndex: 'gradeBand', width: 120,
+      render: (v: string | null) => (v ? <Tag>{v}</Tag> : <Tag color="red">{t('refining.noBand')}</Tag>) },
+    { title: t('inv.goldType'), dataIndex: 'goldTypeCode', width: 80 },
+    { title: t('refining.pickCount'), dataIndex: 'purchaseCount', width: 90, align: 'right' },
+    { title: t('refining.grossGram'), dataIndex: 'grossWeightGram', width: 120, align: 'right',
+      render: (v: number) => weight.format(v) },
+    { title: t('refining.avgPct'), dataIndex: 'avgGoldPct', width: 100, align: 'right',
+      render: (v: number | null) => (v === null ? '—' : v.toFixed(4)) },
+    { title: t('refining.pureGram'), dataIndex: 'pureWeightGram', width: 120, align: 'right',
+      render: (v: number | null) => (v === null ? '—' : weight.format(v)) },
+    { title: t('refining.cost'), dataIndex: 'totalCost', align: 'right',
+      render: (v: number) => money.format(v) },
+  ]
 
   return (
-    <div className={styles.picker}>
-      {picked.length > 0 && (
-        <>
-          <h3 className={styles.pickerTitle}>{t('refining.inThisLot')}</h3>
-          <table className={styles.pickTable}>
-            <thead>
-              <tr>
-                <th>{t('refining.band')}</th>
-                <th className={styles.num}>{t('refining.pickCount')}</th>
-                <th className={styles.num}>{t('refining.grossGram')}</th>
-                <th className={styles.num}>{t('refining.pureGram')}</th>
-                <th className={styles.num}>{t('refining.avgPct')}</th>
-                <th className={styles.num}>{t('refining.cost')}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {totals.map((b) => (
-                <Band key={String(b.gradeBand)} band={b} label={bandLabel(b.gradeBand)} />
-              ))}
-            </tbody>
-          </table>
+    <Space orientation="vertical" size="large" style={{ width: '100%' }}>
+      {error && <Alert type="error" showIcon title={error} />}
 
-          <table className={styles.pickTable}>
-            <tbody>
-              {picked.map((p) => (
-                <tr key={p.id}>
-                  <td>{p.txnDate}</td>
-                  <td>{p.partnerCode}</td>
-                  <td>{p.scrapDetail}</td>
-                  <td className={styles.num}>{p.goldPct === null ? '—' : p.goldPct.toFixed(4)}</td>
-                  <td className={styles.num}>{weight.format(p.qtyGram)}</td>
-                  <td>
-                    <button type="button" className={styles.quiet} disabled={pending}
-                            onClick={() => drop(p.id)}>
-                      {t('refining.unpick')}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className={styles.actions}>
-            <button type="button" className={styles.quiet} disabled={pending} onClick={toLines}>
-              {t('refining.makeLines')}
-            </button>
-          </div>
-        </>
+      <div>
+        <Typography.Title level={5}>{t('refining.pick.picked')} ({picked.length})</Typography.Title>
+        <DataTable<Purchase>
+          rowKey="id"
+          columns={columns}
+          dataSource={picked}
+          pagination={false}
+          emptyTitle={t('common.empty')}
+          rowSelection={{ selectedRowKeys: dropping, onChange: setDropping }}
+        />
+        <Space style={{ marginTop: 8 }} wrap>
+          <Button disabled={busy || dropping.length === 0}
+                  onClick={() => run(() => unpickPurchases({ lotId, txnIds: dropping }))}>
+            {t('refining.pick.remove')} ({dropping.length})
+          </Button>
+        </Space>
+      </div>
+
+      {bands.length > 0 && (
+        <div>
+          <Typography.Title level={5}>{t('refining.pick.bandTotal')}</Typography.Title>
+          <DataTable<BandTotal>
+            rowKey={(b) => `${b.gradeBand}|${b.goldTypeCode}`}
+            columns={bandColumns}
+            dataSource={bands}
+            pagination={false}
+          />
+          <Space style={{ marginTop: 8 }} align="start" wrap>
+            <Button type="primary" disabled={busy}
+                    onClick={() => run(() => bagsFromPicked({ lotId }))}>
+              {t('refining.pick.toBags')}
+            </Button>
+            <Typography.Text type="secondary">{t('refining.pick.toBagsHint')}</Typography.Text>
+          </Space>
+        </div>
       )}
 
-      <h3 className={styles.pickerTitle}>{t('refining.available')}</h3>
-      {available.length === 0 ? (
-        <p className={styles.none}>{t('refining.nothingToPick')}</p>
-      ) : (
-        <>
-          <table className={styles.pickTable}>
-            <thead>
-              <tr>
-                <th />
-                <th>{t('refining.boughtOn')}</th>
-                <th>{t('refining.from')}</th>
-                <th>{t('refining.detail')}</th>
-                <th className={styles.num}>{t('refining.pct')}</th>
-                <th>{t('refining.band')}</th>
-                <th className={styles.num}>{t('refining.grossGram')}</th>
-                <th className={styles.num}>{t('refining.cost')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {available.map((p) => (
-                <tr key={p.id}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      aria-label={`${t('refining.pick')} ${p.txnDate} ${p.partnerCode ?? ''}`}
-                      checked={chosen.has(p.id)}
-                      onChange={() => toggle(p.id)}
-                    />
-                  </td>
-                  <td>{p.txnDate}</td>
-                  <td>{p.partnerCode}</td>
-                  <td>{p.scrapDetail}</td>
-                  <td className={styles.num}>
-                    {p.goldPct === null ? '—' : p.goldPct.toFixed(4)}
-                  </td>
-                  <td>{bandLabel(p.gradeBand)}</td>
-                  <td className={styles.num}>{weight.format(p.qtyGram)}</td>
-                  <td className={styles.num}>{money.format(-p.amount)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className={styles.actions}>
-            <button type="button" className={styles.quiet} disabled={pending || chosen.size === 0}
-                    onClick={commit}>
-              {t('refining.pickInto')} ({chosen.size})
-            </button>
-            {error && <span className={styles.failed}>{error}</span>}
-          </div>
-        </>
-      )}
-    </div>
+      <div>
+        <Typography.Title level={5}>{t('refining.pick.title')} ({available.length})</Typography.Title>
+        <DataTable<Purchase>
+          rowKey="id"
+          columns={columns}
+          dataSource={available}
+          pagination={available.length > 50 ? { pageSize: 50 } : false}
+          emptyTitle={t('refining.pick.none')}
+          rowSelection={{ selectedRowKeys: chosen, onChange: setChosen }}
+        />
+        <Space style={{ marginTop: 8 }} wrap>
+          <Button type="primary" disabled={busy || chosen.length === 0}
+                  onClick={() => run(() => pickPurchases({ lotId, txnIds: chosen }))}>
+            {t('refining.pick.add')} ({chosen.length})
+          </Button>
+        </Space>
+      </div>
+    </Space>
   )
 }

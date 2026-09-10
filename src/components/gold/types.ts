@@ -9,6 +9,7 @@ export type GoldTypeOption = {
 
 export type SavedRow = {
   id: string
+  doc_no: string | null
   txn_type: string
   partner_code: string | null
   sales_person_code: string | null
@@ -43,11 +44,27 @@ export const TXN_TYPES = [
 
 export const PAYMENT_METHODS = ['CASH', 'BANKWIRE', 'ZELLE', 'CHECK'] as const
 
+/**
+ * The two bags scrap is sent to the refinery in (B5: from June 2026, only
+ * these two). Offered as a choice, never typed: the source accumulated six
+ * spellings for what were two bags.
+ */
+export const SCRAP_BANDS = ['10-18k/grs', '19-24k/grs'] as const
+
+/** Gold types that carry a scrap grade at all. */
+export const SCRAP_TYPES = new Set(['SG', 'PT'])
+
+/**
+ * How an order divides between the people on it (B6). Fixed by count and
+ * by position — the first name is the lead — so nobody types a percent and
+ * nobody can type one that does not add up.
+ */
+export const SALES_SPLIT: Record<number, number[]> = { 1: [100], 2: [80, 20], 3: [60, 20, 20] }
+export const MAX_SALES_ON_ORDER = 3
+
 /** A ceiling on what one request may insert, not a rule about the counter. */
 export const MAX_PAYMENTS = 20
 
-/** The same kind of bound, on how many people may share one order. */
-export const MAX_SALES_PEOPLE = 10
 
 /**
  * Amount follows the sign convention the whole system rests on: a purchase is

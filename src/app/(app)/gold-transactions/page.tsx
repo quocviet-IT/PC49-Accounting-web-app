@@ -42,7 +42,7 @@ export default async function GoldTransactionsPage({
     // whatever row cap the API is configured with and stops returning the rest
     // without saying so. A day would quietly lose its payments.
     supabase.from('gold_txn')
-      .select(`id, txn_type, partner_code, sales_person_code, gold_type_code,
+      .select(`id, doc_no, txn_type, partner_code, sales_person_code, gold_type_code,
                scrap_detail, gold_pct, uom, qty, unit_price, amount, remarks,
                gold_txn_payment(seq, amount, method),
                gold_txn_sales_person(sales_person_code, share_pct)`)
