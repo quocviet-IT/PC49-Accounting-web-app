@@ -102,3 +102,75 @@ describe('a transaction arrives with the money and the people on it', () => {
     expect(await turnedBack(b, 2)).toMatchObject({ code: 'BAD_PAYMENT', value: 'AP:VENMO:400' })
   })
 })
+
+describe('a transfer says why it happened', () => {
+  it('makes one conversion out of the rows that share a key', async () => {
+    // The sheet writes a conversion as loose rows on one day. A conversion is
+    // what ties them together, and it is what the system demands before gold
+    // may leave one type and appear as another.
+    const b = await newBatch()
+    await stage(b, 2, { txn_date: '2026-01-05', txn_type: 'TRANSFER_OUT',
+      gold_type_code: 'GRAIN', uom: 'GRAM', qty: '-975', amount: '0', conv_key: '2026-01-05#1' })
+    await stage(b, 3, { txn_date: '2026-01-05', txn_type: 'TRANSFER_IN',
+      gold_type_code: 'RP', uom: 'LUONG', qty: '26', amount: '0', conv_key: '2026-01-05#1' })
+    await commit(b)
+    const r = await db.query<{ n: string; convs: string }>(
+      `SELECT count(*)::text AS n, count(DISTINCT t.conversion_id)::text AS convs
+         FROM pc49.gold_txn t JOIN pc49.import_row r ON r.committed_ref = t.id
+        WHERE r.batch_id = $1`, [b])
+    expect(r.rows[0]).toMatchObject({ n: '2', convs: '1' })
+  })
+
+  it('turns back a transfer with nothing to explain it', async () => {
+    // Ten days in six months do not balance in grams when the day is added up.
+    // Inventing a conversion for those is inventing something that never
+    // happened, so they come back to be looked at instead.
+    const b = await newBatch()
+    expect(await stage(b, 2, { txn_date: '2026-02-11', txn_type: 'TRANSFER_OUT',
+      gold_type_code: 'RP', uom: 'LUONG', qty: '-5', amount: '0' })).toBe('REJECTED')
+    expect(await turnedBack(b, 2)).toMatchObject({ code: 'NO_CONVERSION', value: '2026-02-11' })
+  })
+
+  it('hangs a scrap transfer on the refining lot it went to', async () => {
+    await db.query(
+      `INSERT INTO pc49.refining_lot (lot_code, refinery_name) VALUES ('S26.09', 'Test')`)
+    const b = await newBatch()
+    await stage(b, 2, { txn_date: '2026-01-06', txn_type: 'TRANSFER_OUT',
+      gold_type_code: 'SG', uom: 'GRAM', qty: '-195.09', amount: '0', lot_code: 'S26.09' })
+    await commit(b)
+    const r = await db.query<{ lot: string }>(
+      `SELECT l.lot_code AS lot FROM pc49.gold_txn t
+         JOIN pc49.refining_lot l ON l.id = t.refining_lot_id
+         JOIN pc49.import_row r ON r.committed_ref = t.id
+        WHERE r.batch_id = $1`, [b])
+    expect(r.rows[0].lot).toBe('S26.09')
+  })
+
+  it('says which lot it cannot find rather than dropping the link', async () => {
+    const b = await newBatch()
+    await stage(b, 2, { txn_date: '2026-01-06', txn_type: 'TRANSFER_OUT',
+      gold_type_code: 'SG', uom: 'GRAM', qty: '-10', amount: '0', lot_code: 'S26.NOPE' })
+    await expect(commit(b)).rejects.toThrow(/S26\.NOPE/)
+  })
+
+  it('points a pickup at the deposit it settles', async () => {
+    // The sheet keeps the deposit and the collection on one row. The system
+    // records it as it happened: money taken one day, gold handed over another.
+    const b = await newBatch()
+    await stage(b, 2, { txn_date: '2026-01-10', txn_type: 'DEPOSIT',
+      gold_type_code: 'RP', uom: 'LUONG', qty: '1', amount: '0',
+      partner_code: 'Kelvin Tran', payments: 'AR:CASH:2000', deposit_key: 'd-1' })
+    await stage(b, 3, { txn_date: '2026-01-28', txn_type: 'PICKUP',
+      gold_type_code: 'RP', uom: 'LUONG', qty: '-1', amount: '5310',
+      partner_code: 'Kelvin Tran', payments: 'AR:CASH:3310', deposit_key: 'd-1' })
+    await commit(b)
+    const r = await db.query<{ dep: string; pick: string }>(
+      `SELECT d.id::text AS dep, p.deposit_ref_id::text AS pick
+         FROM pc49.import_row rp
+         JOIN pc49.gold_txn p ON p.id = rp.committed_ref
+         JOIN pc49.import_row rd ON rd.batch_id = rp.batch_id AND rd.row_no = 2
+         JOIN pc49.gold_txn d ON d.id = rd.committed_ref
+        WHERE rp.batch_id = $1 AND rp.row_no = 3`, [b])
+    expect(r.rows[0].pick).toBe(r.rows[0].dep)
+  })
+})
