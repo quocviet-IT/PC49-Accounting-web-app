@@ -31,7 +31,7 @@
 .qty {
   width: 96px;
   text-align: right;
-  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 .quiet {
@@ -105,8 +105,6 @@
   text-align: left;
   font-weight: 600;
   font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--pc-text-faint);
   padding: 4px 8px;
   border-bottom: 1px solid var(--pc-border-default);
@@ -121,7 +119,6 @@
 .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
 }
 
 .none {

@@ -141,7 +141,6 @@
 
 .attentionCount {
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   font-size: var(--pc-font-body);
   font-weight: 600;
 }

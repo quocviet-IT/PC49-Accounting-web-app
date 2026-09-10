@@ -55,8 +55,6 @@
 .sectionTitle {
   font-size: var(--pc-font-section);
   line-height: var(--pc-line-section);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: var(--muted);
   font-weight: 600;
   margin: 0;
@@ -101,8 +99,6 @@
   font-weight: 600;
   font-size: var(--pc-font-label);
   line-height: var(--pc-line-label);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: var(--muted);
   background: var(--pc-surface-muted);
   padding: 8px 12px;
@@ -148,7 +144,6 @@
 .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   min-width: 8.5rem;
   overflow: visible;
   text-overflow: clip;
@@ -187,12 +182,13 @@
   gap: 2px;
 }
 
+/* Sentence case, to match the table headers beside it. Uppercase with tracking
+   spent a third of the label's width saying the same word, and Vietnamese
+   diacritics sit badly in capitals — "VÀNG VÀO / RA KHO" was the worst of it. */
 .statLabel {
   font-size: var(--pc-font-label);
   line-height: var(--pc-line-label);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--muted);
+  color: var(--pc-text-secondary);
 }
 
 .statValue {
@@ -200,7 +196,6 @@
   line-height: var(--pc-line-kpi);
   font-weight: 620;
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   letter-spacing: -0.02em;
   color: var(--pc-text-heading);
 }

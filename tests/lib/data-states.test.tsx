@@ -147,7 +147,7 @@ describe('refining: a failed list must not invite a second lot', async () => {
 })
 
 describe('gold entry: a day that did not load is not a blank day', async () => {
-  const { TxnGrid } = await import('@/components/gold/TxnGrid')
+  const { TxnScreen } = await import('@/components/gold/TxnScreen')
   const base = {
     txnDate: '2026-09-07', goldTypes: [], salesPeople: [], partners: [],
     existing: [],
@@ -156,18 +156,18 @@ describe('gold entry: a day that did not load is not a blank day', async () => {
   it('shows no grid to type into', () => {
     // A blank grid on a day that has transactions is how the same purchase
     // gets entered twice.
-    const html = render(<TxnGrid {...base} loadFailed />)
-    expect(html).not.toContain('Thêm dòng')
+    const html = render(<TxnScreen {...base} loadFailed />)
+    expect(html).not.toContain('Thêm giao dịch')
     expect(text(html)).toContain(FAILED)
   })
 
   it('and keeps the date picker, so the day can be left without a reload', () => {
-    expect(render(<TxnGrid {...base} loadFailed />)).toContain('type="date"')
+    expect(render(<TxnScreen {...base} loadFailed />)).toContain('type="date"')
   })
 
   it('while a day that loaded is still enterable', () => {
-    const html = render(<TxnGrid {...base} />)
-    expect(html).toContain('Thêm dòng')
+    const html = render(<TxnScreen {...base} />)
+    expect(html).toContain('Thêm giao dịch')
     expect(text(html)).not.toContain(FAILED)
   })
 })

@@ -1,4 +1,4 @@
-import { TxnGrid, type GoldTypeOption, type SavedRow } from '@/components/gold/TxnGrid'
+import { TxnScreen, type GoldTypeOption, type SavedRow } from '@/components/gold/TxnScreen'
 import { Forbidden } from '@/components/Forbidden'
 import { getCurrentUser } from '@/lib/auth/currentUser'
 import { can } from '@/lib/auth/roles'
@@ -83,7 +83,7 @@ export default async function GoldTransactionsPage({
     // `?date=` alone keeps the same route segment mounted, which would carry
     // half-typed rows from one day across into the next and offer to save them
     // there.
-    <TxnGrid
+    <TxnScreen
         key={txnDate}
         txnDate={txnDate}
         // A day whose rows did not arrive must not be offered as a blank

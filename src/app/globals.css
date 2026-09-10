@@ -140,7 +140,6 @@ html, body {
 .pc-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   white-space: nowrap;
   /* Wide enough for what this business writes: money into the millions and
      weight to four decimals. Never clipped — a shortened figure reads as a
@@ -317,13 +316,14 @@ html, body {
    the frame scroll rather than being shortened into a different number. */
 .pc-table { min-width: 100%; border-collapse: collapse; font-size: 13px; table-layout: auto; }
 
+/* Sentence case throughout, matching OneBook. Uppercase with tracking spends a
+   third of a label's width saying the same word, and Vietnamese diacritics sit
+   badly in capitals. */
 .pc-table th {
   text-align: left;
   font-weight: 600;
   font-size: var(--pc-font-label);
   line-height: var(--pc-line-label);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: var(--pc-text-faint);
   background: var(--pc-surface-muted);
   padding: 8px 12px;
@@ -369,8 +369,6 @@ html, body {
 .pc-section__title {
   font-size: var(--pc-font-section);
   line-height: var(--pc-line-section);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: var(--pc-text-faint);
   margin: 0;
   font-weight: 600;
@@ -394,8 +392,6 @@ html, body {
   display: block;
   font-size: var(--pc-font-label);
   line-height: var(--pc-line-label);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: var(--pc-text-faint);
 }
 .pc-stat__value {
@@ -406,7 +402,6 @@ html, body {
   font-weight: 620;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
 }
 .pc-stat__note {
   display: block;
@@ -422,7 +417,6 @@ html, body {
   font: inherit;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   width: 100%;
   text-align: right;
   padding: 2px 5px;
@@ -501,4 +495,119 @@ html, body {
 .pc-month button:focus-visible {
   outline: 2px solid var(--pc-intent-primary);
   outline-offset: 1px;
+}
+
+/* ------------------------------------------------------- data table (OneBook)
+
+   The list style the accounting team already reads every day in OneBook:
+   an Ant Design table on a rounded card, dense rows, hairline rules, figures
+   in tabular numerals, and — the part that matters most — held to the width of
+   its box rather than sized by its contents.
+
+   The hand-rolled ledger table this replaces grew as wide as its longest cell,
+   so one long remark pushed the actions column past the right edge of the
+   screen and the Huỷ button could not be pressed without hunting for it. */
+
+.pc-data-table {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--pc-surface-card);
+  border: 1px solid var(--pc-border-default);
+  border-radius: 10px;
+}
+
+.pc-data-table .ant-table-wrapper,
+.pc-data-table .ant-spin-nested-loading,
+.pc-data-table .ant-spin-container {
+  min-width: 0;
+}
+
+.pc-data-table .ant-table { border-radius: 10px; background: transparent; }
+
+/* Figures line up down a column, which is the whole reason a ledger is a
+   table and not a list. */
+.pc-data-table .ant-table-cell { font-variant-numeric: tabular-nums; }
+
+.pc-data-table .ant-table-thead > tr > th {
+  background: var(--pc-surface-muted);
+  color: var(--pc-text-secondary);
+  font-weight: 600;
+  /* Sentence case, as OneBook has it. The uppercase-with-tracking headers the
+     old table used cost a third of the column width to say the same word, and
+     Vietnamese diacritics sit badly in capitals. */
+  text-transform: none;
+  letter-spacing: 0;
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+/*
+ * A table held to its box.
+ *
+ * `fit` means the row total is the container width, so no horizontal scrollbar
+ * is offered at all. Below the narrowest viewport this design supports the
+ * declared widths stop fitting and the table grows on their own account — this
+ * makes the frame scroll rather than the page, which is a phone case only.
+ */
+.pc-table--fit .ant-table-content,
+.pc-table--fit .ant-table-body {
+  overflow-x: auto;
+}
+
+.pc-empty-description.ant-typography {
+  max-width: 420px;
+  margin: 4px auto 0;
+}
+
+/* --------------------------------------------------------------- filter bar
+
+   The strip of controls above a list: what is being looked at on the left,
+   what can be done about it on the right. Top-aligned rather than centred,
+   because a one-row block of buttons centred against a control block that has
+   wrapped to three rows reads as belonging to whatever is beside it. */
+
+.pc-filter-bar {
+  min-height: 52px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: var(--pc-surface-card);
+  border: 1px solid var(--pc-border-default);
+  border-radius: 10px;
+}
+
+.pc-filter-bar__controls,
+.pc-filter-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* The day a screen is showing. A native date input rather than a component
+   library's: this is the control that has to keep working on the screen that
+   says a read failed, so it cannot depend on anything the failure took away. */
+
+.pc-date-field { display: flex; align-items: center; gap: 8px; }
+
+.pc-date-label { font-size: var(--pc-font-label); color: var(--pc-text-secondary); }
+
+.pc-date-input {
+  border: 1px solid var(--pc-border-default);
+  border-radius: 6px;
+  background: var(--pc-surface-card);
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+}
+
+.pc-date-input:focus {
+  outline: 2px solid var(--pc-intent-primary);
+  outline-offset: -1px;
 }
