@@ -174,3 +174,52 @@ describe('a transfer says why it happened', () => {
     expect(r.rows[0].pick).toBe(r.rows[0].dep)
   })
 })
+
+describe('a batch reaches the books', () => {
+  beforeAll(async () => {
+    await db.query(`INSERT INTO pc49.accounting_period (period, status)
+                    VALUES ('2026-03', 'OPEN') ON CONFLICT (period) DO NOTHING`)
+  })
+
+  it('posts every committed transaction, oldest first', async () => {
+    const b = await newBatch()
+    await stage(b, 2, { ...buy, txn_date: '2026-03-15', payments: 'AP:CASH:650' })
+    await stage(b, 3, { ...buy, txn_date: '2026-03-16', payments: 'AP:CASH:650' })
+    await commit(b)
+    const bad = await db.query(`SELECT * FROM pc49.post_import_batch($1)`, [b])
+    expect(bad.rows).toEqual([])
+    const r = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pc49.gold_txn t
+         JOIN pc49.import_row i ON i.committed_ref = t.id
+        WHERE i.batch_id = $1 AND t.journal_entry_id IS NOT NULL`, [b])
+    expect(Number(r.rows[0].n)).toBe(2)
+  })
+
+  it('names the row it could not post instead of stopping at it', async () => {
+    // One bad row must not hold up the other 1,125. Whoever is loading needs
+    // to know which row, by the line number it has in the spreadsheet.
+    const b = await newBatch()
+    await stage(b, 2, { ...buy, txn_date: '2026-03-17', payments: 'AP:CASH:650' })
+    await stage(b, 3, { ...buy, txn_date: '2026-03-18' })
+    await commit(b)
+    const bad = await db.query<{ row_no: number; error: string }>(
+      `SELECT row_no, error FROM pc49.post_import_batch($1)`, [b])
+    expect(bad.rows).toHaveLength(1)
+    expect(bad.rows[0].row_no).toBe(3)
+    expect(bad.rows[0].error).toMatch(/no payments/i)
+    const ok = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pc49.gold_txn t
+         JOIN pc49.import_row i ON i.committed_ref = t.id
+        WHERE i.batch_id = $1 AND t.journal_entry_id IS NOT NULL`, [b])
+    expect(Number(ok.rows[0].n)).toBe(1)
+  })
+
+  it('is safe to run twice', async () => {
+    const b = await newBatch()
+    await stage(b, 2, { ...buy, txn_date: '2026-03-19', payments: 'AP:CASH:650' })
+    await commit(b)
+    await db.query(`SELECT * FROM pc49.post_import_batch($1)`, [b])
+    const again = await db.query(`SELECT * FROM pc49.post_import_batch($1)`, [b])
+    expect(again.rows).toEqual([])
+  })
+})
