@@ -32,6 +32,7 @@
     "shots": "node --env-file=.env.local scripts/shoot-ui.mjs",
     "demo": "node --env-file=.env.local scripts/demo-data.mjs",
     "demo:clear": "node --env-file=.env.local scripts/demo-data.mjs --clear",
+    "load:2026": "node --env-file=.env.local scripts/load-2026.mjs",
     "verify:payments": "node --env-file=.env.local scripts/verify-payments.mjs",
     "verify:correct": "node --env-file=.env.local scripts/verify-correct.mjs",
     "verify:layout": "node --env-file=.env.local scripts/verify-layout.mjs"
