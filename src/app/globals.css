@@ -657,3 +657,19 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--pc-intent-prima
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* The mark beside a menu item whose screen is on its way (NavPending). Always
+   there at a fixed size and only faded in, so the label never moves. */
+.pc-nav-pending {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-inline-start: 8px;
+  border-radius: 50%;
+  background: var(--pc-accent-onDark);
+  vertical-align: middle;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.pc-nav-pending.is-pending { opacity: 1; animation: pc-nav-pending 0.9s ease-in-out infinite; }
+@keyframes pc-nav-pending { 50% { opacity: 0.35; } }

@@ -22,6 +22,7 @@ import { useLocale } from '@/lib/i18n/provider'
 import { LocaleSwitch } from '@/components/LocaleSwitch'
 import { ThemeToggle } from '@/components/theme/ThemeToggle'
 import { ReportDialog } from '@/components/feedback/ReportDialog'
+import { NavPending } from '@/components/NavPending'
 
 const { Header, Sider, Content } = Layout
 
@@ -150,13 +151,13 @@ export function AppShell({
           children: item.children.map((child) => ({
             key: child.key,
             icon: ICONS[child.key],
-            label: <Link href={child.key}>{t(child.labelKey)}</Link>,
+            label: <Link href={child.key}>{t(child.labelKey)}<NavPending /></Link>,
           })),
         }
       : {
           key: item.key,
           icon: ICONS[item.key],
-          label: <Link href={item.key}>{t(item.labelKey)}</Link>,
+          label: <Link href={item.key}>{t(item.labelKey)}<NavPending /></Link>,
         },
   )
 
