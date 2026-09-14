@@ -1,10 +1,11 @@
+import { cache } from 'react'
 import { createServerSupabase } from '@/lib/supabase/server'
 import type { Role } from '@/lib/auth/roles'
 import type { Locale } from '@/lib/i18n'
 
 export type CurrentUser = {
   id: string
-  /** From the auth record rather than the profile: it is what people sign in as. */
+  /** From the session rather than the profile: it is what people sign in as. */
   email: string
   fullName: string
   role: Role
@@ -21,15 +22,27 @@ export type CurrentUser = {
   mustChangePassword: boolean
 }
 
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+/**
+ * The signed-in person, read once per request.
+ *
+ * Who they are comes from the session's claims, verified here against the
+ * project's ES256 signing key, not from a round trip to Supabase Auth. That
+ * trip was one of six in a row on every page, and the layout and the page each
+ * made it — `cache` is what lets the two share this read now.
+ *
+ * The profile is still read on every request. Suspending an account or
+ * requiring a new password takes effect at once, whatever the token says.
+ */
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const supabase = await createServerSupabase()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
+  const { data: session, error } = await supabase.auth.getClaims()
+  const claims = session?.claims
+  if (error || !claims?.sub) return null
 
   const { data } = await supabase
     .from('app_user')
     .select('id, full_name, role, locale, suspended_at, must_change_password')
-    .eq('id', user.id)
+    .eq('id', claims.sub)
     .single()
 
   if (!data) return null
@@ -43,10 +56,10 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   if (data.suspended_at) return null
   return {
     id: data.id as string,
-    email: user.email ?? '',
+    email: typeof claims.email === 'string' ? claims.email : '',
     fullName: data.full_name as string,
     role: data.role as Role,
     locale: data.locale as Locale,
     mustChangePassword: Boolean(data.must_change_password),
   }
-}
+})
