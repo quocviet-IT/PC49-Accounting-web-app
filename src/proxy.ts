@@ -4,15 +4,15 @@ import { updateSession } from '@/lib/supabase/session'
 const PUBLIC_PATHS = ['/login', '/auth']
 
 export async function proxy(request: NextRequest) {
-  const { response, user } = await updateSession(request)
+  const { response, signedIn } = await updateSession(request)
   const { pathname } = request.nextUrl
 
-  if (!user && !PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+  if (!signedIn && !PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
-  if (user && pathname === '/login') {
+  if (signedIn && pathname === '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
