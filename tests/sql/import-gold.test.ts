@@ -223,3 +223,61 @@ describe('a batch reaches the books', () => {
     expect(again.rows).toEqual([])
   })
 })
+
+describe('a file read the way the import screen reads it', () => {
+  // parseRecords keeps every header column on every row, so a blank cell
+  // arrives as the empty string, not as a missing key. Every payload above is
+  // built by hand and simply leaves its blanks out, which is how a loader that
+  // fails on the first empty cell of a real file passed all of them.
+  const asRead = (p: Record<string, string>) => ({
+    txn_date: '', txn_type: '', gold_type_code: '', uom: '', qty: '', unit_price: '',
+    amount: '', partner_code: '', sales: '', scrap_detail: '', gold_pct: '',
+    payments: '', conv_key: '', lot_code: '', deposit_key: '', remarks: '', ...p,
+  })
+
+  it('commits a row whose optional cells are empty', async () => {
+    const b = await newBatch()
+    expect(await stage(b, 2, asRead({ ...buy, unit_price: '', payments: 'AP:CASH:650' })))
+      .toBe('VALID')
+    await commit(b)
+    const r = await db.query<{ price: string | null; pct: string | null }>(
+      `SELECT t.unit_price::text AS price, t.gold_pct::text AS pct
+         FROM pc49.gold_txn t JOIN pc49.import_row i ON i.committed_ref = t.id
+        WHERE i.batch_id = $1`, [b])
+    expect(r.rows).toEqual([{ price: null, pct: null }])
+  })
+
+  it('takes the gold type own unit when the unit cell is empty', async () => {
+    const b = await newBatch()
+    await stage(b, 2, asRead({ ...buy, gold_type_code: 'RP', uom: '', qty: '2',
+      unit_price: '5300', amount: '-10600', scrap_detail: '', payments: 'AP:CASH:10600' }))
+    await commit(b)
+    const r = await db.query<{ uom: string }>(
+      `SELECT t.uom::text AS uom
+         FROM pc49.gold_txn t JOIN pc49.import_row i ON i.committed_ref = t.id
+        WHERE i.batch_id = $1`, [b])
+    expect(r.rows[0].uom).toBe('LUONG')
+  })
+
+  it('still turns back a row with no gold type instead of failing the batch', async () => {
+    // Two rows of May carry neither a gold type nor a unit. Reading an empty
+    // cell as null must not turn a required value into an accepted blank.
+    const b = await newBatch()
+    expect(await stage(b, 2, asRead({ ...buy, gold_type_code: '', uom: '',
+      payments: 'AP:CASH:650' }))).toBe('REJECTED')
+    expect((await turnedBack(b, 2)).code).toBe('UNKNOWN_GOLD_TYPE')
+  })
+
+  it('commits an opening balance whose cost is not known', async () => {
+    const b = await newBatch('OPENING_INVENTORY')
+    await stage(b, 2, { as_of: '2026-01-01', gold_type_code: 'SG', uom: 'GRAM',
+      qty: '234.78', unit_cost: '', value: '', note: '' })
+    await commit(b)
+    const r = await db.query<{ g: string; cost: string | null }>(
+      `SELECT m.qty_gram::text AS g, m.unit_cost::text AS cost
+         FROM pc49.inventory_movement m JOIN pc49.import_row i ON i.committed_ref = m.id
+        WHERE i.batch_id = $1`, [b])
+    expect(Number(r.rows[0].g)).toBeCloseTo(234.78, 2)
+    expect(r.rows[0].cost).toBeNull()
+  })
+})

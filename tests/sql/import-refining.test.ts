@@ -83,3 +83,22 @@ describe('a lot arrives with its bags', () => {
     expect(Number(r.rows[0].est)).toBeCloseTo(12930, 0)
   })
 })
+
+describe('a bag read the way the import screen reads it', () => {
+  it('commits a bag with no assay yet, whose assay cells are empty', async () => {
+    // A lot still at the refinery has no assay date, no assay spot and no assay
+    // weight. In a CSV those are empty cells, not absent columns.
+    const b = await newBatch()
+    await stage(b, 2, { ...lot, lot_code: 'S26.90', status: 'DRAFT',
+      sent_date: '', assay_date: '', received_date: '',
+      spot_gold_per_oz_assay: '', spot_pt_per_oz_assay: '', note: '',
+      seq: '1', owner_code: 'PC49', metal: 'GOLD', gold_type_code: 'SG', source_desc: '',
+      gross_weight_gram: '120.5', gold_pct: '0.75', assay_weight_gram: '', assay_pct: '' })
+    await commit(b)
+    const r = await db.query<{ w: string | null; sent: string | null }>(
+      `SELECT l.assay_weight_gram::text AS w, t.sent_date::text AS sent
+         FROM pc49.refining_lot_line l JOIN pc49.refining_lot t ON t.id = l.lot_id
+        WHERE t.lot_code = 'S26.90'`)
+    expect(r.rows).toEqual([{ w: null, sent: null }])
+  })
+})
