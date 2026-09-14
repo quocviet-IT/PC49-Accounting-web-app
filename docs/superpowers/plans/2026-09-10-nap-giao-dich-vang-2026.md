@@ -801,13 +801,14 @@ Ba quy tắc bộ phiên dịch tự làm, ghi rõ trong đầu tệp:
 2. **`conv_key`**: gộp các dòng `Transfer` cùng ngày; chỉ đặt khoá khi tổng gram trong ngày cân bằng (sai số < 0,5 g) và ngày đó không phải là ngày gửi phân kim. Ngày lệch **không có khoá** — để bộ nạp trả lại.
 3. **`lot_code`**: dòng `Transfer` của `SG`/`PT` khớp ngày gửi của một lô trong `3.2 PC49 SCRAP GOLD` thì mang mã lô đó.
 4. **Kim loại của túi**: `Gold`→`GOLD`, `PT`→`PLATINUM`, và `PD`→`PLATINUM` kèm `source_desc` bắt đầu bằng `PD — ` để trên màn hình đọc ra ngay. Hệ thống chưa biết palladium; đây là quyết định đã chốt ngày 10-09, không phải chỗ tự ý đoán.
+5. **Dòng chép sang tab tháng sau** (thêm ngày 14-09): 15 dòng có mặt hai lần — ở tab của chính ngày đó và, giống từng ô, ở tab tháng kế (phiếu cọc chưa giao, phiếu bán chưa thu). Bộ phiên dịch bỏ bản ở tab sau khi mọi cột trừ `deposit_key` giống hệt, bỏ kèm phiếu giao hàng của phiếu cọc chép, và in từng dòng đã bỏ. Dòng khác đi dù một ô, dòng ghi muộn không có bản gốc, và hai dòng giống nhau trong cùng một tab thì giữ. Việc này phải làm trước khi đặt `conv_key`.
 
 In ra bảng tổng kết mỗi tệp: bao nhiêu dòng, bao nhiêu dòng không có `conv_key`, bao nhiêu ô khách là ghi chú.
 
 - [ ] **Step 6: Chạy thử và xem con số**
 
 Run: `node --env-file=.env.local scripts/sheet-to-import.mjs`
-Expected: 6 tệp giao dịch tổng **1.126 + 32 = 1.158 dòng** (32 dòng Pickup thành 64), 1 tệp phân kim 15 dòng túi PC49, 1 tệp tồn đầu 7 dòng. Bảng tổng kết báo khoảng 10 ngày chuyển đổi không có khoá.
+Expected: 6 tệp giao dịch tổng **1.126 + 32 = 1.158 dòng** (32 dòng Pickup thành 64) — **sau khi bỏ bản chép: 1.136 dòng** (bỏ 15 bản chép và 7 phiếu giao hàng đi kèm; đo ngày 14-09), 1 tệp phân kim 15 dòng túi PC49, 1 tệp tồn đầu 7 dòng. Bảng tổng kết báo khoảng 10 ngày chuyển đổi không có khoá.
 
 - [ ] **Step 7: Cổng và commit**
 
@@ -879,7 +880,9 @@ for (const [code, qty] of Object.entries(CLOSING_JAN)) {
 }
 ```
 
-> Con số trên là **trọng lượng nguyên**; `INVENTORY_GRAM` so theo gram, nên phải quy đổi trước khi khai: RP ×37,5 · ML/CS/OTH/AE ×31,1 · SG/PT/GRAIN ×1. Quy đổi trong script, không gõ tay hai bộ số.
+> Con số trên là **trọng lượng nguyên**; `INVENTORY_GRAM` so theo gram, nên phải quy đổi trước khi khai: RP ×37,5 · ML/CS/OTH/AE ×31,105 · SG/PT/GRAIN ×1. Quy đổi trong script, không gõ tay hai bộ số.
+>
+> Sửa ngày 14-09: bản đầu ghi ×31,1. Đó là số chia khi **định giá**; khối lượng dùng 31,105, đúng như `uom_factor` và `src/lib/domain/units.ts`. `import_reconciliation` chỉ coi là khớp khi lệch dưới 0,005 g, nên quy đổi bằng 31,1 làm CS 25 oz lệch 0,125 g, ML 14 oz lệch 0,07 g, OTH 2 oz lệch 0,01 g — ba dòng đỏ không bao giờ khép, và bước 6 lại bảo đừng sửa con số kỳ vọng.
 
 - [ ] **Step 5: Nạp theo thứ tự bắt buộc**
 

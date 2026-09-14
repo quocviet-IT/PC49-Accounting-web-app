@@ -71,3 +71,7 @@ payments.png
 correct.png
 users.png
 phone-cash*.png
+
+# Bảng tính gốc của khách và CSV sinh ra từ chúng — dữ liệu thật, repo công khai
+import-raw/
+import-csv/
