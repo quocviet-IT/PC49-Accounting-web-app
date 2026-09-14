@@ -87,10 +87,29 @@ describe('flow rules from the Link sheet', () => {
     ).rejects.toThrow(/not a valid.*Scrap Gold|flow/i)
   })
 
-  it('refuses to receive Scrap Gold by transfer', async () => {
-    await expect(
-      addTxn({ type: 'TRANSFER_IN', gold: 'SG', uom: 'GRAM', qty: 10, amount: 0 }),
-    ).rejects.toThrow(/not a valid|flow/i)
+  // The Link sheet had no way for Rong Phung to leave by transfer, or for Scrap
+  // Gold to arrive by one. The 2026 workbooks do both: 10L VRP exchanged for
+  // 375 g of Grain, Grain turned back into Scrap Gold, MH's scrap taken for 12L
+  // VRP. On 14-09-2026 the rules were given the two flows (0067) rather than
+  // real exchanges being retyped as something they were not.
+  it('allows Scrap Gold to arrive by transfer, as Grain turned back into it', async () => {
+    const c = await db.query<{ id: string }>(
+      `INSERT INTO pc49.gold_conversion (conv_date, kind) VALUES ('2026-03-22', 'TRANSFER') RETURNING id`)
+    const r = await db.query<{ id: string }>(
+      `INSERT INTO pc49.gold_txn
+         (txn_date, txn_type, gold_type_code, uom, qty, amount, conversion_id)
+       VALUES ('2026-03-22', 'TRANSFER_IN', 'SG', 'GRAM', 14.1, 0, $1) RETURNING id`, [c.rows[0].id])
+    expect(r.rows[0].id).toBeTruthy()
+  })
+
+  it('allows Rong Phung to leave by transfer, as it is exchanged for Grain', async () => {
+    const c = await db.query<{ id: string }>(
+      `INSERT INTO pc49.gold_conversion (conv_date, kind) VALUES ('2026-02-14', 'TRANSFER') RETURNING id`)
+    const r = await db.query<{ id: string }>(
+      `INSERT INTO pc49.gold_txn
+         (txn_date, txn_type, gold_type_code, uom, qty, amount, conversion_id)
+       VALUES ('2026-02-14', 'TRANSFER_OUT', 'RP', 'LUONG', -10, 0, $1) RETURNING id`, [c.rows[0].id])
+    expect(r.rows[0].id).toBeTruthy()
   })
 
   // A transfer leg has to belong to a conversion, so these two go through one.

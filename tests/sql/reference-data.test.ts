@@ -129,12 +129,35 @@ describe('gold flow rules', () => {
     expect(r.rows.map((x) => x.txn_type)).toEqual(['SALE', 'TRANSFER_OUT'])
   })
 
-  it('lets Scrap Gold in only by purchase', async () => {
+  it('lets Scrap Gold in by purchase, or by transfer back from another gold', async () => {
+    // The Link sheet said purchase only. The 2026 workbooks turn Grain back into
+    // Scrap Gold and take MH's scrap in exchange for Rong Phung, so the transfer
+    // in was added on 14-09-2026 (0067).
     const r = await db.query<{ txn_type: string }>(
       `SELECT txn_type FROM pc49.gold_flow_rule
         WHERE gold_type_code = 'SG' AND direction = 'IN' ORDER BY txn_type`,
     )
-    expect(r.rows.map((x) => x.txn_type)).toEqual(['PO', 'PO_VENDOR'])
+    expect(r.rows.map((x) => x.txn_type)).toEqual(['PO', 'PO_VENDOR', 'TRANSFER_IN'])
+  })
+
+  it('lets Rong Phung out by transfer, but never to refining', async () => {
+    // 0052, 0058 and 0060 decide which gold may be picked into a refining lot by
+    // reading the TRANSFER_OUT rules noted "Phan kim". Rong Phung leaving in an
+    // exchange must not make it something that can be put in a bag.
+    const r = await db.query<{ note: string }>(
+      `SELECT note FROM pc49.gold_flow_rule
+        WHERE gold_type_code = 'RP' AND txn_type = 'TRANSFER_OUT'`,
+    )
+    expect(r.rows).toHaveLength(1)
+    expect(r.rows[0].note).not.toBe('Phan kim')
+  })
+
+  it('refines only Scrap Gold and Platinum', async () => {
+    const r = await db.query<{ code: string }>(
+      `SELECT gold_type_code AS code FROM pc49.gold_flow_rule
+        WHERE txn_type = 'TRANSFER_OUT' AND note = 'Phan kim' ORDER BY gold_type_code`,
+    )
+    expect(r.rows.map((x) => x.code)).toEqual(['PT', 'SG'])
   })
 
   it('lets seven gold types arrive by transfer from Grain', async () => {

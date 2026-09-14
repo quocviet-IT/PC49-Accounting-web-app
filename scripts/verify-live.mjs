@@ -32,8 +32,12 @@ await check('gold types seeded',
   `SELECT count(*)::int AS n FROM pc49.gold_type`, 9)
 await check('accounts seeded',
   `SELECT count(*)::int AS n FROM pc49.account`, 46)
+// 74 from the Link sheet, plus Rong Phung out by transfer and Scrap Gold in by
+// transfer, added on 14-09-2026 (0067). Until that migration is applied to the
+// live database this reads 74 and fails, alongside "every migration on disk is
+// applied" above.
 await check('flow rules seeded',
-  `SELECT count(*)::int AS n FROM pc49.gold_flow_rule`, 74)
+  `SELECT count(*)::int AS n FROM pc49.gold_flow_rule`, 76)
 await check('system parameters seeded',
   `SELECT count(*)::int AS n FROM pc49.system_param`, 6)
 await check('oz weight factor is 31.105',

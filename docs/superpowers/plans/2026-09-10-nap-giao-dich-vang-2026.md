@@ -17,6 +17,14 @@
 - Hai nhóm vàng vụn: `10-18k/grs` và `19-24k/grs`, suy từ `scrap_detail` bằng `pc49.scrap_band()` (0058). Không suy từ `gold_pct`.
 - Mọi mã lý do mới phải có câu tiếng Việt `imp.why.<MÃ>` và câu tiếng Anh tương ứng trong `src/lib/i18n/dictionary.ts`, nếu không màn hình hiện câu tiếng Anh thô.
 - Không chạy `vercel deploy`; anh Việt tự chạy.
+- **Quyết định ngày 14-09** (sau khi chạy thử trên PGlite):
+  - Thêm hai luồng vào `gold_flow_rule` (0067): Rồng Phụng chuyển ra (`TRANSFER_OUT`, ghi chú "Transfer" — không phải "Phan kim", vì ghi chú đó quyết định loại vàng nào được đưa vào lô phân kim) và vàng vụn chuyển vào (`TRANSFER_IN`, nguồn để trống). Sổ 2026 có 17 dòng như vậy, sáu ngày cân đúng gram; thiếu hai luồng thì commit cả tháng dừng ở trigger `gold_txn_check_flow`.
+  - Bỏ 15 dòng chép sang tab tháng sau (xem quy tắc 5 của Task 5), đã được xác nhận.
+  - Chờ đủ BC 201 và GENERAL REPORT rồi mới chạy Task 6 một lần.
+- **Chạy thử 14-09 trên PGlite, cả sáu tháng, sau 0066 và 0067**: tồn đầu 7/7; giao dịch 1.061 dòng vào sổ, 75 dòng bị trả lại kèm lý do (72 `NO_CONVERSION`, 2 `UNKNOWN_GOLD_TYPE`, 1 `MISSING_QTY`); ghi sổ chỉ hỏng 1 dòng (không có tiền thu). Đối chiếu 31/01 chỉ 9999 khớp, nhưng ML, OTH, PT, RP, SG lệch **đúng bằng** tổng các dòng tháng 1 bị trả lại (còn 0,000 g sau khi cộng). Hai chỗ chưa khép, phải hỏi kế toán trước Task 6:
+  - GRAIN dư đúng 1.009 g — bằng dòng PO(Vendor) Grain ngày 29/12/2025 nằm trong tab tháng 1. Nhiều khả năng đã có trong tồn đầu kỳ, tức là đang đếm hai lần.
+  - CS thiếu đúng 3 oz, chưa giải thích được; soát lại tồn đầu CS khi có GENERAL REPORT.
+  - Dòng 164 tháng 4 (23/04, Sale SG, giá 750, không có số lượng, tiền 0) bị trả lại `MISSING_QTY` — cần sửa trong sheet.
 
 ---
 
