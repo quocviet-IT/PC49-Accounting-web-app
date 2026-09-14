@@ -341,7 +341,7 @@ describe('a transfer says why it happened', () => {
     // như nó xảy ra: nhận cọc hôm nay, giao hàng hôm khác.
     const b = await batch()
     await stage(b, 2, { txn_date: '2026-01-10', txn_type: 'DEPOSIT',
-      gold_type_code: 'RP', uom: 'LUONG', qty: '1', amount: '0',
+      gold_type_code: 'RP', uom: 'LUONG', qty: '-1', amount: '0',
       partner_code: 'Kelvin Tran', payments: 'AR:CASH:2000', deposit_key: 'd-1' })
     await stage(b, 3, { txn_date: '2026-01-28', txn_type: 'PICKUP',
       gold_type_code: 'RP', uom: 'LUONG', qty: '-1', amount: '5310',
@@ -795,7 +795,9 @@ Expected: PASS 6/6.
 
 Ba quy tắc bộ phiên dịch tự làm, ghi rõ trong đầu tệp:
 
-1. **Dòng `Pickup` xuất ra hai dòng**: `DEPOSIT` (ngày của dòng, `qty` dương, tiền `Amount-1st`) rồi `PICKUP` (ngày ở cột `Pickup Date`, `qty` âm, tiền `Amount-2nd`), cùng `deposit_key`. Thứ tự đó là thứ tự bộ nạp cần.
+1. **Dòng `Pickup` xuất ra hai dòng**: `DEPOSIT` (ngày của dòng, `qty` **âm — cùng dấu với phiếu bán**, `amount` 0, thanh toán `Amount-1st`) rồi `PICKUP` (ngày ở cột `Pickup Date`, `qty` âm, `amount` là toàn bộ giá bán, thanh toán `Amount-2nd`), cùng `deposit_key`. Thứ tự đó là thứ tự bộ nạp cần.
+
+   > Sửa ngày 14-09: bản đầu ghi `qty` dương cho phiếu cọc. `record_inventory_movement` (0021) trừ `ON_HAND` theo `qty` có dấu và cộng `DEPOSIT_HELD` theo dấu ngược lại, nên `qty` dương làm kệ hàng *tăng* một lượng khi bán và ngăn giữ hộ âm hai lượng — tháng 1 riêng RP lệch +225 g trên bảng đối chiếu. Test `leaves the shelf one lượng lower…` trong `import-gold.test.ts` giữ cho điều này đúng.
 2. **`conv_key`**: gộp các dòng `Transfer` cùng ngày; chỉ đặt khoá khi tổng gram trong ngày cân bằng (sai số < 0,5 g) và ngày đó không phải là ngày gửi phân kim. Ngày lệch **không có khoá** — để bộ nạp trả lại.
 3. **`lot_code`**: dòng `Transfer` của `SG`/`PT` khớp ngày gửi của một lô trong `3.2 PC49 SCRAP GOLD` thì mang mã lô đó.
 4. **Kim loại của túi**: `Gold`→`GOLD`, `PT`→`PLATINUM`, và `PD`→`PLATINUM` kèm `source_desc` bắt đầu bằng `PD — ` để trên màn hình đọc ra ngay. Hệ thống chưa biết palladium; đây là quyết định đã chốt ngày 10-09, không phải chỗ tự ý đoán.

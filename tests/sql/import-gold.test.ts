@@ -158,7 +158,7 @@ describe('a transfer says why it happened', () => {
     // records it as it happened: money taken one day, gold handed over another.
     const b = await newBatch()
     await stage(b, 2, { txn_date: '2026-01-10', txn_type: 'DEPOSIT',
-      gold_type_code: 'RP', uom: 'LUONG', qty: '1', amount: '0',
+      gold_type_code: 'RP', uom: 'LUONG', qty: '-1', amount: '0',
       partner_code: 'Kelvin Tran', payments: 'AR:CASH:2000', deposit_key: 'd-1' })
     await stage(b, 3, { txn_date: '2026-01-28', txn_type: 'PICKUP',
       gold_type_code: 'RP', uom: 'LUONG', qty: '-1', amount: '5310',
@@ -172,6 +172,36 @@ describe('a transfer says why it happened', () => {
          JOIN pc49.gold_txn d ON d.id = rd.committed_ref
         WHERE rp.batch_id = $1 AND rp.row_no = 3`, [b])
     expect(r.rows[0].pick).toBe(r.rows[0].dep)
+  })
+
+  it('leaves the shelf one lượng lower and nothing held once the pickup is posted', async () => {
+    // A deposit sells on paper. record_inventory_movement (0021) moves the
+    // signed quantity on ON_HAND and the opposite into DEPOSIT_HELD, and the
+    // pickup takes it back out of DEPOSIT_HELD. That balances only if the
+    // deposit carries the sale sign. With a positive quantity the shelf gains
+    // the lượng it sold and the held bucket goes minus two — and the January
+    // reconciliation, which reads ON_HAND, would be out by 75 g for every
+    // Rồng Phụng collected.
+    await db.query(`INSERT INTO pc49.accounting_period (period, status)
+                    VALUES ('2026-01', 'OPEN') ON CONFLICT (period) DO NOTHING`)
+    const b = await newBatch()
+    await stage(b, 2, { txn_date: '2026-01-10', txn_type: 'DEPOSIT',
+      gold_type_code: 'RP', uom: 'LUONG', qty: '-1', amount: '0',
+      partner_code: 'Kelvin Tran', payments: 'AR:CASH:2000', deposit_key: 'd-2' })
+    await stage(b, 3, { txn_date: '2026-01-28', txn_type: 'PICKUP',
+      gold_type_code: 'RP', uom: 'LUONG', qty: '-1', amount: '5310',
+      partner_code: 'Kelvin Tran', payments: 'AR:CASH:3310', deposit_key: 'd-2' })
+    await commit(b)
+    expect((await db.query(`SELECT * FROM pc49.post_import_batch($1)`, [b])).rows).toEqual([])
+    const r = await db.query<{ bucket: string; g: string }>(
+      `SELECT m.bucket::text AS bucket, sum(m.qty_gram)::text AS g
+         FROM pc49.inventory_movement m
+         JOIN pc49.import_row i ON i.committed_ref = m.source_id
+        WHERE i.batch_id = $1
+        GROUP BY m.bucket`, [b])
+    const held = Object.fromEntries(r.rows.map((x) => [x.bucket, Number(x.g)]))
+    expect(held.ON_HAND).toBeCloseTo(-37.5, 2)
+    expect(held.DEPOSIT_HELD ?? 0).toBeCloseTo(0, 2)
   })
 })
 
