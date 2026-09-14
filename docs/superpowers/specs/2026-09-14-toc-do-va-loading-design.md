@@ -82,3 +82,36 @@ Test và kiểm tra:
 - Cache danh mục (loại vàng, sales, khách) và giảm JavaScript của antd — để sau, nếu sau phần này vẫn thấy chậm.
 - Mọi thay đổi về giao diện, màu nút, icon — phần 3.
 - Sổ giao dịch vàng lọc theo khoảng ngày — phần 2.
+
+## Kết quả sau khi deploy (14-09)
+
+Deploy commit `90d7b10`. Header trên Production: `X-Vercel-Id: hkg1::sin1::…` (ba lần gọi liên tiếp, cả ba đều `sin1`).
+
+`npm run probe:speed` trên Production, chạy khi máy đo không chạy việc gì khác, lượt tải thứ hai:
+
+| Màn hình | Byte đầu | Dựng xong (HTML) | Tới lúc im mạng | Trước khi sửa (HTML) |
+|---|---|---|---|---|
+| Tổng quan | 93 ms | 501 ms | 2.624 ms | 2.272 ms |
+| Giao dịch vàng | 93 ms | 775 ms | 2.163 ms | 1.992 ms |
+| Giá vàng | 93 ms | 396 ms | 2.133 ms | 2.203 ms |
+| Tồn kho | 93 ms | 450 ms | 2.269 ms | 2.428 ms |
+| Dòng tiền | 93 ms | 481 ms | 1.879 ms | 1.580 ms |
+| Sổ nhật ký | 93 ms | 414 ms | 1.850 ms | 1.832 ms |
+| Báo cáo | 94 ms | 391 ms | 1.813 ms | 1.451 ms |
+| Phân kim | 94 ms | 425 ms | 2.085 ms | 2.336 ms |
+| Nạp dữ liệu | 93 ms | 551 ms | 2.339 ms | 2.157 ms |
+| Danh mục | 94 ms | 537 ms | 1.647 ms | 1.710 ms |
+
+Đăng nhập tới trang chủ: 2.760 ms (trước: 11.314 ms). Kết luận của script: `SPEED TARGETS MET`.
+
+`npm run verify:loading` trên Production — từ lúc bấm tới khi khung chờ hoặc trang đích hiện:
+- "Báo lỗi": 195, 148, 91 ms;
+- "Tổng quan": 86, 103, 133 ms.
+
+Cả hai đạt. `verify:signin` và `verify:screens` trên Production đều đạt. Trên máy dev, `verify:signin`, `verify:screens`, `verify:grid` đạt, `verify:layout` đạt 85/85. Toàn bộ 654 test đạt.
+
+Hai điều ghi lại cho đúng:
+
+- Lần đo đầu, chạy song song với hai trình duyệt kiểm tra khác trên cùng máy, đăng nhập mất 4.444 ms và script báo `SPEED TARGETS NOT MET`; mọi màn hình khi đó vẫn dựng xong trong 384–665 ms. Con số trong bảng trên là lần chạy một mình.
+- Tách riêng đăng nhập trên trình duyệt mới (không cache), ba lượt: lượt đầu 8.683 ms, trong đó riêng `/login` mất 6.489 ms mới có DOM; hai lượt sau 2.476 ms và 2.655 ms. Lượt đầu sau deploy hay sau một lúc không ai dùng trả giá khởi động nguội của máy chủ Vercel. Phần này chưa sửa.
+- "Tới lúc im mạng" vẫn 1,6–2,6 giây. Phần lớn là JavaScript tải và chạy trên trình duyệt (antd), không phải máy chủ; đó là việc "giảm JavaScript" đã để ra ngoài phạm vi ở trên.
