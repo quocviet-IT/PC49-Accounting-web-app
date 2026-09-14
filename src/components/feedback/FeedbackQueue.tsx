@@ -146,24 +146,38 @@ export function FeedbackQueue({
   )
 }
 
-/** Moving one report on, with the reason a decline needs. */
+/**
+ * Moving one report on, with a note the reporter will read.
+ *
+ * The note goes with every status, not only a decline. "Fixed" on its own can
+ * say the wrong thing: the first blocking report said transactions typed in on
+ * two days were not there afterwards, and what got fixed was the form that let
+ * that happen. What its reporter needed to hear was that those two days had to
+ * be entered again, and there was nowhere to say it.
+ */
 function Triage({ id, status }: { id: string; status: string }) {
   const { t } = useLocale()
   const router = useRouter()
   const [next, setNext] = useState(status)
+  // Empty, not holding the note already sent. Notes run to a paragraph, and a
+  // one-line box showed the first few words of one; the note as the reporter
+  // reads it is under what they wrote. Moving the status without typing keeps it.
   const [note, setNote] = useState('')
+  // What this box last sent, so leaving it alone does not send it again.
+  const [saved, setSaved] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
-  function move(to: string) {
-    setNext(to)
+  function send(to: string) {
     setError(null)
-    // A decline needs a reason, and the database refuses without one — so the
-    // box appears and nothing is sent until it is filled.
-    if (to === 'DECLINED' && note.trim() === '') return
+    const said = note.trim()
+    // A decline needs a reason, and the database refuses without one — so
+    // nothing is sent until the box is filled.
+    if (to === 'DECLINED' && said === '') return
     startTransition(async () => {
-      const result = await triageReport({ id, status: to, note: note || null })
+      const result = await triageReport({ id, status: to, note: said || null })
       if (!result.ok) { setError(result.message); return }
+      if (said) setSaved(said)
       router.refresh()
     })
   }
@@ -174,21 +188,24 @@ function Triage({ id, status }: { id: string; status: string }) {
         aria-label={t('fb.state')}
         value={next}
         disabled={pending}
-        onChange={(e) => move(e.target.value)}
+        onChange={(e) => { setNext(e.target.value); send(e.target.value) }}
       >
         {STATUSES.map((s) => (
           <option key={s} value={s}>{t(`fb.status.${s}` as const)}</option>
         ))}
       </select>
-      {(next === 'DECLINED' || note !== '') && (
-        <input
-          aria-label={t('fb.note')}
-          placeholder={t('fb.note')}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          onBlur={() => { if (next === 'DECLINED' && note.trim()) move('DECLINED') }}
-        />
-      )}
+      <input
+        aria-label={t('fb.note')}
+        placeholder={t('fb.note')}
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        // An emptied box sends nothing. The database keeps a note it is given no
+        // replacement for, so clearing it here would only look like it worked.
+        onBlur={() => {
+          const said = note.trim()
+          if (said !== '' && said !== saved) send(next)
+        }}
+      />
       {error && <span className={styles.failed}>{error}</span>}
     </span>
   )

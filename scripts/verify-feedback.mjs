@@ -200,6 +200,35 @@ try {
   check('and with one, the reporter is told why',
     declined?.note === 'the 250 is a deposit, not a sale', declined?.note ?? '(never declined)')
 
+  // "Fixed" on its own can tell a reporter the wrong thing. The first real
+  // blocking report said transactions typed in on two days were not there
+  // afterwards. What got fixed was the form that let that happen; what the
+  // reporter needed to hear was that those two days had to be entered again.
+  // The box for saying so used to appear only for a decline.
+  const otherRow = ad.locator('tr').filter({ hasText: "somebody else's report" })
+  const otherId = other.rows[0].id
+  await otherRow.getByRole('combobox').selectOption('FIXED')
+  const fixed = await untilRowIs(db,
+    `SELECT status::text AS s FROM pc49.feedback_report WHERE id = $1`, [otherId],
+    (r) => r.s === 'FIXED')
+  check('a report can be marked fixed', fixed !== null, fixed?.s ?? '(never moved)')
+
+  const toldThem = 'fixed on 14/09; the two missing days need entering again'
+  const box = otherRow.getByRole('textbox')
+  const offered = (await box.count()) > 0
+  check('with a note for the reporter, not only when declining', offered)
+  if (offered) {
+    await box.fill(toldThem)
+    await box.blur()
+    const noted = await untilRowIs(db,
+      `SELECT status::text AS s, triage_note AS note FROM pc49.feedback_report WHERE id = $1`,
+      [otherId], (r) => r.note === toldThem)
+    check('and the note is kept, the report still fixed',
+      noted?.s === 'FIXED', noted ? `${noted.s} / ${noted.note}` : '(no note saved)')
+    check('where the reporter will read it',
+      await until(async () => ((await otherRow.textContent()) ?? '').includes(toldThem)))
+  }
+
   // And the database holds the same line, whoever reaches past the screen.
   let refused = false
   try {
@@ -224,9 +253,6 @@ try {
 
   await ad.screenshot({ path: 'feedback.png', fullPage: true })
   await adCtx.close()
-
-  // Referenced so the linter can see it is used, and to be tidy about it.
-  void other
 } finally {
   await browser.close()
   // The client's database is not a scratch pad.
