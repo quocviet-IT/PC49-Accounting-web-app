@@ -35,7 +35,9 @@
     "load:2026": "node --env-file=.env.local scripts/load-2026.mjs",
     "verify:payments": "node --env-file=.env.local scripts/verify-payments.mjs",
     "verify:correct": "node --env-file=.env.local scripts/verify-correct.mjs",
-    "verify:layout": "node --env-file=.env.local scripts/verify-layout.mjs"
+    "verify:layout": "node --env-file=.env.local scripts/verify-layout.mjs",
+    "probe:speed": "node --env-file=.env.local scripts/probe-speed.mjs",
+    "verify:loading": "node --env-file=.env.local scripts/verify-loading.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",
