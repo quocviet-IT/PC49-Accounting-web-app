@@ -2,9 +2,9 @@
 //
 //   node scripts/sheet-to-import.mjs
 //
-// Đọc  import-raw/dashboard.xlsx   (US_PC49 DASHBOARD 2026, tab PC49 Sale 01–06.2026)
+// Đọc  import-raw/dashboard.xlsx   (US_PC49 DASHBOARD 2026, mọi tab PC49 Sale MM.2026 có giao dịch)
 //      import-raw/scrap.xlsx       (US_Scrap Gold Report 2026, tab 1.Scrap Gold, PT Scrap)
-// Ghi  import-csv/01-gold-txn-2026-MM.csv   sáu tệp, mỗi tháng một lô nạp
+// Ghi  import-csv/01-gold-txn-2026-MM.csv   mỗi tháng có giao dịch một tệp, một lô nạp
 //      import-csv/03-opening-inventory.csv  tồn đầu 01/01/2026
 //
 // Cả hai thư mục nằm trong .gitignore: đây là dữ liệu thật của khách, và repo
@@ -41,7 +41,6 @@ import {
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const RAW = join(ROOT, 'import-raw')
 const OUT = join(ROOT, 'import-csv')
-const MONTHS = ['01', '02', '03', '04', '05', '06']
 
 function workbook(name) {
   const path = join(RAW, name)
@@ -82,7 +81,18 @@ for (const r of sg.rows.slice(4)) {
 }
 
 // ── Giao dịch, từng tháng ───────────────────────────────────────────────────
-const records = new Map(MONTHS.map((m) => [m, readTab(dashboard.get(`PC49 Sale ${m}.2026`))]))
+// Mọi tab tháng có ít nhất một dòng mang ngày, theo thứ tự tháng. Workbook dựng
+// sẵn đủ mười hai tab từ đầu năm, tab chưa tới tháng chỉ là khung trống (bản tải
+// ngày 10-09: tab 07–12 không có dòng nào). Cố định sáu tháng như bản đầu là cách
+// bỏ sót tháng 7 trở đi khi sheet đã có chúng — sheet đang dùng ngày 14-09 đã có
+// giao dịch tới 06/09.
+const records = new Map()
+for (const name of [...dashboard.keys()].sort()) {
+  const tab = /^PC49 Sale (\d{2})\.2026$/.exec(name)
+  if (!tab) continue
+  const list = readTab(dashboard.get(name))
+  if (list.length > 0) records.set(tab[1], list)
+}
 
 const dashSeen = new Map()
 for (const list of records.values()) {

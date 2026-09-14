@@ -25,6 +25,14 @@
   - GRAIN dư đúng 1.009 g — bằng dòng PO(Vendor) Grain ngày 29/12/2025 nằm trong tab tháng 1. Nhiều khả năng đã có trong tồn đầu kỳ, tức là đang đếm hai lần.
   - CS thiếu đúng 3 oz, chưa giải thích được; soát lại tồn đầu CS khi có GENERAL REPORT.
   - Dòng 164 tháng 4 (23/04, Sale SG, giá 750, không có số lượng, tiền 0) bị trả lại `MISSING_QTY` — cần sửa trong sheet.
+- **Quyết định chiều 14-09** (anh Việt chọn, khi hai tệp vẫn chưa về):
+  - Nạp giao dịch nhưng **chưa ghi sổ**: commit phần nhận được, không gọi `post_import_batch`. Giao dịch chưa ghi sổ không sinh bút toán, không sinh biến động kho (trigger `gold_txn_after_post` chỉ chạy khi có `journal_entry_id`), và `withdraw_import_batch` còn rút ra được. Khi đủ BC 201 và GENERAL REPORT thì rút, nạp lại, rồi mới ghi sổ. Tồn đầu và lô phân kim chưa nạp.
+  - Xoá demo (`npm run demo:clear`) trước khi nạp. Đã soát trên cơ sở dữ liệu thật ngày 14-09: nó chỉ chạm 62 giao dịch `DEMO-` cùng 62 bút toán của chúng, 11 dòng thu chi `DEMO` và 2 lô `DEMO-`; kỳ 07–08/2026 không có bút toán nào khác.
+  - Đường nạp là màn hình Nạp dữ liệu; bước này không cần `scripts/load-2026.mjs`. Màn hình `stage_import_row` từng dòng, nút "Ghi phần nhận được, bỏ lại dòng lỗi" là `commit_import_batch(batch, true)`, và không ghi sổ. Chữ "Ghi vào sổ" trên màn hình đó nghĩa là đưa giao dịch vào hệ thống, không phải sinh bút toán.
+  - Migration 0062–0067 **chưa lên cơ sở dữ liệu thật**: auto mode của Claude Code từ chối `npm run migrate` ("Production Deploy"). Anh Việt chạy.
+- **Chạy thử chiều 14-09, đúng đường màn hình** (PGlite, `parseRecords` của màn hình, không tồn đầu, không kỳ kế toán, commit phần nhận được): 1.136 dòng → **1.061 vào, 75 trả lại** — 72 `NO_CONVERSION` (35 trong số đó là vàng vụn/bạch kim gửi phân kim, chờ mã lô), 2 `UNKNOWN_GOLD_TYPE` ngày 11/05, 1 `MISSING_QTY` (dòng 164 tháng 4). Từng tháng vào/trả: T1 214/27, T2 181/0, T3 218/11, T4 200/16, T5 175/11, T6 73/10. Không dòng nào ghi sổ, không biến động kho; 991 dòng thanh toán, 26 phiên quy đổi, 601 khách, 15 sales. Số chứng từ: PC49-2512-001 (dòng PO(Vendor) Grain 29/12/2025), rồi PC49-2601-001 … PC49-2606-073. Commit không đòi kỳ kế toán.
+- **Sheet đang dùng mới hơn bản trong `import-raw/`.** Lúc 13:33 ngày 14-09 tab tháng 9 xuất thẳng từ sheet được tải lên màn hình Nạp dữ liệu, trong đó 42 dòng mang ngày 13/08–06/09/2026. `import-raw/dashboard.xlsx` (tải 10-09) dừng ở 10/06 và tab 07–12 trống. Bộ phiên dịch nay đọc mọi tab tháng có giao dịch: tải lại workbook trước khi nạp thì nạp một lần cho cả 01–09, khỏi phải rút tháng 6 ra nạp lại.
+  - Tab xuất thẳng từ sheet không nạp được qua màn hình: tiêu đề nằm ở hàng 3–4, nên CSV thô chỉ đọc ra hai cột và cả 1.003 dòng bị trả `MISSING_QTY`. Phải đi qua bộ phiên dịch.
 
 ---
 
@@ -859,6 +867,8 @@ await db.query(`DELETE FROM pc49.gold_txn WHERE doc_no IS NULL`)
 ```
 
 Expected: `gold_txn` còn 0 dòng, `import_batch` còn 0 dòng.
+
+> Sửa ngày 14-09: **đừng chạy câu xoá `doc_no IS NULL`** trên cơ sở dữ liệu thật. Ở đó có một giao dịch mua 1 oz ML ngày 29/08/2026, đã ghi sổ, không phải demo, chỉ là không có số chứng từ; câu xoá đó sẽ lấy mất nó. `import_batch` cũng còn một lô tab tháng 9 đã commit 0 dòng — để lại hay rút ra đều không đổi con số nào.
 
 - [ ] **Step 3: Dựng chỗ để đặt giao dịch**
 
