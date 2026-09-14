@@ -17,11 +17,34 @@ export type DataTableProps<RecordType extends object> = TableProps<RecordType> &
   fit?: boolean
 }
 
+/** The narrowest a column that declares no width may be drawn. */
+const ELASTIC_MIN_WIDTH = 120
+
+/**
+ * The narrowest a fitted table may be: every declared width, plus a floor for
+ * each column that declares none.
+ *
+ * Under a fixed layout the undeclared columns share whatever the declared ones
+ * leave, and nothing stopped that being nothing. On the transaction list eight
+ * declared columns came to 936px, so on a 1280px laptop the customer and remark
+ * columns got 33px each, and at 1024px none at all — the only two columns of
+ * prose on the screen, reduced to "Chi" and "v…".
+ */
+function minimumWidth<RecordType>(columns: TableProps<RecordType>['columns']): number {
+  return (columns ?? []).reduce<number>((sum, column) => {
+    if ('children' in column && column.children?.length) {
+      return sum + minimumWidth<RecordType>(column.children)
+    }
+    return sum + (typeof column.width === 'number' ? column.width : ELASTIC_MIN_WIDTH)
+  }, 0)
+}
+
 /**
  * The table every list on this screen set is drawn with.
  *
- * Held to its box by default: the columns that declare a width take it, the
- * ones that do not share what is left, and nothing scrolls sideways. The
+ * Held to its box by default: the columns that declare a width take it, and the
+ * ones that do not share what is left — down to a floor, below which the
+ * table's own frame scrolls instead of a column being squeezed away. The
  * hand-rolled table this replaces sized itself by its contents, so a day with
  * a long remark pushed the actions column off the right of the screen — you
  * could not press Huỷ on a row until you scrolled to find it.
@@ -50,12 +73,14 @@ export function DataTable<RecordType extends object>({
         {...props}
         size={size}
         tableLayout={props.tableLayout ?? (fit ? 'fixed' : undefined)}
-        // Under `fit` the row total IS the box, so there is nothing to scroll
-        // sideways and `scroll.x` must not be set — setting it is what makes
-        // every column shrink to its content and the table drift off the side.
+        // Under `fit` the table is given a number, never 'max-content'. rc-table
+        // turns a numeric x into `width: x; min-width: 100%` on the table and
+        // `overflow-x: auto` on its frame: a wide screen still fills the box, a
+        // narrow one scrolls the frame. 'max-content' is what made every column
+        // shrink to its content and the table drift off the side.
         scroll={
           fit
-            ? (scroll?.y === undefined ? undefined : { y: scroll.y })
+            ? { x: minimumWidth<RecordType>(props.columns), ...(scroll?.y === undefined ? {} : { y: scroll.y }) }
             : { x: 'max-content', ...scroll }
         }
         locale={{

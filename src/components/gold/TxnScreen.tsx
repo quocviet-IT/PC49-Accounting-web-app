@@ -179,7 +179,7 @@ export function TxnScreen({
         : (v ?? '—')),
     },
     {
-      title: t('txn.col.gold'), dataIndex: 'gold_type_code', width: 148,
+      title: t('txn.col.gold'), dataIndex: 'gold_type_code', width: 124,
       render: (v: string, r) => (
         <>
           <div>{goldName(v)}</div>
@@ -192,7 +192,7 @@ export function TxnScreen({
       ),
     },
     {
-      title: t('txn.col.qty'), dataIndex: 'qty', width: 112, align: 'right',
+      title: t('txn.col.qty'), dataIndex: 'qty', width: 104, align: 'right',
       render: (v: number, r) => (
         <>
           <div>{weight.format(v)}</div>
@@ -207,7 +207,7 @@ export function TxnScreen({
       ),
     },
     {
-      title: t('txn.col.price'), dataIndex: 'unit_price', width: 100, align: 'right',
+      title: t('txn.col.price'), dataIndex: 'unit_price', width: 92, align: 'right',
       render: (v: number | null) => (v === null ? '—' : money.format(v)),
     },
     {

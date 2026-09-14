@@ -33,7 +33,8 @@
     "demo": "node --env-file=.env.local scripts/demo-data.mjs",
     "demo:clear": "node --env-file=.env.local scripts/demo-data.mjs --clear",
     "verify:payments": "node --env-file=.env.local scripts/verify-payments.mjs",
-    "verify:correct": "node --env-file=.env.local scripts/verify-correct.mjs"
+    "verify:correct": "node --env-file=.env.local scripts/verify-correct.mjs",
+    "verify:layout": "node --env-file=.env.local scripts/verify-layout.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",

@@ -164,7 +164,10 @@ export function LotDetail({
       {error && <Alert type="error" showIcon closable title={error} onClose={() => setError(null)}
                        style={{ marginBottom: 16 }} />}
 
-      <Descriptions size="small" column={4} style={{ marginBottom: 20 }} items={[
+      {/* Four across only where four fit. A fixed four put "Spot /oz Gold" in an
+          80px cell on a phone, a word per line. */}
+      <Descriptions size="small" column={{ xs: 1, sm: 2, md: 2, lg: 4, xl: 4, xxl: 4 }}
+        style={{ marginBottom: 20 }} items={[
         { key: 'r', label: t('refining.refinery'), children: lot.refineryName ?? '—' },
         { key: 's', label: t('refining.sent'), children: lot.sentDate ?? '—' },
         { key: 'a', label: t('refining.assayed'), children: lot.assayDate ?? '—' },

@@ -48,15 +48,19 @@ const COLLAPSED_KEY = 'pc49.sidebar-collapsed'
 const STORAGE_EVENT = 'pc49:storage'
 
 /**
- * A flag kept in the browser, read the way React wants an external store read.
+ * A choice kept in the browser, or null when this browser has never made one.
  *
- * The server has no idea what this browser stored, so it renders the default
- * and the client corrects on hydration — `useSyncExternalStore` is what makes
- * that correction a single render rather than a cascade. The custom event is
- * because `storage` only fires in *other* tabs, and this one needs to hear its
- * own writes too.
+ * Read the way React wants an external store read. The server has no idea what
+ * this browser stored, so it renders "no choice" and the client corrects on
+ * hydration — `useSyncExternalStore` makes that correction a single render
+ * rather than a cascade. The custom event is because `storage` only fires in
+ * *other* tabs, and this one needs to hear its own writes too.
+ *
+ * Null matters: it is what lets a default depend on the screen while an explicit
+ * choice still wins. A flag that read a missing key as false could not tell
+ * "never touched the button" from "chose to keep the menu open".
  */
-function useStoredFlag(key: string): [boolean, (value: boolean) => void] {
+function useStoredChoice(key: string): [boolean | null, (value: boolean) => void] {
   const value = useSyncExternalStore(
     (onChange) => {
       const onCustom = (e: Event) => {
@@ -71,9 +75,12 @@ function useStoredFlag(key: string): [boolean, (value: boolean) => void] {
       }
     },
     () => {
-      try { return window.localStorage.getItem(key) === 'true' } catch { return false }
+      try {
+        const stored = window.localStorage.getItem(key)
+        return stored === null ? null : stored === 'true'
+      } catch { return null }
     },
-    () => false,
+    () => null,
   )
 
   const set = useCallback((next: boolean) => {
@@ -89,6 +96,30 @@ function useStoredFlag(key: string): [boolean, (value: boolean) => void] {
   return [value, set]
 }
 
+/** Whether a media query matches, assuming `onServer` before hydration. */
+function useMediaQuery(query: string, onServer: boolean): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const list = window.matchMedia(query)
+      list.addEventListener('change', onChange)
+      return () => list.removeEventListener('change', onChange)
+    },
+    () => window.matchMedia(query).matches,
+    () => onServer,
+  )
+}
+
+/**
+ * Wide enough to keep the menu's labels beside the working area.
+ *
+ * The transaction list needs 1,136px once no column is squeezed; with the menu
+ * open at 236px that fits from about 1,412px. On a 1280 or 1366 laptop the open
+ * menu used to leave the list either scrolling sideways or with its customer and
+ * remark columns squeezed to a few letters, so below this the menu starts
+ * folded to its icons — until somebody opens it, and then it stays open.
+ */
+const ROOMY = '(min-width: 1440px)'
+
 export function AppShell({
   role, email, children,
 }: { role: Role | null; email?: string; children: ReactNode }) {
@@ -97,7 +128,10 @@ export function AppShell({
   const router = useRouter()
   const screens = Grid.useBreakpoint()
   const isMobile = screens.lg === false
-  const [collapsed, setCollapsed] = useStoredFlag(COLLAPSED_KEY)
+  const roomy = useMediaQuery(ROOMY, true)
+  const [chosen, setCollapsed] = useStoredChoice(COLLAPSED_KEY)
+  // An explicit choice wins; otherwise the screen decides.
+  const collapsed = chosen ?? !roomy
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   const items = useMemo(() => navigationForRole(role), [role])

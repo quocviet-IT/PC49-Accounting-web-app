@@ -75,7 +75,7 @@ export function FeedbackQueue({
       <Section>
         {loadFailed ? <LoadFailed /> : rows.length === 0 ? <Empty /> : (
           <Frame>
-            <table className={ledger.table}>
+            <table className={`${ledger.table} ${styles.queueTable}`}>
               <colgroup>
                 <col style={{ width: '12%' }} /><col style={{ width: '19%' }} />
                 <col style={{ width: '32%' }} /><col style={{ width: '15%' }} />

@@ -183,3 +183,10 @@
   line-height: 1.45;
   color: var(--pc-money-negative);
 }
+
+/* The five columns are fractions of the table, and on a phone the table was
+   360px, so the account of what happened wrapped to a word per line. Below this
+   width the frame scrolls instead. max() keeps a wide screen filling its box. */
+table.queueTable {
+  min-width: max(100%, 760px);
+}

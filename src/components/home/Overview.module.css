@@ -29,6 +29,10 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--pc-space-2);
+  /* The stats row draws its dividers by letting its own grey show through a
+     1px gap, so anything in a cell that does not paint the whole cell shows a
+     grey patch. */
+  background: var(--pc-surface-card);
 }
 
 .failedText {
@@ -63,13 +67,20 @@
 /* A KPI that opens the page behind it. Underline only on hover, so a row of
    four does not read as a row of links first and figures second. */
 .kpiLink {
-  display: block;
+  /* A column, so the stat inside fills the cell. The link stretches to the
+     height of the tallest stat in the row but a block child does not follow
+     it, and the row's grey divider colour showed under every shorter card. */
+  display: flex;
+  flex-direction: column;
   color: inherit;
   text-decoration: none;
-  border-radius: var(--pc-radius-frame);
 }
 
-.kpiLink:hover { background: var(--pc-surface-subtle); }
+.kpiLink > * { flex: 1; }
+
+/* On the stat itself: it paints its own background, so a hover colour on the
+   link underneath it could never be seen. */
+.kpiLink:hover > * { background: var(--pc-surface-subtle); }
 
 .quick {
   display: flex;
@@ -102,12 +113,20 @@
 .columns {
   display: grid;
   gap: var(--pc-space-5);
-  grid-template-columns: 1fr;
+  /* minmax(0, …), not a bare 1fr. A bare fraction has an automatic minimum —
+     the min-content width of what is inside it — and the recent-transactions
+     table does not wrap, so its column grew past the window and squeezed the
+     attention list to a word per line (1024px), or pushed the whole page 361px
+     sideways on a phone. With a zero minimum the table's own frame scrolls. */
+  grid-template-columns: minmax(0, 1fr);
 }
 
-@media (min-width: 900px) {
+/* Side by side only where both halves have room. At 900px the recent
+   transactions got about 600px and scrolled inside their frame; stacked, the
+   table has the whole width and the waiting list reads as a list. */
+@media (min-width: 1200px) {
   .columns {
-    grid-template-columns: 1fr 2fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   }
 }
 

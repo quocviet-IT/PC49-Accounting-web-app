@@ -10,13 +10,15 @@
 
 .split {
   display: grid;
-  grid-template-columns: minmax(280px, 34%) 1fr;
+  /* A zero minimum on the editor side: a bare 1fr is at least as wide as the
+     line table inside it, which on a phone pushed the page 32px sideways. */
+  grid-template-columns: minmax(280px, 34%) minmax(0, 1fr);
   gap: 28px;
   align-items: start;
 }
 
 @media (max-width: 880px) {
-  .split { grid-template-columns: 1fr; }
+  .split { grid-template-columns: minmax(0, 1fr); }
 }
 
 .list {
@@ -73,6 +75,12 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+/* The line table scrolls inside its own strip when the screen is narrower than
+   its columns, instead of widening the page around it. */
+.lineScroll {
+  overflow-x: auto;
 }
 
 .lineGrid {

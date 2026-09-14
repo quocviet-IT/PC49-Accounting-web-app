@@ -159,6 +159,7 @@ export function ConversionView({
         <section className={styles.editor}>
           {!selected ? <p className={ledger.empty}>{t('conv.pick')}</p> : (
             <>
+              <div className={styles.lineScroll}>
               <table className={styles.lineGrid}>
                 <thead>
                   <tr>
@@ -223,6 +224,7 @@ export function ConversionView({
                   })}
                 </tbody>
               </table>
+              </div>
 
               {lines.filter(outOfBand).map((row) => (
                 <div key={`warn-${row.key}`} className={styles.warn}>
