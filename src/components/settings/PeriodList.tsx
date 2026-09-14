@@ -56,7 +56,7 @@ export function PeriodList({ rows, loadFailed = false }: {
   return (
     <Page titleKey="period.title" noteKey="period.note">
       <Section>
-        <Frame>
+        <Frame explore>
 <table className={ledger.table}>
             <colgroup>
               <col style={{ width: '16%' }} /><col style={{ width: '14%' }} />

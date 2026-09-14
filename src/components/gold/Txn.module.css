@@ -1,0 +1,109 @@
+.filters {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filterSelect {
+  width: 132px;
+}
+
+.filterSelectWide {
+  width: 164px;
+}
+
+.summaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+  margin: -8px 0 12px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section {
+  padding: 16px;
+  border: 1px solid var(--pc-border-default);
+  border-radius: 10px;
+  background: var(--pc-surface-card);
+}
+
+.sectionHeading {
+  margin: 0 0 14px;
+  color: var(--pc-text-heading);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.sectionDescription {
+  display: block;
+  margin: -8px 0 14px;
+  color: var(--pc-text-secondary);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.calculatedAmount {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -4px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--pc-surface-muted);
+  color: var(--pc-text-secondary);
+}
+
+.calculatedAmount strong {
+  color: var(--pc-text-heading);
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.paymentRow {
+  padding: 10px 10px 0;
+  border-radius: 8px;
+  background: var(--pc-surface-muted);
+}
+
+.formDate {
+  margin: 0;
+  text-align: right;
+}
+
+@media (max-width: 767px) {
+  .filterSelect,
+  .filterSelectWide {
+    width: min(100%, 180px);
+    flex: 1 1 140px;
+  }
+
+  .filters {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .summaryRow,
+  .calculatedAmount {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .section {
+    padding: 12px;
+  }
+
+  .formDate {
+    text-align: left;
+  }
+}

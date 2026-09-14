@@ -7,6 +7,8 @@ import type { ColumnsType } from 'antd/es/table'
 import { useLocale } from '@/lib/i18n/provider'
 import { money, weight } from '@/components/ledger/Ledger'
 import { DataTable } from '@/components/ui/DataTable'
+import { ListToolbar } from '@/components/ui/ListToolbar'
+import { matchesSearch } from '@/lib/ui/list'
 import { bagsFromPicked, pickPurchases, unpickPurchases } from '@/app/(app)/refining/actions'
 import type { BandTotal, Purchase } from './types'
 
@@ -33,6 +35,8 @@ export function PurchasePicker({
   const [dropping, setDropping] = useState<React.Key[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const filtered = available.filter((p) => matchesSearch(search, [p.docNo, p.txnDate, p.partnerCode, p.gradeBand, p.scrapDetail]))
 
   async function run(fn: () => Promise<{ ok: boolean; message?: string }>) {
     setBusy(true); setError(null)
@@ -82,7 +86,6 @@ export function PurchasePicker({
           rowKey="id"
           columns={columns}
           dataSource={picked}
-          pagination={false}
           emptyTitle={t('common.empty')}
           rowSelection={{ selectedRowKeys: dropping, onChange: setDropping }}
         />
@@ -115,11 +118,12 @@ export function PurchasePicker({
 
       <div>
         <Typography.Title level={5}>{t('refining.pick.title')} ({available.length})</Typography.Title>
+        <ListToolbar search={search} onSearch={(v) => { setSearch(v); setChosen([]) }} count={filtered.length} total={available.length} />
         <DataTable<Purchase>
           rowKey="id"
           columns={columns}
-          dataSource={available}
-          pagination={available.length > 50 ? { pageSize: 50 } : false}
+          key={search}
+          dataSource={filtered}
           emptyTitle={t('refining.pick.none')}
           rowSelection={{ selectedRowKeys: chosen, onChange: setChosen }}
         />

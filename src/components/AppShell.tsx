@@ -8,11 +8,13 @@ import {
   Avatar, Button, Drawer, Dropdown, Grid, Layout, Menu, Tooltip, Typography,
 } from 'antd'
 import {
-  BankOutlined, BarChartOutlined, DashboardOutlined, DollarOutlined, ExperimentOutlined,
-  GoldOutlined, LeftOutlined, LogoutOutlined, MenuOutlined, ReadOutlined, RightOutlined,
-  MessageOutlined, SettingOutlined, ShopOutlined, SwapOutlined, TableOutlined,
-  UserOutlined,
-} from '@ant-design/icons'
+  Landmark as BankOutlined, ChartNoAxesCombined as BarChartOutlined, LayoutDashboard as DashboardOutlined,
+  CircleDollarSign as DollarOutlined, FlaskConical as ExperimentOutlined, Gem as GoldOutlined,
+  ChevronLeft as LeftOutlined, LogOut as LogoutOutlined, Menu as MenuOutlined,
+  BookOpen as ReadOutlined, ChevronRight as RightOutlined, MessageCircle as MessageOutlined,
+  Settings2 as SettingOutlined, ArrowLeftRight as ShopOutlined, Repeat2 as SwapOutlined,
+  NotebookTabs as TableOutlined, UserRound as UserOutlined,
+} from 'lucide-react'
 import { createBrowserSupabase } from '@/lib/supabase/client'
 import type { Role } from '@/lib/auth/roles'
 import { findActiveGroup, findActivePage, isNavGroup, navigationForRole } from '@/lib/nav'
@@ -168,6 +170,7 @@ export function AppShell({
     <Menu
       aria-label={t('nav.primary')}
       className="pc-shell__nav"
+      key={`${activeGroup ?? 'root'}-${collapsed ? 'folded' : 'open'}`}
       theme="dark"
       mode="inline"
       inlineIndent={18}

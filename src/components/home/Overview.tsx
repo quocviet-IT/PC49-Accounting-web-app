@@ -8,6 +8,8 @@ import type { MessageKey } from '@/lib/i18n'
 import { Page, Stats, Stat, Section, Frame, money, weight } from '@/components/ledger/Ledger'
 import ledger from '@/components/ledger/Ledger.module.css'
 import type { DataState } from '@/lib/data/result'
+import type { DashboardTransactionSummary } from './dashboard-series'
+import { TransactionCharts } from './TransactionCharts'
 import styles from './Overview.module.css'
 
 export type AttentionItem = {
@@ -88,7 +90,8 @@ function StatState({
 
 export function Overview({
   inventoryValue, inventoryGram, cashTotal, openDeposits, atRefineryGram,
-  priceDate, asOf, period, attention, recent, links,
+  priceDate, asOf, period, attention, recent, activity, activityStart, activityEnd,
+  transactionAccess, links,
 }: {
   inventoryValue: DataState<number>
   inventoryGram: DataState<number>
@@ -100,6 +103,10 @@ export function Overview({
   period: string
   attention: AttentionItem[]
   recent: DataState<RecentRow[]>
+  activity: DataState<DashboardTransactionSummary>
+  activityStart: string
+  activityEnd: string
+  transactionAccess: boolean
   links: Links
 }) {
   const { t } = useLocale()
@@ -168,6 +175,15 @@ export function Overview({
         </div>
       )}
 
+      <Section titleKey="home.activity">
+        {transactionAccess ? (
+          <TransactionCharts activity={activity} start={activityStart} end={activityEnd}
+                             today={asOf} onRetry={retry} />
+        ) : (
+          <p className={ledger.note}>{t('home.activityRestricted')}</p>
+        )}
+      </Section>
+
       <div className={styles.columns}>
         {/* Attention comes first in the markup so a phone reads it before a
             list of ten rows it would otherwise have to scroll past. */}
@@ -193,7 +209,7 @@ export function Overview({
           )}
         </Section>
 
-        <Section titleKey="home.recent">
+        {transactionAccess && <Section titleKey="home.recent">
           {recent.state === 'error' ? (
             <div className={styles.failed}>
               <p className={styles.failedText}>{t('common.loadFailed')}</p>
@@ -241,7 +257,7 @@ export function Overview({
               </table>
             </Frame>
           )}
-        </Section>
+        </Section>}
       </div>
     </Page>
   )

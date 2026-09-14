@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Tabs } from 'antd'
 import { useRouter } from 'next/navigation'
 import { useLocale } from '@/lib/i18n/provider'
 import { Page, Section, ledger, Frame, LoadFailed } from '@/components/ledger/Ledger'
@@ -74,6 +75,12 @@ export function ReferenceView({
 
   return (
     <Page titleKey="ref.title" noteKey="ref.note">
+      {/* Every pane is rendered, open or not: one catalogue failing says so in
+          its own tab without hiding the ones that loaded, and antd otherwise
+          leaves a closed tab out of the page altogether. A catalogue that did
+          not arrive shows no count on its tab. */}
+      <Tabs className="pc-tabs" items={[
+      { key: 'params', label: t('ref.params'), forceRender: true, children:
       <Section titleKey="ref.params">
         {failed.params ? <LoadFailed /> : (
           <>
@@ -81,7 +88,7 @@ export function ReferenceView({
             are editable because the source treats them as settings, and shown
             with their description because 31.1 and 31.105 are one keystroke
             apart and mean different things. */}
-        <Frame>
+        <Frame explore>
 <table className={ledger.table}>
             <colgroup>
               <col style={{ width: '28%' }} /><col style={{ width: '16%' }} />
@@ -123,15 +130,16 @@ export function ReferenceView({
         )}
       </Section>
 
-      {/* The rest is shown, not edited. A gold type carries the accounts every
+      /* The rest is shown, not edited. A gold type carries the accounts every
           posting rule reaches for, and a cash account is referenced by the chart
           of accounts; changing either from a screen would break postings that
           already exist. Whoever needs to change one does it as a migration, in
-          the open, with the rest of the schema. */}
+          the open, with the rest of the schema. */
+      }, { key: 'gold', label: t('ref.goldTypes'), forceRender: true, children:
       <Section titleKey="ref.goldTypes">
         {failed.goldTypes ? <LoadFailed /> : (
           <>
-        <Frame>
+        <Frame explore>
 <table className={ledger.table}>
             <colgroup>
               <col style={{ width: '10%' }} /><col style={{ width: '26%' }} />
@@ -170,10 +178,11 @@ export function ReferenceView({
         )}
       </Section>
 
+      }, { key: 'cash', label: t('ref.cashAccounts'), forceRender: true, children:
       <Section titleKey="ref.cashAccounts">
         {failed.cashAccounts ? <LoadFailed /> : (
           <>
-        <Frame>
+        <Frame explore>
 <table className={ledger.table}>
             <colgroup>
               <col style={{ width: '14%' }} /><col style={{ width: '26%' }} />
@@ -206,10 +215,11 @@ export function ReferenceView({
         )}
       </Section>
 
+      }, { key: 'staff', label: t('ref.salesPeople'), forceRender: true, children:
       <Section titleKey="ref.salesPeople">
         {failed.salesPeople ? <LoadFailed /> : (
           <>
-        <Frame>
+        <Frame explore>
 <table className={ledger.table}>
             <colgroup>
               <col style={{ width: '20%' }} /><col style={{ width: '54%' }} />
@@ -241,10 +251,12 @@ export function ReferenceView({
         )}
       </Section>
 
+      }, { key: 'partners', forceRender: true,
+        label: failed.partners ? t('ref.partners') : `${t('ref.partners')} (${partners.length})`, children:
       <Section titleKey="ref.partners">
         {failed.partners ? <LoadFailed /> : (
           <>
-        <Frame>
+        <Frame explore>
           <table className={ledger.table}>
             <colgroup>
               <col style={{ width: '22%' }} /><col style={{ width: '38%' }} />
@@ -281,6 +293,7 @@ export function ReferenceView({
         )}
       </Section>
 
+      }]} />
       <p className={ledger.note}>{t('ref.chartNote')}: {accountCount}</p>
     </Page>
   )

@@ -235,6 +235,16 @@ describe('import: no rejected rows means the batch went in clean', async () => {
   it('while a clean batch that really loaded says nothing failed', () => {
     expect(text(render(<ImportView {...base} />))).not.toContain(FAILED)
   })
+
+  it('and a list of batches that did not arrive is not counted as none', () => {
+    // The sections sit in tabs now, and a tab label carries its count. "(0)"
+    // on a list the screen could not read is the same false statement as an
+    // empty table, only smaller.
+    const html = text(render(
+      <ImportView {...base} batches={[]} selected={null} loadFailed={{ batches: true }} />))
+    expect(html).toContain(FAILED)
+    expect(html).not.toMatch(/\(0\)/)
+  })
 })
 
 describe('bank conversion: the tolerance is a rule, not a default', async () => {
@@ -324,5 +334,12 @@ describe('reference: a catalogue answers for itself alone', async () => {
 
   it('and none failing shows no failure', () => {
     expect(text(render(<ReferenceView {...base} />))).not.toContain(FAILED)
+  })
+
+  it('and a customer list that did not arrive is not counted as none', () => {
+    const html = text(render(
+      <ReferenceView {...base} partners={[]} failed={{ partners: true }} />))
+    expect(html).toContain(FAILED)
+    expect(html).not.toMatch(/\(0\)/)
   })
 })

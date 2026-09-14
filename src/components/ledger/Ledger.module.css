@@ -24,6 +24,7 @@
   --out: var(--pc-money-negative);
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 /* Owned by PageHeader now. Kept so a screen that still renders its own heading
@@ -105,6 +106,9 @@
   white-space: nowrap;
   border-bottom: 1px solid var(--rule-strong);
 }
+
+.table th.num { text-align: right; }
+.table td { vertical-align: middle; }
 
 .table th:first-child { border-top-left-radius: 9px; }
 .table th:last-child { border-top-right-radius: 9px; }

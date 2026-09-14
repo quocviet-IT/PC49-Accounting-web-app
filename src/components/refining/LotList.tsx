@@ -2,7 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Alert, Button, Tag } from 'antd'
+import { Alert, Button, Select, Tag } from 'antd'
+import { Plus } from 'lucide-react'
+import { ListToolbar } from '@/components/ui/ListToolbar'
+import { matchesSearch } from '@/lib/ui/list'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocale } from '@/lib/i18n/provider'
 import { Page, LoadFailed, money, weight } from '@/components/ledger/Ledger'
@@ -23,6 +26,12 @@ export function LotList({ lots, loadFailed = false }: { lots: LotRow[]; loadFail
   const router = useRouter()
   const [opening, setOpening] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState<LotStatus | undefined>()
+  const [refinery, setRefinery] = useState<string | undefined>()
+  const filtered = lots.filter((r) => (!status || r.status === status)
+    && (!refinery || r.refineryName === refinery)
+    && matchesSearch(search, [r.lotCode, r.refineryName, r.sentDate, r.assayDate, r.receivedDate]))
 
   async function openLot() {
     setOpening(true)
@@ -75,15 +84,25 @@ export function LotList({ lots, loadFailed = false }: { lots: LotRow[]; loadFail
     <Page
       titleKey="refining.title"
       actions={
-        <Button type="primary" loading={opening} onClick={openLot}>{t('refining.newLot')}</Button>
+        <Button type="primary" icon={<Plus size={17} aria-hidden />} loading={opening} onClick={openLot}>{t('refining.newLot')}</Button>
       }
     >
       {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} />}
+      <ListToolbar search={search} onSearch={setSearch} count={filtered.length} total={lots.length}
+        onReset={search || status || refinery ? () => { setSearch(''); setStatus(undefined); setRefinery(undefined) } : undefined}>
+        <Select className="pc-filter-select" aria-label={t('refining.status')} placeholder={t('refining.status')}
+          allowClear value={status} onChange={setStatus} options={Object.keys(STATUS_COLOR).map((s) => ({
+            value: s, label: t(`refining.status.${s as LotStatus}`),
+          }))} />
+        <Select className="pc-filter-select" aria-label={t('refining.refinery')} placeholder={t('refining.refinery')}
+          allowClear value={refinery} onChange={setRefinery} options={[...new Set(lots.map((l) => l.refineryName).filter(Boolean))]
+            .map((value) => ({ value, label: value }))} />
+      </ListToolbar>
       <DataTable<LotRow>
         rowKey="id"
         columns={columns}
-        dataSource={lots}
-        pagination={lots.length > 25 ? { pageSize: 25 } : false}
+        key={`${search}-${status}-${refinery}`}
+        dataSource={filtered}
         onRow={(r) => ({ onClick: () => router.push(`/refining/${r.id}`), style: { cursor: 'pointer' } })}
       />
     </Page>

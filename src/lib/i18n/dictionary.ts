@@ -1,5 +1,14 @@
+import { goldUi } from './ui-gold'
+import { cashUi } from './ui-cash'
+import { homeUi } from './ui-home'
+import { commonUi } from './ui-common'
+
 export const dictionary = {
   vi: {
+    ...goldUi.vi,
+    ...cashUi.vi,
+    ...homeUi.vi,
+    ...commonUi.vi,
     'app.name': 'PC49',
     'nav.dashboard': 'Tổng quan',
     'nav.goldTxn': 'Giao dịch vàng',
@@ -620,6 +629,10 @@ export const dictionary = {
     'fb.openShot': 'Xem ảnh',
   },
   en: {
+    ...goldUi.en,
+    ...cashUi.en,
+    ...homeUi.en,
+    ...commonUi.en,
     'app.name': 'PC49',
     'nav.dashboard': 'Dashboard',
     'nav.goldTxn': 'Gold Transactions',

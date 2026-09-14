@@ -1,337 +1,321 @@
 'use client'
 
+import { useMemo, useState } from 'react'
+import { Select, Table, Tabs, type TableColumnsType } from 'antd'
 import { useLocale } from '@/lib/i18n/provider'
-import {
-  Page, Section, Empty, Signed, money, ledger, Frame, LoadFailed, Body,
-} from '@/components/ledger/Ledger'
+import { matchesSearch } from '@/lib/ui/list'
+import { Page, Section, Empty, Signed, money, ledger, LoadFailed, Body } from '@/components/ledger/Ledger'
+import { DataTable } from '@/components/ui/DataTable'
+import { ListToolbar } from '@/components/ui/ListToolbar'
 import { StatementImport } from './StatementImport'
 import { Reconcile } from './Reconcile'
+import styles from './CashView.module.css'
 
-/** One movement of money in the month being read. */
 export type CashTxnRow = {
-  id: string
-  date: string
-  account: string
-  direction: 'IN' | 'OUT'
-  amount: number
-  description: string | null
-  /** The accountant's own note: "Mua khach", "Phi ngan hang", "Luong". */
-  note: string | null
-  source: string
+  id: string; date: string; account: string; direction: 'IN' | 'OUT'
+  amount: number; description: string | null; note: string | null; source: string
 }
-
-/** A statement line the importer could not place against any account. */
 export type QueueRow = {
-  id: string
-  date: string | null
-  accountNo: string | null
-  accountName: string | null
-  amount: number | null
-  description: string | null
-  reason: string
+  id: string; date: string | null; accountNo: string | null
+  accountName: string | null; amount: number | null
+  description: string | null; reason: string
 }
-
-/** One account squared against what the other book says it closed at. */
 export type ReconRow = {
-  account: string
-  date: string
-  ours: number
-  theirs: number
-  difference: number
-  status: string
-  reason: string | null
+  account: string; date: string; ours: number; theirs: number
+  difference: number; status: string; reason: string | null
+}
+export type LoanRow = { counterparty: string; outstanding: number }
+export type AccountRow = {
+  code: string; displayName: string; isClearing: boolean
+  opening: number; received: number; paid: number; closing: number
+}
+export type ReconciliationViewRow = {
+  account: string; accountName: string; ours: number
+  reconciliation: ReconRow | null
 }
 
-/** What one counterparty still owes the group, or is owed by it. */
-export type LoanRow = { counterparty: string; outstanding: number }
+export function filterCashMovements(
+  rows: CashTxnRow[], query: string, account: string | null,
+  direction: CashTxnRow['direction'] | null,
+) {
+  return rows.filter((row) => (!account || row.account === account)
+    && (!direction || row.direction === direction)
+    && matchesSearch(query, [row.date, row.account, row.description, row.note, row.source]))
+}
 
-export type AccountRow = {
-  code: string
-  displayName: string
-  isClearing: boolean
-  opening: number
-  received: number
-  paid: number
-  closing: number
+export function filterReconciliations(
+  rows: ReconciliationViewRow[], query: string, status: string | null,
+) {
+  return rows.filter((row) => {
+    const actualStatus = row.reconciliation?.status ?? 'pending'
+    return (!status || actualStatus === status) && matchesSearch(query, [row.account, row.accountName])
+  })
 }
 
 export function CashView({
   period, rows, unmatched, movements, unplaced, recon, loans, monthEnd,
   balancesFailed = false, mayWrite = false, failed = {},
 }: {
-  period: string
-  rows: AccountRow[]
-  /** The balances query failed, so no figure here is known. */
-  balancesFailed?: boolean
-  /**
-   * Which of the other reads did not arrive. Each section says so for itself:
-   * the balances loading while the movements did not is a real outcome, and
-   * showing a closing figure above an empty list of transactions would be the
-   * screen contradicting itself.
-   */
+  period: string; rows: AccountRow[]; balancesFailed?: boolean
   failed?: { movements?: boolean; queue?: boolean; recon?: boolean; loans?: boolean }
-  /**
-   * Whether this reader may change the cash book, not merely read it. The
-   * database has always refused the rest; this stops them being offered.
-   */
-  mayWrite?: boolean
-  unmatched: number
-  movements: CashTxnRow[]
-  unplaced: QueueRow[]
-  recon: ReconRow[]
-  loans: LoanRow[]
-  monthEnd: string
+  mayWrite?: boolean; unmatched: number; movements: CashTxnRow[]; unplaced: QueueRow[]
+  recon: ReconRow[]; loans: LoanRow[]; monthEnd: string
 }) {
   const { t } = useLocale()
-  const real = rows.filter((r) => !r.isClearing)
-  const clearing = rows.filter((r) => r.isClearing)
-  const totalClosing = real.reduce((s, r) => s + r.closing, 0)
-
-  const body = (list: AccountRow[]) => list.map((r) => (
-    <tr key={r.code} className={r.isClearing ? ledger.aside : undefined}>
-      <td>{r.displayName}</td>
-      <td className={ledger.num}>{money.format(r.opening)}</td>
-      <td className={ledger.num}><Signed value={r.received} /></td>
-      <td className={ledger.num}><Signed value={-r.paid} /></td>
-      <td className={ledger.num}><Signed value={r.closing} /></td>
-    </tr>
-  ))
-
-  // The clearing table repeats the same columns, so it is laid out to the same
-  // widths: two tables of figures that do not line up are two tables nobody can
-  // compare.
-  const columns = (
-    <colgroup>
-      <col style={{ width: '34%' }} />
-      <col style={{ width: '16%' }} />
-      <col style={{ width: '16%' }} />
-      <col style={{ width: '16%' }} />
-      <col style={{ width: '18%' }} />
-    </colgroup>
+  const [movementSearch, setMovementSearch] = useState('')
+  const [movementAccount, setMovementAccount] = useState<string | null>(null)
+  const [movementDirection, setMovementDirection] = useState<CashTxnRow['direction'] | null>(null)
+  const [queueSearch, setQueueSearch] = useState('')
+  const [reconSearch, setReconSearch] = useState('')
+  const [reconStatus, setReconStatus] = useState<string | null>(null)
+  const [loanSearch, setLoanSearch] = useState('')
+  const real = rows.filter((row) => !row.isClearing)
+  const clearing = rows.filter((row) => row.isClearing)
+  const totalClosing = real.reduce((sum, row) => sum + row.closing, 0)
+  const accountOptions = useMemo(
+    () => [...new Set(movements.map((row) => row.account))]
+      .sort().map((value) => ({ value, label: value })),
+    [movements],
   )
+  const filteredMovements = filterCashMovements(movements, movementSearch, movementAccount, movementDirection)
+  const filteredQueue = unplaced.filter((row) => matchesSearch(queueSearch, [row.date, row.accountNo, row.accountName, row.description, row.reason]))
+  const reconciliationRows: ReconciliationViewRow[] = real.map((account) => {
+    const reconciliation = recon.find((row) => row.account === account.code) ?? null
+    return { account: account.code, accountName: account.displayName,
+      ours: reconciliation?.ours ?? account.closing, reconciliation }
+  })
+  const filteredRecon = filterReconciliations(reconciliationRows, reconSearch, reconStatus)
+  const filteredLoans = loans.filter((row) => matchesSearch(loanSearch, [row.counterparty]))
 
-  const header = (
-    <thead>
-      <tr>
-        <th>{t('cash.account')}</th>
-        <th className={ledger.num}>{t('cash.opening')}</th>
-        <th className={ledger.num}>{t('cash.received')}</th>
-        <th className={ledger.num}>{t('cash.paid')}</th>
-        <th className={ledger.num}>{t('cash.closing')}</th>
-      </tr>
-    </thead>
-  )
+  const accountColumns: TableColumnsType<AccountRow> = [
+    { title: t('cash.account'), dataIndex: 'displayName', width: 240 },
+    { title: t('cash.opening'), dataIndex: 'opening', width: 150, align: 'right',
+      render: (value: number) => money.format(value) },
+    { title: t('cash.received'), dataIndex: 'received', width: 150, align: 'right',
+      render: (value: number) => <Signed value={value} /> },
+    { title: t('cash.paid'), dataIndex: 'paid', width: 150, align: 'right',
+      render: (value: number) => <Signed value={-value} /> },
+    { title: t('cash.closing'), dataIndex: 'closing', width: 160, align: 'right',
+      render: (value: number) => <Signed value={value} /> },
+  ]
+  const movementColumns: TableColumnsType<CashTxnRow> = [
+    { title: t('cash.date'), dataIndex: 'date', width: 120 },
+    { title: t('cash.account'), dataIndex: 'account', width: 150 },
+    { title: t('cash.amount'), dataIndex: 'amount', width: 150, align: 'right',
+      render: (value: number, row) => (
+        <Signed value={row.direction === 'IN' ? value : -value} />
+      ) },
+    { title: t('cash.description'), dataIndex: 'description', width: 280,
+      render: (value: string | null) => value ?? '—' },
+    { title: t('cash.note'), dataIndex: 'note', width: 190,
+      render: (value: string | null) => (
+        <span className={ledger.muted}>{value ?? '—'}</span>
+      ) },
+  ]
+  const queueColumns: TableColumnsType<QueueRow> = [
+    { title: t('cash.date'), dataIndex: 'date', width: 120,
+      render: (value: string | null) => value ?? '—' },
+    { title: t('cash.rawAccount'), key: 'account', width: 220,
+      render: (_, row) => (
+        [row.accountNo, row.accountName].filter(Boolean).join(' · ') || '—'
+      ) },
+    { title: t('cash.amount'), dataIndex: 'amount', width: 140, align: 'right',
+      render: (value: number | null) => value === null ? '—' : money.format(value) },
+    { title: t('cash.description'), dataIndex: 'description', width: 260,
+      render: (value: string | null) => value ?? '—' },
+    { title: t('imp.reason'), dataIndex: 'reason', width: 220,
+      render: (value: string) => <span className={ledger.out}>{value}</span> },
+  ]
+  const reconColumns: TableColumnsType<ReconciliationViewRow> = [
+    { title: t('cash.account'), dataIndex: 'accountName', width: 220 },
+    { title: t('cash.ourClosing'), dataIndex: 'ours', width: 150, align: 'right',
+      render: (value: number) => money.format(value) },
+    { title: t('cash.theirClosing'), key: 'theirs', width: 150, align: 'right',
+      render: (_, row) => row.reconciliation
+        ? money.format(row.reconciliation.theirs) : '—' },
+    { title: t('cash.difference'), key: 'difference', width: 150, align: 'right',
+      render: (_, row) => (
+        <span className={!row.reconciliation || row.reconciliation.difference === 0
+          ? ledger.muted : ledger.out}>
+          {row.reconciliation ? money.format(row.reconciliation.difference) : '—'}
+        </span>
+      ) },
+    { title: t('cash.recStatus'), key: 'status', width: 280,
+      render: (_, row) => row.reconciliation ? (
+        <>
+          <span className={ledger.badge}>
+            {t(`cash.rec.${row.reconciliation.status}` as never)}
+          </span>
+          {row.reconciliation.reason && (
+            <span className={ledger.muted}> {row.reconciliation.reason}</span>
+          )}
+        </>
+      ) : mayWrite ? (
+        <Reconcile accountCode={row.account} accountName={row.accountName}
+          ourClosing={row.ours} recDate={monthEnd} />
+      ) : <span className={ledger.muted}>—</span> },
+  ]
+  const loanColumns: TableColumnsType<LoanRow> = [
+    { title: t('rep.partner'), dataIndex: 'counterparty' },
+    { title: t('cash.outstanding'), dataIndex: 'outstanding', width: 220,
+      align: 'right', render: (value: number) => <Signed value={value} /> },
+  ]
 
   if (balancesFailed) {
-    return (
-      <Page titleKey="cash.title">
-        <Section><LoadFailed /></Section>
-      </Page>
-    )
+    return <Page titleKey="cash.title"><Section><LoadFailed /></Section></Page>
   }
+
+  const overview = (
+    <div className={styles.panel}>
+      <p className={styles.context}>
+        {t('common.period')}: <strong>{period}</strong>
+      </p>
+      {real.length === 0 ? <Empty /> : (
+        <DataTable<AccountRow>
+          rowKey="code"
+          columns={accountColumns}
+          dataSource={real}
+          pagination={false}
+          summary={() => (
+            <Table.Summary.Row>
+              <Table.Summary.Cell index={0}>{t('common.total')}</Table.Summary.Cell>
+              <Table.Summary.Cell index={1} colSpan={3} />
+              <Table.Summary.Cell index={4} align="right">
+                <Signed value={totalClosing} />
+              </Table.Summary.Cell>
+            </Table.Summary.Row>
+          )}
+        />
+      )}
+      {clearing.length > 0 && (
+        <div className={styles.subpanel}>
+          <h2 className={ledger.sectionTitle}>{t('cash.clearing')}</h2>
+          <p className={ledger.note}>{t('cash.clearingNote')}</p>
+          <DataTable<AccountRow>
+            rowKey="code"
+            columns={accountColumns}
+            dataSource={clearing}
+            pagination={false}
+            rowClassName={() => ledger.aside}
+          />
+        </div>
+      )}
+    </div>
+  )
+
+  const movementPanel = (
+    <div className={styles.panel}>
+      <ListToolbar
+        search={movementSearch}
+        onSearch={setMovementSearch}
+        placeholder={t('cash.searchMovements')}
+        count={filteredMovements.length}
+        total={movements.length}
+        onReset={movementSearch || movementAccount || movementDirection ? () => {
+          setMovementSearch('')
+          setMovementAccount(null)
+          setMovementDirection(null)
+        } : undefined}
+      >
+        <Select className="pc-filter-select" allowClear
+          aria-label={t('cash.filterAccount')} placeholder={t('cash.filterAccount')}
+          value={movementAccount} options={accountOptions} onChange={setMovementAccount} />
+        <Select className="pc-filter-select" allowClear
+          aria-label={t('cash.filterDirection')} placeholder={t('cash.filterDirection')}
+          value={movementDirection} onChange={setMovementDirection}
+          options={[
+            { value: 'IN', label: t('cash.direction.in') },
+            { value: 'OUT', label: t('cash.direction.out') },
+          ]} />
+      </ListToolbar>
+      <Body failed={failed.movements} empty={movements.length === 0}>
+        <DataTable<CashTxnRow> rowKey="id" columns={movementColumns}
+          dataSource={filteredMovements} emptyDescription={t('cash.noFilterResults')} />
+      </Body>
+    </div>
+  )
+
+  const clearingPanel = (
+    <div className={styles.panel}>
+      {mayWrite && <StatementImport />}
+      {(unmatched > 0 || unplaced.length > 0 || failed.queue) && (
+        <Section titleKey="cash.unmatched">
+          <p className={ledger.note}>{t('cash.unmatchedNote')}</p>
+          <ListToolbar search={queueSearch} onSearch={setQueueSearch}
+            placeholder={t('cash.searchQueue')} count={filteredQueue.length}
+            total={unplaced.length}
+            onReset={queueSearch ? () => setQueueSearch('') : undefined} />
+          <Body failed={failed.queue} empty={unplaced.length === 0}>
+            <DataTable<QueueRow> rowKey="id" columns={queueColumns}
+              dataSource={filteredQueue} emptyDescription={t('cash.noFilterResults')} />
+          </Body>
+        </Section>
+      )}
+      <Section titleKey="cash.reconciliation">
+        <p className={ledger.note}>{t('cash.reconciliationNote')}</p>
+        <ListToolbar search={reconSearch} onSearch={setReconSearch}
+          placeholder={t('cash.searchAccounts')} count={filteredRecon.length}
+          total={reconciliationRows.length}
+          onReset={reconSearch || reconStatus ? () => {
+            setReconSearch('')
+            setReconStatus(null)
+          } : undefined}
+        >
+          <Select className="pc-filter-select" allowClear
+            aria-label={t('cash.filterStatus')} placeholder={t('cash.filterStatus')}
+            value={reconStatus} onChange={setReconStatus}
+            options={[
+              { value: 'pending', label: t('cash.rec.pending') },
+              { value: 'MATCHED', label: t('cash.rec.MATCHED') },
+              { value: 'DIFF_EXPLAINED', label: t('cash.rec.DIFF_EXPLAINED') },
+              { value: 'NOT_FOUND', label: t('cash.rec.NOT_FOUND') },
+              { value: 'PENDING', label: t('cash.rec.PENDING') },
+            ]} />
+        </ListToolbar>
+        {failed.recon ? <LoadFailed /> : (
+          <DataTable<ReconciliationViewRow> rowKey="account" columns={reconColumns}
+            dataSource={filteredRecon} emptyDescription={t('cash.noFilterResults')} />
+        )}
+      </Section>
+    </div>
+  )
+
+  const loansPanel = (
+    <div className={styles.panel}>
+      <Section titleKey="cash.loans">
+        <p className={ledger.note}>{t('cash.loansNote')}</p>
+        <ListToolbar search={loanSearch} onSearch={setLoanSearch}
+          placeholder={t('cash.searchLoans')} count={filteredLoans.length}
+          total={loans.length}
+          onReset={loanSearch ? () => setLoanSearch('') : undefined} />
+        <Body failed={failed.loans} empty={loans.length === 0}>
+          <DataTable<LoanRow> rowKey="counterparty" columns={loanColumns}
+            dataSource={filteredLoans} emptyDescription={t('cash.noFilterResults')} />
+        </Body>
+      </Section>
+    </div>
+  )
 
   return (
     <Page titleKey="cash.title">
-      {mayWrite && <StatementImport />}
-      <Section>
-        <p className={ledger.note}>{t('common.period')}: {period}</p>
-        {rows.length === 0 ? <Empty /> : (
-          <Frame>
-<table className={ledger.table}>
-              {columns}
-              {header}
-              <tbody>{body(real)}</tbody>
-              <tfoot>
-                <tr>
-                  <td>{t('common.total')}</td>
-                  <td colSpan={3} />
-                  <td className={ledger.num}><Signed value={totalClosing} /></td>
-                </tr>
-              </tfoot>
-            </table>
-          </Frame>
-        )}
-      </Section>
-
-      {clearing.length > 0 && (
-        <Section titleKey="cash.clearing">
-          <p className={ledger.note}>{t('cash.clearingNote')}</p>
-          <Frame>
-<table className={ledger.table}>
-              {columns}
-              {header}
-              <tbody>{body(clearing)}</tbody>
-            </table>
-          </Frame>
-        </Section>
-      )}
-
-      {(unmatched > 0 || unplaced.length > 0 || failed.queue) && (
-        <Section titleKey="cash.unmatched">
-          {/* A count alone is not actionable. What the line said, and why it
-              could not be placed, is what somebody needs to fix it. */}
-          <p className={ledger.note}>{t('cash.unmatchedNote')}</p>
-          <Body failed={failed.queue} empty={unplaced.length === 0}>
-          <Frame>
-            <table className={ledger.table}>
-              <colgroup>
-                <col style={{ width: '13%' }} /><col style={{ width: '20%' }} />
-                <col style={{ width: '14%' }} /><col style={{ width: '28%' }} />
-                <col style={{ width: '25%' }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>{t('cash.date')}</th>
-                  <th>{t('cash.rawAccount')}</th>
-                  <th className={ledger.num}>{t('cash.amount')}</th>
-                  <th>{t('cash.description')}</th>
-                  <th>{t('imp.reason')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {unplaced.map((q) => (
-                  <tr key={q.id}>
-                    <td>{q.date ?? '—'}</td>
-                    <td>{[q.accountNo, q.accountName].filter(Boolean).join(' · ') || '—'}</td>
-                    <td className={ledger.num}>
-                      {q.amount === null ? '—' : money.format(q.amount)}
-                    </td>
-                    <td>{q.description ?? '—'}</td>
-                    <td className={ledger.out}>{q.reason}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Frame>
-          </Body>
-        </Section>
-      )}
-
-      <Section titleKey="cash.reconciliation">
-        <p className={ledger.note}>{t('cash.reconciliationNote')}</p>
-        {failed.recon ? <LoadFailed /> : (
-        <Frame>
-          <table className={ledger.table}>
-            <colgroup>
-              <col style={{ width: '24%' }} /><col style={{ width: '15%' }} />
-              <col style={{ width: '15%' }} /><col style={{ width: '15%' }} />
-              <col style={{ width: '31%' }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>{t('cash.account')}</th>
-                <th className={ledger.num}>{t('cash.ourClosing')}</th>
-                <th className={ledger.num}>{t('cash.theirClosing')}</th>
-                <th className={ledger.num}>{t('cash.difference')}</th>
-                <th>{t('cash.recStatus')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {real.map((a) => {
-                const r = recon.find((x) => x.account === a.code)
-                return (
-                  <tr key={a.code}>
-                    <td>{a.displayName}</td>
-                    <td className={ledger.num}>{money.format(r ? r.ours : a.closing)}</td>
-                    <td className={ledger.num}>{r ? money.format(r.theirs) : '—'}</td>
-                    {/* A difference of nothing is the answer everyone wants, so
-                        it reads quiet rather than green. */}
-                    <td className={`${ledger.num} ${
-                      !r ? ledger.muted : r.difference === 0 ? ledger.muted : ledger.out}`}>
-                      {r ? money.format(r.difference) : '—'}
-                    </td>
-                    <td>
-                      {r ? (
-                        <>
-                          <span className={ledger.badge}>{t(`cash.rec.${r.status}` as never)}</span>
-                          {r.reason && <span className={ledger.muted}> {r.reason}</span>}
-                        </>
-                      ) : mayWrite ? (
-                        <Reconcile
-                          accountCode={a.code}
-                          accountName={a.displayName}
-                          ourClosing={a.closing}
-                          recDate={monthEnd}
-                        />
-                      ) : (
-                        // Not reconciled, and not this reader's to reconcile.
-                        // A dash says so; a button that refuses does not.
-                        <span className={ledger.muted}>—</span>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </Frame>
-        )}
-      </Section>
-
-      {(loans.length > 0 || failed.loans) && (
-        <Section titleKey="cash.loans">
-          <p className={ledger.note}>{t('cash.loansNote')}</p>
-          <Body failed={failed.loans} empty={loans.length === 0}>
-          <Frame>
-            <table className={ledger.table}>
-              <colgroup><col style={{ width: '60%' }} /><col style={{ width: '40%' }} /></colgroup>
-              <thead>
-                <tr>
-                  <th>{t('rep.partner')}</th>
-                  <th className={ledger.num}>{t('cash.outstanding')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loans.map((l) => (
-                  <tr key={l.counterparty}>
-                    <td>{l.counterparty}</td>
-                    <td className={ledger.num}><Signed value={l.outstanding} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Frame>
-          </Body>
-        </Section>
-      )}
-
-      <Section titleKey="cash.movements">
-        <Body failed={failed.movements} empty={movements.length === 0}>
-          <Frame>
-            <table className={ledger.table}>
-              <colgroup>
-                <col style={{ width: '12%' }} /><col style={{ width: '16%' }} />
-                <col style={{ width: '15%' }} /><col style={{ width: '38%' }} />
-                <col style={{ width: '19%' }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>{t('cash.date')}</th>
-                  <th>{t('cash.account')}</th>
-                  <th className={ledger.num}>{t('cash.amount')}</th>
-                  <th>{t('cash.description')}</th>
-                  <th>{t('cash.note')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {movements.map((m) => (
-                  <tr key={m.id}>
-                    <td>{m.date}</td>
-                    <td>{m.account}</td>
-                    {/* Direction carries the sign, so the figure reads the way
-                        it moved rather than the way the bank wrote it. */}
-                    <td className={ledger.num}>
-                      <Signed value={m.direction === 'IN' ? m.amount : -m.amount} />
-                    </td>
-                    <td>{m.description ?? '—'}</td>
-                    <td className={ledger.muted}>{m.note ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Frame>
-        </Body>
-      </Section>
+      {/* A tab whose read failed shows no count: 0 there would be a figure the
+          screen never read. The failure itself is said inside the tab. */}
+      <Tabs className={`pc-tabs ${styles.tabs}`} defaultActiveKey="overview" items={[
+        { key: 'overview', label: t('cash.tab.overview'),
+          children: overview, forceRender: true },
+        { key: 'movements', label: (
+          <span>{t('cash.tab.movements')} {!failed.movements && <span className={styles.count}>{movements.length}</span>}</span>
+        ), children: movementPanel, forceRender: true },
+        { key: 'clearing', label: (
+          <span>{t('cash.tab.clearing')} {!failed.queue && <span className={styles.count}>{unplaced.length}</span>}</span>
+        ), children: clearingPanel, forceRender: true },
+        ...((loans.length > 0 || failed.loans) ? [{
+          key: 'loans',
+          label: <span>{t('cash.tab.loans')} {!failed.loans && <span className={styles.count}>{loans.length}</span>}</span>,
+          children: loansPanel,
+          forceRender: true,
+        }] : []),
+      ]} />
     </Page>
   )
 }

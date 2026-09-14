@@ -154,7 +154,7 @@ export function UsersView({ people, meId, loadFailed = false }: {
       {error && <p className={styles.failed}>{error}</p>}
 
       <Section>
-        <Frame>
+        <Frame explore>
           <table className={ledger.table}>
             <thead>
               <tr>

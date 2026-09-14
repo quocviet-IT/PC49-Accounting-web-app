@@ -1,5 +1,9 @@
 'use client'
 
+import { useState } from 'react'
+import { Pagination, Select } from 'antd'
+import { ListToolbar } from '@/components/ui/ListToolbar'
+import { matchesSearch, pageSlice } from '@/lib/ui/list'
 import { useLocale } from '@/lib/i18n/provider'
 import { Page, Section, Empty, Grams, money, ledger, Frame, LoadFailed } from '@/components/ledger/Ledger'
 
@@ -29,6 +33,16 @@ export function JournalView({ period, entries, loadFailed = false }: {
   loadFailed?: boolean
 }) {
   const { t } = useLocale()
+  const [search, setSearch] = useState('')
+  const [posted, setPosted] = useState<string | undefined>()
+  const [account, setAccount] = useState<string | undefined>()
+  const [current, setCurrent] = useState(1)
+  const [size, setSize] = useState(20)
+  const filtered = entries.filter((e) => (!posted || String(e.posted) === posted)
+    && (!account || e.lines.some((l) => l.debit === account || l.credit === account))
+    && matchesSearch(search, [e.entryDate, e.memo, ...e.lines.flatMap((l) => [l.debit, l.credit, l.goldType])]))
+  const page = pageSlice(filtered, current, size)
+  const accounts = [...new Set(entries.flatMap((e) => e.lines.flatMap((l) => [l.debit, l.credit])).filter((a): a is string => !!a))].sort()
   if (loadFailed) return <Page titleKey="journal.title"><LoadFailed /></Page>
   if (entries.length === 0) return <Page titleKey="journal.title"><Empty /></Page>
 
@@ -41,6 +55,15 @@ export function JournalView({ period, entries, loadFailed = false }: {
     <Page titleKey="journal.title">
       <Section>
         <p className={ledger.note}>{t('common.period')}: {period}</p>
+        <ListToolbar search={search} onSearch={(v) => { setSearch(v); setCurrent(1) }} count={filtered.length} total={entries.length}
+          onReset={search || posted || account ? () => { setSearch(''); setPosted(undefined); setAccount(undefined); setCurrent(1) } : undefined}>
+          <Select className="pc-filter-select" aria-label={t('rep.account')} placeholder={t('rep.account')} allowClear
+            value={account} onChange={(v) => { setAccount(v); setCurrent(1) }} showSearch options={accounts.map((a) => ({ value: a, label: a }))} />
+          <Select className="pc-filter-select" aria-label={t('users.state')} placeholder={t('users.state')} allowClear value={posted}
+            onChange={(v) => { setPosted(v); setCurrent(1) }} options={[
+              { value: 'true', label: t('home.posted') }, { value: 'false', label: t('journal.unposted') },
+            ]} />
+        </ListToolbar>
         <Frame>
 <table className={ledger.table}>
             <thead>
@@ -54,7 +77,7 @@ export function JournalView({ period, entries, loadFailed = false }: {
               </tr>
             </thead>
             <tbody>
-              {entries.flatMap((e) =>
+              {page.rows.flatMap((e) =>
                 e.lines.map((l, i) => (
                   <tr key={`${e.id}-${l.seq}`} className={e.posted ? undefined : ledger.aside}>
                     <td className={ledger.muted}>{i === 0 ? e.entryDate : ''}</td>
@@ -84,6 +107,12 @@ export function JournalView({ period, entries, loadFailed = false }: {
             </tfoot>
           </table>
         </Frame>
+        {filtered.length === 0 && <Empty />}
+        <div className="pc-table-explorer__footer">
+          <p>{t('ui.totalScope')}</p>
+          <Pagination current={page.page} pageSize={size} total={filtered.length} showSizeChanger pageSizeOptions={[10, 20, 50, 100]}
+            onChange={(p, n) => { setCurrent(n === size ? p : 1); setSize(n) }} />
+        </div>
       </Section>
     </Page>
   )

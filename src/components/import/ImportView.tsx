@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { Tabs } from 'antd'
 import Link from 'next/link'
 import { useLocale } from '@/lib/i18n/provider'
 import type { MessageKey } from '@/lib/i18n'
@@ -92,10 +93,17 @@ export function ImportView({
 
   return (
     <Page titleKey="imp.title" noteKey="imp.note">
-      <StageFile />
+      {/* Every pane is rendered, open or not, as on the cash and inventory
+          screens: a section whose read failed carries its own notice, and antd
+          otherwise leaves a closed tab out of the page altogether. A tab whose
+          read failed shows no count, since "(0)" would be a figure never read. */}
+      <Tabs className="pc-tabs" key={selected?.id ?? 'batches'} defaultActiveKey={selected ? 'selected' : 'batches'} items={[
+      { key: 'upload', label: t('imp.file'), children: <StageFile />, forceRender: true },
+      { key: 'batches', forceRender: true,
+        label: loadFailed.batches ? t('imp.batches') : `${t('imp.batches')} (${batches.length})`, children:
       <Section titleKey="imp.batches">
         {loadFailed.batches ? <LoadFailed /> : batches.length === 0 ? <Empty /> : (
-          <Frame>
+          <Frame explore>
 <table className={ledger.table}>
               <colgroup>
                 <col style={{ width: '18%' }} /><col style={{ width: '30%' }} />
@@ -144,12 +152,13 @@ export function ImportView({
         )}
       </Section>
 
-      {selected && (
+      },
+      ...(selected ? [{ key: 'selected', label: t('imp.rejectedRows'), forceRender: true, children:
         <Section titleKey="imp.rejectedRows">
           {loadFailed.rejected ? <LoadFailed /> : rejected.length === 0 ? (
             <p className={ledger.note}>{t('imp.noRejected')}</p>
           ) : (
-            <Frame>
+            <Frame explore>
 <table className={ledger.table}>
                 <colgroup>
                   <col style={{ width: '10%' }} /><col style={{ width: '42%' }} />
@@ -219,8 +228,9 @@ export function ImportView({
             )}
           </div>
         </Section>
-      )}
+      }] : []),
 
+      { key: 'recon', label: t('imp.recon'), forceRender: true, children:
       <Section titleKey="imp.recon">
         <form className={styles.asOf} method="get" action="/import">
           <label htmlFor="asOf">{t('imp.asOf')}</label>
@@ -234,7 +244,7 @@ export function ImportView({
           <p className={ledger.note}>{t('imp.noExpected')}</p>
         ) : (
           <>
-            <Frame>
+            <Frame explore>
 <table className={ledger.table}>
                 <colgroup>
                   <col style={{ width: '26%' }} /><col style={{ width: '16%' }} />
@@ -276,6 +286,7 @@ export function ImportView({
           </>
         )}
       </Section>
+      }]} />
     </Page>
   )
 }

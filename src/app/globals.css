@@ -169,11 +169,12 @@ html, body {
 
 .pc-shell { min-height: 100dvh; }
 
-.pc-shell__sider {
+.pc-shell > .pc-shell__sider.ant-layout-sider {
   border-right: 1px solid var(--pc-chrome-border);
   position: sticky;
   top: 0;
   height: 100dvh;
+  align-self: flex-start;
   overflow: hidden;
 }
 
@@ -274,7 +275,7 @@ html, body {
 .pc-shell__account-role { font-size: var(--pc-font-label); color: var(--pc-text-faint); }
 
 .pc-shell__content { padding: 20px; }
-.pc-shell__content-inner { max-width: 1360px; margin: 0 auto; }
+.pc-shell__content-inner { width: 100%; min-width: 0; max-width: 1680px; margin: 0 auto; }
 
 /* ----------------------------------------------------------- page header */
 
@@ -610,4 +611,49 @@ html, body {
 .pc-date-input:focus {
   outline: 2px solid var(--pc-intent-primary);
   outline-offset: -1px;
+}
+
+/* Shared working surfaces. Menus, charts and table frames each own overflow. */
+.pc-shell__sidebar-frame, .pc-shell__nav-scroll { min-height: 0; }
+.pc-shell__sider .ant-layout-sider-children { height: 100%; }
+.pc-shell__content { min-width: 0; }
+.pc-shell__nav .ant-menu-item-icon { width: 19px; height: 19px; }
+.pc-page-header { margin-bottom: 20px; }
+.pc-data-table .ant-table-cell { vertical-align: middle; overflow-wrap: anywhere; }
+.pc-data-table .ant-table-cell.ant-table-cell-align-right { white-space: nowrap; }
+.pc-data-table .ant-table-pagination { padding: 0 14px; align-items: center; }
+.pc-data-table .ant-table-thead > tr > th { padding-top: 12px; padding-bottom: 12px; }
+.pc-data-table .ant-table-tbody > tr > td { padding-top: 10px; padding-bottom: 10px; }
+.pc-result-count { font-size: 12px; color: var(--pc-text-secondary); padding: 7px 0; white-space: nowrap; }
+.pc-list-search.ant-input-affix-wrapper { width: 280px; max-width: 100%; }
+.pc-filter-bar__controls { flex: 1; }
+.pc-filter-select { min-width: 150px; }
+.pc-tabs .ant-tabs-nav { margin-bottom: 20px; }
+.pc-tabs .ant-tabs-content-holder, .pc-tabs .ant-tabs-tabpane { min-width: 0; }
+.pc-tabs .ant-tabs-tab { padding: 12px 4px; font-weight: 500; }
+.pc-table-explorer { min-width: 0; }
+.pc-table-explorer__scroll { overflow-x: auto; border: 1px solid var(--pc-border-default); border-radius: 10px; }
+.pc-table-explorer__footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 14px 0; }
+.pc-table-explorer__footer p { margin: 0; max-width: 65ch; font-size: 12px; color: var(--pc-text-secondary); }
+.pc-form-section { padding: 20px; margin: 0 0 16px; border: 1px solid var(--pc-border-default); border-radius: 10px; background: var(--pc-surface-card); }
+.pc-form-section legend { padding: 0 8px; font-weight: 600; font-size: 14px; color: var(--pc-text-heading); }
+.ant-modal .ant-modal-body { max-height: calc(100dvh - 220px); overflow-y: auto; overscroll-behavior: contain; }
+.ant-modal .ant-form-item-label > label { font-weight: 500; }
+.ant-modal .ant-form-item { margin-bottom: 18px; }
+.ant-modal .ant-modal-footer { border-top: 1px solid var(--pc-border-default); padding-top: 16px; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--pc-intent-primary); outline-offset: 3px; }
+
+@media (max-width: 767px) {
+  .pc-shell__header { gap: 8px; padding-inline: 12px; }
+  .pc-filter-bar__controls { width: 100%; }
+  .pc-list-search.ant-input-affix-wrapper { width: 100%; }
+  .pc-filter-bar__controls > .ant-select { flex: 1; min-width: 140px; }
+  .pc-data-table .ant-table-pagination { margin-block: 12px; row-gap: 8px; }
+  .pc-form-section { padding: 14px; }
+  .ant-modal { max-width: calc(100vw - 24px); margin: 12px auto; top: 12px; padding-bottom: 0; }
+  .ant-modal .ant-modal-body { max-height: calc(100dvh - 180px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

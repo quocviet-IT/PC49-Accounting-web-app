@@ -1,7 +1,7 @@
 'use client'
 
 import { Button, Tooltip } from 'antd'
-import { DesktopOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
+import { Monitor, Moon, Sun } from 'lucide-react'
 import { useTheme } from './ThemeProvider'
 import { useLocale } from '@/lib/i18n/provider'
 import type { ThemeMode } from '@/lib/domain/theme'
@@ -17,9 +17,9 @@ import type { ThemeMode } from '@/lib/domain/theme'
 const ORDER: ThemeMode[] = ['light', 'dark', 'system']
 
 const ICON = {
-  light: <SunOutlined />,
-  dark: <MoonOutlined />,
-  system: <DesktopOutlined />,
+  light: <Sun size={19} aria-hidden />,
+  dark: <Moon size={19} aria-hidden />,
+  system: <Monitor size={19} aria-hidden />,
 }
 
 export function ThemeToggle() {

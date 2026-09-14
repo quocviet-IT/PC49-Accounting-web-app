@@ -79,6 +79,15 @@ function survey() {
     }
     return false
   }
+  // antd's tab bar clips the tabs that do not fit and lists them under its own
+  // "more" button. That is overflow by design, so long as the button is there
+  // to reach them: at 390px the reference screen shows two of its five tabs,
+  // and the other three are one tap away.
+  const tabsWithMore = (el) => {
+    const wrap = el.closest('.ant-tabs-nav-wrap')
+    const more = wrap?.parentElement?.querySelector(':scope > .ant-tabs-nav-operations')
+    return Boolean(more) && !more.classList.contains('ant-tabs-nav-operations-hidden')
+  }
   const problems = []
   const overflow = document.documentElement.scrollWidth - vw
   if (overflow > 0) problems.push(`the page scrolls sideways by ${overflow}px`)
@@ -88,10 +97,10 @@ function survey() {
     if (r.width === 0 || r.height === 0) continue
     const cs = getComputedStyle(el)
     let issue = null
-    if (r.right > vw + 1 && !insideScroller(el)) {
+    if (r.right > vw + 1 && !insideScroller(el) && !tabsWithMore(el)) {
       issue = `${label(el)} runs past the window (right edge ${Math.round(r.right)}px)`
     } else if ((cs.overflowX === 'hidden' || cs.overflowX === 'clip')
-        && el.scrollWidth > el.clientWidth + 2 && !chosenTruncation(el)) {
+        && el.scrollWidth > el.clientWidth + 2 && !chosenTruncation(el) && !tabsWithMore(el)) {
       issue = `${label(el)} cuts off its content (${el.scrollWidth}px in ${el.clientWidth}px)`
     } else if (el.children.length === 0 && (el.textContent ?? '').trim().length > 12 && r.width < 90
         && r.height > 4 * (parseFloat(cs.lineHeight) || 18)) {

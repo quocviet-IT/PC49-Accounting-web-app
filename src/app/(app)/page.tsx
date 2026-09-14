@@ -3,8 +3,51 @@ import { getCurrentUser } from '@/lib/auth/currentUser'
 import { can } from '@/lib/auth/roles'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { combine, readState, type DataState } from '@/lib/data/result'
+import {
+  aggregateDashboardTransactions,
+  dashboardActivityEnd,
+  dashboardDateRange,
+  type DashboardTransactionRow,
+} from '@/components/home/dashboard-series'
 
-export default async function HomePage() {
+const TRANSACTION_PAGE_SIZE = 1_000
+
+async function readAllDashboardTransactions(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  start: string,
+  end: string,
+) {
+  const rows: DashboardTransactionRow[] = []
+
+  for (let from = 0; ; from += TRANSACTION_PAGE_SIZE) {
+    // Supabase projects commonly cap one response at 1,000 rows. Explicit
+    // ranges make the chart complete even when a busy 30-day period exceeds
+    // that cap; txn_date + id gives every page a stable boundary.
+    const result = await supabase.from('gold_txn')
+      .select('id, txn_date, txn_type, amount')
+      .gte('txn_date', start)
+      .lte('txn_date', end)
+      .is('voided_at', null)
+      .order('txn_date', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + TRANSACTION_PAGE_SIZE - 1)
+
+    if (result.error) return { data: null, error: result.error }
+    const page = (result.data ?? []) as Record<string, unknown>[]
+    rows.push(...page.map((row) => ({
+      txnDate: row.txn_date as string,
+      txnType: row.txn_type as string,
+      amount: Number(row.amount),
+    })))
+    if (page.length < TRANSACTION_PAGE_SIZE) return { data: rows, error: null }
+  }
+}
+
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ activityEnd?: string }>
+}) {
   // The layout has already refused anyone who is not signed in; this guard is
   // what keeps TypeScript from having to trust that.
   const user = await getCurrentUser()
@@ -13,6 +56,9 @@ export default async function HomePage() {
 
   const today = new Date().toISOString().slice(0, 10)
   const period = today.slice(0, 7)
+  const params = await searchParams
+  const activityEnd = dashboardActivityEnd(params.activityEnd, today)
+  const activityRange = dashboardDateRange(activityEnd)
   const supabase = await createServerSupabase()
 
   const mayRead = can(role, 'report.read')
@@ -20,7 +66,22 @@ export default async function HomePage() {
   const mayImportBank = can(role, 'bankImport.run')
   const mayRefine = can(role, 'refining.write') || can(role, 'refining.approve')
 
-  const [totalAsset, spot, cash, deposits, refinery, recent, unresolved, uncosted, openLots] =
+  // The transaction-entry screen is the permission boundary for gold_txn.
+  // Do not even issue these reads for roles that cannot open that screen.
+  const recentRead = mayWriteTxn
+    ? supabase.from('gold_txn')
+        .select('id, txn_date, txn_type, partner_code, gold_type_code, qty, uom, amount, journal_entry_id')
+        .is('voided_at', null)
+        .order('txn_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(10)
+    : Promise.resolve({ data: [], error: null })
+  const activityRead = mayWriteTxn
+    ? readAllDashboardTransactions(supabase, activityRange.start, activityRange.end)
+    : Promise.resolve({ data: [], error: null })
+
+  const [totalAsset, spot, cash, deposits, refinery, recent, activity,
+         unresolved, uncosted, openLots] =
     await Promise.all([
       supabase.from('v_inventory_total_asset').select('qty_gram').eq('owner_code', 'PC49'),
       supabase.from('spot_price_daily').select('spot_per_gram, price_date')
@@ -33,14 +94,8 @@ export default async function HomePage() {
       supabase.from('v_deposit_open').select('id', { count: 'exact', head: true }),
       supabase.from('inventory_movement').select('qty_gram')
         .eq('bucket', 'AT_REFINERY').eq('owner_code', 'PC49'),
-      // The last ten, newest first. No telephone number: it is on the row for
-      // whoever is serving that customer, not on a screen anybody may open.
-      supabase.from('gold_txn')
-        .select('id, txn_date, txn_type, partner_code, gold_type_code, qty, uom, amount, journal_entry_id')
-        .is('voided_at', null)
-        .order('txn_date', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(10),
+      recentRead,
+      activityRead,
       supabase.from('bank_import_row').select('id', { count: 'exact', head: true })
         .is('resolved_at', null),
       supabase.from('v_sale_without_cost').select('txn_id', { count: 'exact', head: true }),
@@ -131,6 +186,12 @@ export default async function HomePage() {
     () => [],
   )
 
+  const activitySummary = readState(
+    activity,
+    (rows: DashboardTransactionRow[]) => aggregateDashboardTransactions(rows, activityEnd),
+    () => aggregateDashboardTransactions([], activityEnd),
+  )
+
   return (
     <Overview
         inventoryValue={combine(gram, spotPerGram, (g, p) => g * p)}
@@ -143,6 +204,10 @@ export default async function HomePage() {
         period={period}
         attention={attention}
         recent={recentRows}
+        activity={activitySummary}
+        activityStart={activityRange.start}
+        activityEnd={activityEnd}
+        transactionAccess={mayWriteTxn}
         // Only where the capability actually opens the page. A link that leads
         // to Forbidden is worse than no link: it reads as a fault rather than
         // as a boundary.

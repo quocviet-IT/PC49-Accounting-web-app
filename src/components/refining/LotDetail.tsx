@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Alert, Button, Descriptions, Space, Steps, Tag, Typography } from 'antd'
+import { Alert, Button, Descriptions, Space, Steps, Tabs, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocale } from '@/lib/i18n/provider'
 import { Page, Section, LoadFailed, money, weight } from '@/components/ledger/Ledger'
@@ -178,8 +178,8 @@ export function LotDetail({
         { key: 'fp', label: `${t('refining.bag.fee')} PT`, children: lot.feePctPt === null ? '—' : `${lot.feePctPt}%` },
       ]} />
 
-      {/* The green table — the one the accountant computed by hand in the
-          sheet ("phần màu xanh người dùng tự tính"). Here it simply is. */}
+      <Tabs className="pc-tabs" key={lot.status} defaultActiveKey={lot.status === 'DRAFT' ? 'bags' : hasAssay ? 'settlement' : 'bags'} items={[
+        { key: 'bags', label: `${t('refining.bags')} (${bags.length})`, children: <>
       <Section titleKey="refining.bags">
         <Typography.Paragraph type="secondary">{t('refining.bag.greenNote')}</Typography.Paragraph>
         <SendTable
@@ -194,31 +194,32 @@ export function LotDetail({
           </Space>
         )}
       </Section>
-
-      {hasAssay && (
+      </> },
+      ...(hasAssay ? [{ key: 'assay', label: t('ui.assay'), children:
         <Section>
           <Typography.Paragraph type="secondary">{t('refining.bag.blueNote')}</Typography.Paragraph>
           <AssayTable bags={bags} />
         </Section>
-      )}
+      }] : []),
 
-      {lot.status === 'DRAFT' && (
+      ...(lot.status === 'DRAFT' ? [{ key: 'purchases', label: `${t('ui.source')} (${picked.length})`, children:
         <Section>
           <PurchasePicker lotId={lot.id} available={available} picked={picked} bands={bands} />
         </Section>
-      )}
+      }] : []),
 
-      {stage >= LOT_STAGES.indexOf('ASSAYED') && (
+      ...(stage >= LOT_STAGES.indexOf('ASSAYED') ? [{ key: 'settlement', label: t('ui.settlement'), children:
         <Section titleKey="refining.owner">
           <DataTable<OwnerShare> rowKey="ownerCode" columns={shareColumns} dataSource={shares} pagination={false} />
           {receipts.length > 0 && (
             <div style={{ marginTop: 16 }}>
               <Typography.Title level={5}>{t('refining.receipts')}</Typography.Title>
-              <DataTable<Receipt> rowKey="id" columns={receiptColumns} dataSource={receipts} pagination={false} />
+              <DataTable<Receipt> rowKey="id" columns={receiptColumns} dataSource={receipts} />
             </div>
           )}
         </Section>
-      )}
+      }] : []),
+      ]} />
 
       {dialog?.kind === 'send' && (
         <SendDialog open lotId={lot.id} onClose={() => setDialog(null)} onDone={done} />

@@ -63,6 +63,7 @@ export function DataTable<RecordType extends object>({
   // Accounting work means comparing many rows at once, so lists are dense by
   // default; a screen can still ask for a roomier table.
   size = 'small',
+  pagination,
   ...props
 }: DataTableProps<RecordType>) {
   const { t } = useLocale()
@@ -71,6 +72,14 @@ export function DataTable<RecordType extends object>({
     <div className={`pc-data-table${fit ? ' pc-table--fit' : ''}`}>
       <Table<RecordType>
         {...props}
+        pagination={pagination === false ? false : {
+          defaultPageSize: 20,
+          showSizeChanger: true,
+          pageSizeOptions: [10, 20, 50, 100],
+          hideOnSinglePage: false,
+          showTotal: (total, range) => `${range[0]}–${range[1]} / ${total} ${t('ui.rows')}`,
+          ...pagination,
+        }}
         size={size}
         tableLayout={props.tableLayout ?? (fit ? 'fixed' : undefined)}
         // Under `fit` the table is given a number, never 'max-content'. rc-table

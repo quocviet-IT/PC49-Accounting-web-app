@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Alert, AutoComplete, Button, Col, Divider, Form, Input, InputNumber, Modal,
+  Alert, AutoComplete, Button, Col, Form, Input, InputNumber, Modal,
   Row, Select, Typography,
 } from 'antd'
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { Plus, Trash2 } from 'lucide-react'
 import { useLocale } from '@/lib/i18n/provider'
 import type { Uom } from '@/lib/domain/units'
 import {
@@ -16,6 +16,8 @@ import {
   SCRAP_BANDS, SCRAP_TYPES, TXN_TYPES,
   type GoldTypeOption, type SavedRow,
 } from './types'
+import { normalizeTransactionSearch } from './transactionFilters'
+import styles from './Txn.module.css'
 
 const money = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2, maximumFractionDigits: 2,
@@ -88,6 +90,7 @@ export function TxnForm({
   const [warning, setWarning] = useState<string | null>(null)
   const [lastSaved, setLastSaved] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [validationError, setValidationError] = useState(false)
   /**
    * Whether anything has been typed since the form opened or last saved.
    *
@@ -226,6 +229,8 @@ export function TxnForm({
       // The fields already say what is wrong, and scrollToFirstError brings the
       // first of them into view. Left unhandled, this rejection was logged as an
       // error on every save attempted with a field missing.
+      setValidationError(true)
+      topRef.current?.scrollIntoView({ block: 'nearest' })
       return
     }
 
@@ -308,8 +313,12 @@ export function TxnForm({
           new form offered no way it was paid. It belongs on the two scrap
           fields that come and go. */}
       <Form<Values> form={form} layout="vertical" initialValues={initial}
-                    scrollToFirstError onValuesChange={() => setDirty(true)}>
+                    className={styles.form} scrollToFirstError
+                    onValuesChange={() => { setDirty(true); setValidationError(false) }}>
         <div ref={topRef} />
+        {validationError && (
+          <Alert type="error" showIcon role="alert" title={t('txn.form.checkFields')} />
+        )}
         {error && (
           <Alert type="error" showIcon title={t('txn.rowError')} description={error}
                  style={{ marginBottom: 12 }} />
@@ -324,7 +333,10 @@ export function TxnForm({
         )}
 
         {correcting && (
-          <>
+          <section className={styles.section} aria-labelledby="txn-correction-heading">
+            <h3 id="txn-correction-heading" className={styles.sectionHeading}>
+              {t('txn.form.correction')}
+            </h3>
             <Form.Item
               name="reason"
               label={t('txn.form.reason')}
@@ -333,11 +345,14 @@ export function TxnForm({
             >
               <Input />
             </Form.Item>
-            <Divider />
-          </>
+          </section>
         )}
 
-        <Row gutter={12}>
+        <section className={styles.section} aria-labelledby="txn-details-heading">
+          <h3 id="txn-details-heading" className={styles.sectionHeading}>
+            {t('txn.form.details')}
+          </h3>
+          <Row gutter={12}>
           <Col xs={24} sm={8}>
             <Form.Item name="txnType" label={t('txn.col.type')}
                        rules={[{ required: true, message: t('txn.form.required') }]}>
@@ -360,7 +375,7 @@ export function TxnForm({
               <Input value={uom} disabled />
             </Form.Item>
           </Col>
-        </Row>
+          </Row>
 
         {/* The bag and the measured content are two different things (H4):
             the first is a choice of two, the second a number nobody has for
@@ -383,13 +398,14 @@ export function TxnForm({
             </Col>
           </Row>
         )}
+        </section>
 
-        <Divider titlePlacement="start" plain>{t('txn.form.money')}</Divider>
-
-        <Row gutter={12}>
+        <section className={styles.section} aria-labelledby="txn-money-heading">
+          <h3 id="txn-money-heading" className={styles.sectionHeading}>{t('txn.form.money')}</h3>
+          <span className={styles.sectionDescription}>{t('txn.hint')}</span>
+          <Row gutter={12}>
           <Col xs={24} sm={8}>
             <Form.Item name="qty" label={t('txn.col.qty')}
-                       extra={t('txn.hint')}
                        rules={[
                          { required: true, message: t('txn.form.required') },
                          () => ({
@@ -414,22 +430,24 @@ export function TxnForm({
                            onChange={totalTyped} />
             </Form.Item>
           </Col>
-        </Row>
+          </Row>
 
-        <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
-          {t('txn.col.amount')}: <strong>{money.format(signed)}</strong>
-          {' · '}{t('txn.form.amountAuto')}
-        </Typography.Paragraph>
+          <div className={styles.calculatedAmount} aria-live="polite">
+            <span>{t('txn.form.amountAuto')}</span>
+            <strong>{t('txn.col.amount')}: {money.format(signed)}</strong>
+          </div>
+        </section>
 
-        <Divider titlePlacement="start" plain>{t('txn.form.who')}</Divider>
-
-        <Row gutter={12}>
+        <section className={styles.section} aria-labelledby="txn-who-heading">
+          <h3 id="txn-who-heading" className={styles.sectionHeading}>{t('txn.form.who')}</h3>
+          <Row gutter={12}>
           <Col xs={24} sm={12}>
             <Form.Item name="partnerCode" label={t('txn.col.partner')}>
               <AutoComplete
                 options={partners.map((p) => ({ value: p.code }))}
                 filterOption={(input, option) =>
-                  String(option?.value ?? '').toLowerCase().includes(input.toLowerCase())}
+                  normalizeTransactionSearch(option?.value)
+                    .includes(normalizeTransactionSearch(input))}
                 onChange={(value) => {
                   // Naming a customer we know brings their number up rather
                   // than making somebody go and look it up.
@@ -444,7 +462,7 @@ export function TxnForm({
               <Input />
             </Form.Item>
           </Col>
-        </Row>
+          </Row>
 
         <Form.Item name="salesPeople" label={t('txn.col.sales')} extra={t('txn.form.split')}>
           <Select
@@ -458,10 +476,11 @@ export function TxnForm({
             {shares.map((s) => `${s.code} ${s.sharePct}%`).join(' · ')}
           </Typography.Paragraph>
         )}
+        </section>
 
-        <Divider titlePlacement="start" plain>{t('txn.form.settle')}</Divider>
-
-        <Form.List
+        <section className={styles.section} aria-labelledby="txn-settle-heading">
+          <h3 id="txn-settle-heading" className={styles.sectionHeading}>{t('txn.form.settle')}</h3>
+          <Form.List
           name="payments"
           rules={[{
             // The books refuse a purchase or a deposit with no payment on it
@@ -476,7 +495,7 @@ export function TxnForm({
           {(fields, { add, remove }, { errors }) => (
             <>
               {fields.map((field) => (
-                <Row gutter={12} key={field.key} align="middle">
+                <Row gutter={12} key={field.key} align="middle" className={styles.paymentRow}>
                   <Col xs={24} sm={10}>
                     <Form.Item name={[field.name, 'amount']} label={t('txn.form.payAmount')}>
                       <InputNumber style={{ width: '100%' }} min={0} step={0.01}
@@ -502,7 +521,7 @@ export function TxnForm({
                     </Form.Item>
                   </Col>
                   <Col xs={8} sm={4}>
-                    <Button type="text" danger icon={<DeleteOutlined />}
+                    <Button type="text" danger icon={<Trash2 size={16} aria-hidden />}
                             aria-label={t('txn.form.remove')}
                             disabled={fields.length === 1}
                             onClick={() => remove(field.name)} />
@@ -513,20 +532,21 @@ export function TxnForm({
                   ordinary morning at this counter (B11). */}
               <Form.ErrorList errors={errors} />
               {fields.length < MAX_PAYMENTS && (
-                <Button type="dashed" block icon={<PlusOutlined />}
+                <Button type="dashed" block icon={<Plus size={16} aria-hidden />}
                         onClick={() => add({ amount: null, method: null })}>
                   {t('txn.form.addPayment')}
                 </Button>
               )}
             </>
           )}
-        </Form.List>
+          </Form.List>
 
-        <Form.Item name="remarks" label={t('txn.col.remarks')} style={{ marginTop: 16 }}>
-          <Input.TextArea rows={2} />
-        </Form.Item>
+          <Form.Item name="remarks" label={t('txn.col.remarks')} style={{ marginTop: 16 }}>
+            <Input.TextArea rows={2} />
+          </Form.Item>
+        </section>
 
-        <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
+        <Typography.Paragraph type="secondary" className={styles.formDate}>
           {t('txn.date')}: {txnDate}
         </Typography.Paragraph>
       </Form>

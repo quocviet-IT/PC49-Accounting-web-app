@@ -215,7 +215,7 @@ export function ReportView({
       {data.kind === 'trial' && (
         <Section>
           {data.rows.length === 0 ? <Empty /> : (
-            <Frame>
+            <Frame explore>
               <table className={ledger.table}>
                 <colgroup>
                   <col style={{ width: '34%' }} /><col style={{ width: '16%' }} />
@@ -272,7 +272,7 @@ export function ReportView({
       {data.kind === 'ledger' && (
         <Section>
           {data.rows.length === 0 ? <Empty /> : (
-            <Frame>
+            <Frame explore>
               <table className={ledger.table}>
                 <colgroup>
                   <col style={{ width: '11%' }} /><col style={{ width: '12%' }} />
@@ -310,7 +310,7 @@ export function ReportView({
       {data.kind === 'stock' && (
         <Section>
           {data.rows.length === 0 ? <Empty /> : (
-            <Frame>
+            <Frame explore>
               <table className={ledger.table}>
                 <colgroup>
                   <col style={{ width: '16%' }} /><col style={{ width: '14%' }} />
@@ -353,7 +353,7 @@ export function ReportView({
       {data.kind === 'deposits' && (
         <Section>
           {data.rows.length === 0 ? <Empty /> : (
-            <Frame>
+            <Frame explore>
               <table className={ledger.table}>
                 <colgroup>
                   <col style={{ width: '10%' }} /><col style={{ width: '15%' }} />
@@ -414,7 +414,7 @@ export function ReportView({
       {data.kind === 'apar' && (
         <Section>
           {data.rows.length === 0 ? <Empty /> : (
-            <Frame>
+            <Frame explore>
               <table className={ledger.table}>
                 <colgroup>
                   <col style={{ width: '24%' }} /><col style={{ width: '16%' }} />
@@ -452,7 +452,7 @@ export function ReportView({
       {data.kind === 'vendor' && (
         <Section>
           {data.rows.length === 0 ? <Empty /> : (
-            <Frame>
+            <Frame explore>
               <table className={ledger.table}>
                 <colgroup>
                   <col style={{ width: '28%' }} /><col style={{ width: '16%' }} />

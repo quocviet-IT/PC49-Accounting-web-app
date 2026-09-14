@@ -2,16 +2,21 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Alert, Button, Input, Modal, Space, Tag, Tooltip, Typography } from 'antd'
+import { Alert, Button, Input, Modal, Select, Space, Tag, Tooltip, Typography } from 'antd'
+import { Plus } from 'lucide-react'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocale } from '@/lib/i18n/provider'
 import { toGrams } from '@/lib/domain/units'
 import { voidTransaction } from '@/app/(app)/gold-transactions/actions'
 import { Page, Stat, Stats, LoadFailed, money, weight } from '@/components/ledger/Ledger'
 import { DataTable } from '@/components/ui/DataTable'
-import { FilterBar } from '@/components/ui/FilterBar'
+import { ListToolbar } from '@/components/ui/ListToolbar'
 import { TxnForm } from './TxnForm'
-import type { GoldTypeOption, SavedRow } from './types'
+import { PAYMENT_METHODS, TXN_TYPES, type GoldTypeOption, type SavedRow } from './types'
+import {
+  filterGoldTransactions, type GoldTransactionFilters,
+} from './transactionFilters'
+import styles from './Txn.module.css'
 
 export type { GoldTypeOption, SavedRow } from './types'
 
@@ -60,6 +65,10 @@ export function TxnScreen({
   const [voiding, setVoiding] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [filters, setFilters] = useState<GoldTransactionFilters>({
+    query: '', txnType: null, goldTypeCode: null, staff: null,
+    paymentMethod: null, status: null,
+  })
 
   const goldName = (code: string) => {
     const g = goldTypes.find((x) => x.code === code)
@@ -67,6 +76,33 @@ export function TxnScreen({
   }
   const phoneOf = (code: string | null) =>
     partners.find((p) => p.code === code)?.phone ?? null
+
+  const partnerPhones = useMemo(
+    () => new Map(partners.map((partner) => [partner.code, partner.phone])),
+    [partners],
+  )
+  const filtered = useMemo(
+    () => filterGoldTransactions(existing, filters, partnerPhones),
+    [existing, filters, partnerPhones],
+  )
+  const hasFilters = Boolean(
+    filters.query || filters.txnType || filters.goldTypeCode || filters.staff
+      || filters.paymentMethod || filters.status,
+  )
+
+  function changeFilter<K extends keyof GoldTransactionFilters>(
+    key: K,
+    value: GoldTransactionFilters[K],
+  ) {
+    setFilters((current) => ({ ...current, [key]: value }))
+  }
+
+  function clearFilters() {
+    setFilters({
+      query: '', txnType: null, goldTypeCode: null, staff: null,
+      paymentMethod: null, status: null,
+    })
+  }
 
   const totals = useMemo(() => {
     const purchases = existing
@@ -112,7 +148,8 @@ export function TxnScreen({
   )
 
   const newButton = (
-    <Button type="primary" onClick={() => setEditing({ correcting: null })}>
+    <Button type="primary" icon={<Plus size={16} aria-hidden />}
+            onClick={() => setEditing({ correcting: null })}>
       {t('txn.new')}
     </Button>
   )
@@ -255,35 +292,101 @@ export function TxnScreen({
                onClose={() => setToast(null)} style={{ marginBottom: 16 }} />
       )}
 
-      <FilterBar
-        actions={
-          totals.movement.length === 0 ? null : (
-            <Space size={4} wrap>
-              <Typography.Text type="secondary">{t('txn.total.movement')}</Typography.Text>
-              {totals.movement.map(([code, grams]) => (
-                <Tag key={code} color={grams > 0 ? 'green' : 'red'}>
-                  {goldName(code)} {weight.format(grams)} g
-                </Tag>
-              ))}
-            </Space>
-          )
-        }
+      <ListToolbar
+        search={filters.query}
+        onSearch={(query) => changeFilter('query', query)}
+        placeholder={t('txn.filter.search')}
+        count={filtered.length}
+        total={existing.length}
+        onReset={hasFilters ? clearFilters : undefined}
       >
-        {datePicker}
-      </FilterBar>
+        <div className={styles.filters} role="group" aria-label={t('txn.filter.label')}>
+          {datePicker}
+          <Select
+            allowClear
+            className={styles.filterSelect}
+            value={filters.txnType}
+            aria-label={t('txn.filter.type')}
+            placeholder={t('txn.filter.type')}
+            options={TXN_TYPES.map((value) => ({ value, label: value }))}
+            onChange={(value) => changeFilter('txnType', value ?? null)}
+          />
+          <Select
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            className={styles.filterSelectWide}
+            value={filters.goldTypeCode}
+            aria-label={t('txn.filter.gold')}
+            placeholder={t('txn.filter.gold')}
+            options={goldTypes.map((gold) => ({ value: gold.code, label: goldName(gold.code) }))}
+            onChange={(value) => changeFilter('goldTypeCode', value ?? null)}
+          />
+          <Select
+            allowClear
+            showSearch
+            className={styles.filterSelect}
+            value={filters.staff}
+            aria-label={t('txn.filter.staff')}
+            placeholder={t('txn.filter.staff')}
+            options={salesPeople.map((value) => ({ value, label: value }))}
+            onChange={(value) => changeFilter('staff', value ?? null)}
+          />
+          <Select
+            allowClear
+            className={styles.filterSelectWide}
+            value={filters.paymentMethod}
+            aria-label={t('txn.filter.payment')}
+            placeholder={t('txn.filter.payment')}
+            options={PAYMENT_METHODS.map((value) => ({ value, label: value }))}
+            onChange={(value) => changeFilter('paymentMethod', value ?? null)}
+          />
+          <Select
+            allowClear
+            className={styles.filterSelectWide}
+            value={filters.status}
+            aria-label={t('txn.filter.status')}
+            placeholder={t('txn.filter.status')}
+            options={[
+              { value: 'correctable', label: t('txn.filter.correctable') },
+              { value: 'locked', label: t('txn.filter.locked') },
+            ]}
+            onChange={(value) => changeFilter('status', value ?? null)}
+          />
+        </div>
+      </ListToolbar>
 
       <Stats>
-        <Stat labelKey="txn.total.purchases" value={money.format(totals.purchases)} tone="out" />
-        <Stat labelKey="txn.total.sales" value={money.format(totals.sales)} tone="in" />
+        <Stat labelKey="txn.total.purchases" value={money.format(totals.purchases)}
+              note={t('txn.total.fullDay')} tone="out" />
+        <Stat labelKey="txn.total.sales" value={money.format(totals.sales)}
+              note={t('txn.total.fullDay')} tone="in" />
       </Stats>
+
+      <div className={styles.summaryRow}>
+        {totals.movement.length > 0 && (
+          <Space size={4} wrap>
+            <Typography.Text type="secondary">{t('txn.total.movement')}</Typography.Text>
+            {totals.movement.map(([code, grams]) => (
+              <Tag key={code} color={grams > 0 ? 'green' : 'red'}>
+                {goldName(code)} {weight.format(grams)} g
+              </Tag>
+            ))}
+          </Space>
+        )}
+        {hasFilters && (
+          <Typography.Text type="secondary">{t('txn.filter.totalsUnfiltered')}</Typography.Text>
+        )}
+      </div>
 
       <DataTable<SavedRow>
         rowKey="id"
         columns={columns}
-        dataSource={existing}
-        pagination={false}
-        emptyTitle={t('txn.empty2')}
-        emptyAction={newButton}
+        dataSource={filtered}
+        emptyTitle={hasFilters ? t('txn.filter.empty') : t('txn.empty2')}
+        emptyAction={hasFilters
+          ? <Button onClick={clearFilters}>{t('txn.filter.clear')}</Button>
+          : newButton}
         style={{ marginTop: 16 }}
       />
 
@@ -325,6 +428,7 @@ export function TxnScreen({
           </p>
         )}
         <Input autoFocus value={voidReason}
+               aria-label={t('txn.voidWhy')}
                onChange={(e) => setVoidReason(e.target.value)}
                placeholder={t('txn.correctReason')} />
       </Modal>

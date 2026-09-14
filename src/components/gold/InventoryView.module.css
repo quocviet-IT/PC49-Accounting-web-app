@@ -1,0 +1,26 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pc-space-3);
+  min-width: 0;
+  padding-top: var(--pc-space-1);
+}
+
+.count {
+  display: inline-flex;
+  min-width: 1.5rem;
+  justify-content: center;
+  margin-inline-start: var(--pc-space-1);
+  padding-inline: var(--pc-space-1);
+  border-radius: var(--pc-radius-control);
+  background: var(--pc-surface-muted);
+  color: var(--pc-text-faint);
+  font-size: var(--pc-font-label);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 520px) {
+  .dateForm { align-items: stretch; flex-direction: column; }
+  .dateForm input,
+  .dateForm button { min-height: var(--pc-control-height); }
+}

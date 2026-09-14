@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useLocale } from '@/lib/i18n/provider'
 import type { MessageKey } from '@/lib/i18n'
 import { PageHeader } from '@/components/PageHeader'
+import { TableExplorer } from '@/components/ui/TableExplorer'
 import styles from './Ledger.module.css'
 
 export const money = new Intl.NumberFormat('en-US', {
@@ -49,7 +50,8 @@ export function Section({
  * difference between a table you can read on a laptop and one that pushes the
  * whole layout sideways.
  */
-export function Frame({ children }: { children: ReactNode }) {
+export function Frame({ children, explore = false }: { children: ReactNode; explore?: boolean }) {
+  if (explore) return <TableExplorer>{children}</TableExplorer>
   return <div className={styles.frame}>{children}</div>
 }
 

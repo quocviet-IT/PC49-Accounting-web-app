@@ -3,7 +3,7 @@
 import { useCallback, useState, useTransition } from 'react'
 import { usePathname } from 'next/navigation'
 import { Button, Modal } from 'antd'
-import { WarningOutlined } from '@ant-design/icons'
+import { TriangleAlert as WarningOutlined } from 'lucide-react'
 import { findActivePage } from '@/lib/nav'
 import { useLocale } from '@/lib/i18n/provider'
 import { fileReport } from '@/app/(app)/feedback/actions'
