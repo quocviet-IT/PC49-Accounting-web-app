@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert, AutoComplete, Button, Col, Divider, Form, Input, InputNumber, Modal,
   Row, Select, Typography,
@@ -65,6 +65,9 @@ function sharesFor(people: string[]): { code: string; sharePct: number }[] {
  * stays live and posted until this is saved, and the reversal and the
  * replacement happen in the same database transaction.
  */
+/** The types the books will not post without a payment (post_gold_txn, 0015). */
+const NEEDS_PAYMENT = new Set(['PO', 'PO_VENDOR', 'DEPOSIT'])
+
 export function TxnForm({
   open, onClose, onSaved, txnDate, goldTypes, salesPeople, partners, correcting,
 }: {
@@ -85,6 +88,36 @@ export function TxnForm({
   const [warning, setWarning] = useState<string | null>(null)
   const [lastSaved, setLastSaved] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  /**
+   * Whether anything has been typed since the form opened or last saved.
+   *
+   * A form that threw its input away on Esc, on the X, or on Close is the same
+   * loss the grid's draft guard was built against: somebody believes they have
+   * entered a transaction that never reached the books.
+   */
+  const [dirty, setDirty] = useState(false)
+  const [confirmClose, setConfirmClose] = useState(false)
+  const topRef = useRef<HTMLDivElement>(null)
+
+  function requestClose() {
+    if (dirty) setConfirmClose(true)
+    else onClose()
+  }
+
+  // Reloading or closing the tab loses the same input.
+  useEffect(() => {
+    if (!dirty) return
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
+
+  // A refusal is shown at the top of the form and brought into view. At the foot
+  // of a dialog this long it sat below the fold, and pressing Save looked like
+  // nothing happening at all.
+  useEffect(() => {
+    if (error) topRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [error])
 
   /**
    * Stable for the life of one transaction on this form, so pressing Save
@@ -99,6 +132,18 @@ export function TxnForm({
     goldTypes.find((g) => g.code === code)?.native_uom ?? ''
   const phoneOf = (code: string) =>
     partners.find((p) => p.code === code.trim())?.phone ?? ''
+
+  /**
+   * A refusal from the books, in words the accountant reads.
+   *
+   * The database words its refusals for whoever wrote the trigger. The two an
+   * accountant can meet at this counter are said in Vietnamese; anything else
+   * passes through unchanged rather than being guessed at.
+   */
+  const readable = (message: string) => (
+    /no journal lines|no payments recorded/.test(message) ? t('txn.err.noPayments')
+      : /is not a valid movement for .*no such flow rule/.test(message) ? t('txn.err.flowRule')
+        : message)
 
   const initial: Values = useMemo(() => (correcting
     ? {
@@ -174,7 +219,15 @@ export function TxnForm({
     setError(null)
     setWarning(null)
     setLastSaved(null)
-    const v = await form.validateFields()
+    let v: Values
+    try {
+      v = await form.validateFields()
+    } catch {
+      // The fields already say what is wrong, and scrollToFirstError brings the
+      // first of them into view. Left unhandled, this rejection was logged as an
+      // error on every save attempted with a field missing.
+      return
+    }
 
     const payments = (v.payments ?? [])
       .map((p) => ({ amount: Number(p?.amount ?? 0), method: String(p?.method ?? '') }))
@@ -209,7 +262,7 @@ export function TxnForm({
       : await saveTransaction(body)
     setSaving(false)
 
-    if (!result.ok) { setError(result.message); return }
+    if (!result.ok) { setError(readable(result.message)); return }
     // The money is on the books. Something beside it — filing the customer —
     // may not be, and that is a different sentence: shown against a
     // transaction that saved, never as a failure to save.
@@ -220,10 +273,12 @@ export function TxnForm({
       // fresh, and a fresh key so it cannot be mistaken for a retry of this one.
       requestKey.current = crypto.randomUUID()
       form.resetFields()
+      setDirty(false)
       setLastSaved(result.docNo)
       onSaved(result.docNo, true)
       return
     }
+    setDirty(false)
     onSaved(result.docNo, false)
   }
 
@@ -232,11 +287,11 @@ export function TxnForm({
       open={open}
       width={820}
       title={t(correcting ? 'txn.form.correctTitle' : 'txn.form.newTitle')}
-      onCancel={onClose}
+      onCancel={requestClose}
       mask={{ closable: false }}
       destroyOnHidden
       footer={[
-        <Button key="close" onClick={onClose}>{t('txn.form.close')}</Button>,
+        <Button key="close" onClick={requestClose}>{t('txn.form.close')}</Button>,
         !correcting && (
           <Button key="more" loading={saving} onClick={() => submit(true)}>
             {t('txn.form.saveMore')}
@@ -247,7 +302,22 @@ export function TxnForm({
         </Button>,
       ]}
     >
-      <Form<Values> form={form} layout="vertical" initialValues={initial} preserve={false}>
+      {/* Not preserve={false} on the whole form: the form library does not
+          apply it to list fields, and in development — where React mounts
+          everything twice — it wiped the payment rows' default method, so a
+          new form offered no way it was paid. It belongs on the two scrap
+          fields that come and go. */}
+      <Form<Values> form={form} layout="vertical" initialValues={initial}
+                    scrollToFirstError onValuesChange={() => setDirty(true)}>
+        <div ref={topRef} />
+        {error && (
+          <Alert type="error" showIcon title={t('txn.rowError')} description={error}
+                 style={{ marginBottom: 12 }} />
+        )}
+        {warning && (
+          <Alert type="warning" showIcon title={t('txn.savedWithWarning')} description={warning}
+                 style={{ marginBottom: 12 }} />
+        )}
         {lastSaved && (
           <Alert type="success" showIcon style={{ marginBottom: 12 }}
                  title={`${t('txn.form.savedAs')} ${lastSaved}`} />
@@ -298,14 +368,14 @@ export function TxnForm({
         {isScrap && (
           <Row gutter={12}>
             <Col xs={24} sm={12}>
-              <Form.Item name="scrapDetail" label={t('txn.form.band')}
+              <Form.Item name="scrapDetail" label={t('txn.form.band')} preserve={false}
                          extra={t('txn.form.scrapHint')}>
                 <Select allowClear
                         options={SCRAP_BANDS.map((b) => ({ value: b, label: b }))} />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
-              <Form.Item name="goldPct" label={t('txn.col.purity')}
+              <Form.Item name="goldPct" label={t('txn.col.purity')} preserve={false}
                          rules={[{ type: 'number', min: 0, max: 1, message: t('txn.col.purity') }]}>
                 <InputNumber style={{ width: '100%' }} min={0} max={1} step={0.0001}
                              controls={false} placeholder="0.7351" />
@@ -391,8 +461,19 @@ export function TxnForm({
 
         <Divider titlePlacement="start" plain>{t('txn.form.settle')}</Divider>
 
-        <Form.List name="payments">
-          {(fields, { add, remove }) => (
+        <Form.List
+          name="payments"
+          rules={[{
+            // The books refuse a purchase or a deposit with no payment on it
+            // ("produced no journal lines"). Said here, before it gets that far.
+            validator: async (_, payments: PaymentField[] | undefined) => {
+              if (!NEEDS_PAYMENT.has(form.getFieldValue('txnType'))) return
+              const complete = (payments ?? []).some((p) => Number(p?.amount ?? 0) > 0 && p?.method)
+              if (!complete) throw new Error(t('txn.form.paymentRequired'))
+            },
+          }]}
+        >
+          {(fields, { add, remove }, { errors }) => (
             <>
               {fields.map((field) => (
                 <Row gutter={12} key={field.key} align="middle">
@@ -403,7 +484,19 @@ export function TxnForm({
                     </Form.Item>
                   </Col>
                   <Col xs={16} sm={10}>
-                    <Form.Item name={[field.name, 'method']} label={t('txn.col.method')}>
+                    <Form.Item
+                      name={[field.name, 'method']}
+                      label={t('txn.col.method')}
+                      dependencies={[['payments', field.name, 'amount']]}
+                      rules={[({ getFieldValue }) => ({
+                        // An amount with no method used to be dropped on save,
+                        // so the money typed simply was not there afterwards.
+                        validator: (_, method) => (
+                          Number(getFieldValue(['payments', field.name, 'amount']) ?? 0) > 0 && !method
+                            ? Promise.reject(new Error(t('txn.form.methodMissing')))
+                            : Promise.resolve()),
+                      })]}
+                    >
                       <Select allowClear
                               options={PAYMENT_METHODS.map((m) => ({ value: m, label: m }))} />
                     </Form.Item>
@@ -418,6 +511,7 @@ export function TxnForm({
               ))}
               {/* Half in cash, half by transfer and the rest by check is an
                   ordinary morning at this counter (B11). */}
+              <Form.ErrorList errors={errors} />
               {fields.length < MAX_PAYMENTS && (
                 <Button type="dashed" block icon={<PlusOutlined />}
                         onClick={() => add({ amount: null, method: null })}>
@@ -432,18 +526,22 @@ export function TxnForm({
           <Input.TextArea rows={2} />
         </Form.Item>
 
-        {error && (
-          <Alert type="error" showIcon title={t('txn.rowError')} description={error}
-                 style={{ marginTop: 8 }} />
-        )}
-        {warning && (
-          <Alert type="warning" showIcon title={t('txn.savedWithWarning')} description={warning}
-                 style={{ marginTop: 8 }} />
-        )}
         <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
           {t('txn.date')}: {txnDate}
         </Typography.Paragraph>
       </Form>
+
+      <Modal
+        open={confirmClose}
+        title={t('txn.form.unsavedTitle')}
+        okText={t('txn.form.discard')}
+        okButtonProps={{ danger: true }}
+        cancelText={t('txn.form.keepEditing')}
+        onOk={() => { setConfirmClose(false); setDirty(false); onClose() }}
+        onCancel={() => setConfirmClose(false)}
+      >
+        {t('txn.form.unsavedBody')}
+      </Modal>
     </Modal>
   )
 }
