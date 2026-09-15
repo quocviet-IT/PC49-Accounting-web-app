@@ -81,11 +81,55 @@ Database đã nhanh hơn 3–4 lần mà trang gần như không đổi. Vậy l
 - Đợt này không đụng tới đăng nhập. Đăng nhập mất 5,0–5,5 giây ở lượt 1–2 rồi về 3,99 giây ở lượt 3, cùng nhịp với trang Tồn kho, nên đó là nhiễu của mạng hoặc Vercel.
 - Kiểm tra trên Production sau khi đẩy: giao diện 12/12 (nhãn tên nút vẽ bằng CSS), `verify:screens` đạt.
 
-## Chưa làm, đề xuất
+## Các đề xuất còn lại, đã làm tiếp (15-09)
 
-- **CSS tĩnh của antd (`zeroRuntime`, có từ antd 6):**
-  - bỏ khoảng 105 ms sinh CSS mỗi yêu cầu và khoảng 370 KB CSS nhúng trong mỗi trang;
-  - đổi lại, phải sinh CSS theo màu xanh kế toán cho cả nền sáng và tối, và nạp một file CSS riêng (`antd.css` gốc nặng 1 MB);
-  - thay đổi này đụng mọi trang và dễ lệch màu, nên nên làm thành một đợt riêng, có ảnh chụp so sánh.
-- **RLS:** bọc `effective_role()` thành `(SELECT pc49.effective_role())` trong các chính sách, để database tính một lần cho mỗi truy vấn thay vì mỗi dòng. Hiện tốn khoảng 15 ms mỗi truy vấn trên 1062 dòng, và sẽ tăng theo lượng dữ liệu.
-- **Lý do không sửa được giao dịch** (`correction_blocked_reason`) đang là tiếng Anh, ví dụ "this is one leg of a conversion…". Nên trả về mã lý do rồi dịch như màn Nạp dữ liệu.
+Ba đề xuất ghi ở cuối đợt này đều đã làm. CSS tĩnh của antd là một đợt riêng, ghi trong `2026-09-15-css-tinh-antd.md`. Hai việc còn lại ghi dưới đây.
+
+### Migration 0070 `a_role_is_read_once_per_query`: RLS hỏi quyền một lần cho mỗi truy vấn
+
+- **Trước đây:** 78 chính sách của `pc49` gọi thẳng `pc49.effective_role()` hoặc `auth.uid()`, nên database gọi lại cho từng dòng.
+- **Cách sửa:**
+  - migration viết lại từng chính sách từ chính định nghĩa đang lưu, chỉ bọc các lời gọi đó thành `(SELECT …)`;
+  - quyền của từng chính sách giữ nguyên.
+- **Không đổi:** chính sách ảnh chụp góp ý trên `storage.objects`, vì bảng đó thuộc dịch vụ Storage và ảnh chỉ được đọc từng cái một.
+- **Test SQL mới:** không chính sách nào của `pc49` còn gọi thẳng. Test đỏ trước 0070 và xanh sau. Cả bộ SQL đạt 30/30 file, 433 test.
+- **Trên database thật sau khi chạy:**
+  - cả 78 chính sách đã được bọc;
+  - admin vẫn thấy đủ 1062 giao dịch, 611 khách và 4 người dùng.
+
+Đo trên database thật, vai trò đăng nhập như app (admin), trung vị 7 lần:
+
+| Truy vấn | Trước 0070 | Sau 0070 |
+|---|---|---|
+| Quét `gold_txn` qua RLS (1062 dòng) | 17,9 ms | 0,6 ms |
+| `gold_txn_ledger` (50 dòng, không lọc) | 34,1 ms | 11,9 ms |
+| `gold_txn_ledger_totals` (không lọc) | 22,0 ms | 3,6 ms |
+
+So với trước đợt tăng tốc (104 ms và 84 ms), đọc một trang sổ giờ nhanh hơn khoảng 9 lần và số tổng khoảng 23 lần.
+
+### Migration 0071 `a_refusal_to_correct_is_a_code`: lý do không sửa được là một mã
+
+- **Trong database:**
+  - `correction_blocked_code` trả một trong các mã `NOT_FOUND`, `VOIDED`, `CONVERSION_LEG`, `DEPOSIT_PICKUP`, `DEPOSIT_PICKED_UP`, `REFINING_RECEIPT`, `REFINING_SOURCE`, `CASH_LINK`, hoặc `null` nếu sửa được; các bước kiểm tra và thứ tự giữ đúng như 0055;
+  - `correction_blocked_reason` vẫn trả câu tiếng Anh như cũ, nay lấy từ mã, để `correct_gold_transaction` dùng khi từ chối;
+  - `gold_txn_ledger` trả cột `blocked_code` thay cho `blocked_reason`, và bộ lọc trạng thái dùng mã.
+- **Trên màn hình:**
+  - mã được dịch qua khoá `txn.blocked.<mã>`, có câu tiếng Việt và tiếng Anh;
+  - mã chưa có câu dịch thì hiện câu chung "Không sửa được dòng này ở đây", không hiện mã.
+- **Test:**
+  - sổ trả `DEPOSIT_PICKED_UP` cho đơn cọc đã có lần lấy hàng, và `DEPOSIT_PICKUP` cho chính lần lấy hàng;
+  - giao dịch đã huỷ trả `VOIDED` kèm câu tiếng Anh cũ; mã giao dịch không tồn tại trả `NOT_FOUND`;
+  - đọc mã từ chính thân hàm, rồi kiểm tra mỗi mã đều có câu trong cả hai ngôn ngữ;
+  - nút Sửa bị khoá hiện câu tiếng Việt, không hiện mã hay câu tiếng Anh.
+- **Triển khai (15-09):**
+  - thứ tự: đẩy code (`678e0b9`), chờ Vercel báo xong, rồi mới chạy 0071 trên database thật. Đẩy trước là để nếu lệnh đẩy bị chặn thì database vẫn khớp với bản đang chạy;
+  - trong vài phút từ lúc bản mới lên đến lúc chạy xong 0071, các dòng bị khoá hiện nút Sửa đang bật, vì bản mới đọc `blocked_code` mà database chưa có cột này. Nếu có ai bấm lưu trong lúc đó, `correct_gold_transaction` vẫn từ chối, nên không có dữ liệu sai;
+  - đo lại database thật sau 0071: sổ 11,9 ms, số tổng 3,7 ms, không đổi so với sau 0070.
+- **Kiểm tra trên Production sau khi chạy 0071:**
+  - database thật có 131 dòng bị khoá: 81 vế quy đổi, 25 đơn cọc đã có lần lấy hàng, 25 lần lấy hàng;
+  - thử ba dòng thật, mỗi dòng một lý do: vế quy đổi `PC49-2601-036`, đơn cọc đã lấy hàng `PC49-2601-095`, lần lấy hàng `PC49-2601-096`. Cả ba đều khoá nút Sửa và hiện đúng câu tiếng Việt;
+  - `verify:screens` đạt.
+  - `probe:speed` chạy một lượt ngay sau đó, **đạt** mọi ngưỡng:
+    - trang Giao dịch vàng dựng xong trong 504 ms; lượt cuối sau đợt CSS tĩnh là 582 ms;
+    - các trang khác 273–472 ms;
+    - đăng nhập 3668 ms.
