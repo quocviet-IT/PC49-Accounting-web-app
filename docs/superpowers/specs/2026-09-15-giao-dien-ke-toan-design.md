@@ -127,3 +127,19 @@ Bốn lối tắt thành thẻ có icon màu chính, xếp lưới co giãn:
 - `verify:users`: đạt 12/12 (thêm người bằng nút mới, mật khẩu tạm hiện một lần, người mới bị buộc đổi mật khẩu, bấm Khoá dạng icon theo tên, lý do được lưu, tài khoản đã khoá không vào được) và tự xoá tài khoản thử. Lần chạy đầu, ngay sau build, hết giờ ở bước mở trang đăng nhập vì máy đang bận; chạy lại khi máy rảnh thì đạt.
 - `verify:void` và `verify:correct` không chạy. Hai script này vẫn gõ vào lưới nhập cũ, đã bỏ từ 10-09 khi nhập chuyển sang form (`eabfb54`), nên không thể đạt dù giao diện đúng. Nút Sửa và Huỷ mới được kiểm bằng lượt kiểm tra giao diện ở trên. Hai script cần viết lại theo form.
 - Ảnh chụp 4 màn hình (tổng quan, sổ giao dịch, đối chiếu tiền, người dùng) ở chủ đề sáng và tối: "trước" chụp trên Production khi chưa đẩy, "sau" chụp trên dev. Ảnh không commit vì có tên khách và số tiền.
+
+### Production (15-09, sau khi đẩy `20790e4`)
+
+- Bản mới lên Production: trang Tổng quan có thẻ lối tắt có icon.
+- `verify:screens` trên Production đạt.
+- `probe:speed` (cột "built" là thời gian tới hết HTML, `responseEnd − requestStart`, lấy ở lượt thứ hai khi đã ấm):
+  - lượt 1, ngay sau khi triển khai: đăng nhập 3194 ms (ngưỡng 4000); 10/11 trang dưới 800 ms; `/gold-transactions` 1036 ms, **chưa đạt** (phần 2 đo 753 ms);
+  - lượt 2 và 3, máy rảnh: `/gold-transactions` 1542 ms rồi 905 ms, vẫn **chưa đạt**; ngày 2026-01-08 886 ms rồi 794 ms; các trang khác 320–600 ms; đăng nhập 3535 và 3189 ms.
+- Kiểm tra giao diện trên Production, không ghi dữ liệu: đạt 12/12, giống trên dev.
+- Vì sao sổ giao dịch chậm hơn các trang khác (đo trên Production, 15-09):
+  - HTML trang 20 dòng là 517 KB: 373 KB CSS của antd trong 2 thẻ `<style>`, 53 KB dữ liệu React (có danh mục 611 khách hàng), 87 KB HTML hiển thị. Ở 50 dòng, HTML hiển thị lên 163 KB.
+  - Hai thẻ CSS không trùng nhau: thẻ đầu 183 KB giống hệt trên mọi trang (khung app), thẻ sau là CSS riêng của trang; chỉ 56/920 khối trùng. Trang Tồn kho mang 394 KB CSS mà vẫn 420–640 ms, nên CSS không phải lý do.
+  - Phần 3 thêm khoảng 28 KB HTML cho trang 50 dòng (icon và nhãn màu), chừng 5% trang. Thời gian tăng theo số dòng khoảng 3 ms mỗi dòng, tính mọi thứ trong dòng: 20 dòng 690–890 ms, 50 dòng 940–1240 ms, 100 dòng 1020–1090 ms.
+  - Năm truy vấn của trang, gọi từ máy ở Việt Nam tới Supabase Singapore (một lượt đi-về rỗng mất 106 ms), trung vị 4 lần: gọi cùng lúc như trang thật hết 378 ms. `gold_txn_ledger` 283 ms, gần như không đổi theo số dòng (20 dòng 288 ms, 100 dòng 321 ms) hay theo ngày (279 ms); `gold_txn_ledger_totals` 269 ms; danh mục khách 166 ms. Từ Vercel tới Supabase cùng vùng thì đường truyền còn ngắn hơn.
+  - Kết luận: dữ liệu chiếm khoảng 300–400 ms. Phần còn lại của 0,9–1 giây là dựng và gửi một trang khoảng 600 KB nhiều component antd. Phần 3 góp một phần nhỏ (28 KB HTML, thêm 50 Tooltip ở cột thao tác); muốn tách chính xác phải so hai bản build.
+  - Hướng xử lý, chưa làm: đo thời gian dựng trang ở server rồi chọn giữa: thay Tooltip của antd ở từng dòng bằng cách hiện tên nhẹ hơn; xem form nhập có bị dựng sẵn khi chưa mở không; chỉ tải danh mục khách khi mở form.

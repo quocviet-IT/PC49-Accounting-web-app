@@ -27,7 +27,7 @@
   Commit.
 - [x] **Task 4 — Tiền, quy đổi, nạp dữ liệu, giá, báo cáo:** `Reconcile`, `ConversionView`, `ImportView`, `StateFigure`, `PriceGrid`, `ReportView`, `Ledger` (`LoadFailed`). Bỏ CSS nút trong module. Commit.
 - [x] **Task 5 — Cài đặt, báo lỗi, phân kim, khung app:** `UsersView`, `PeriodList`, `PasswordView`, `ReportDialog`, `LotDetail`, `LotList`, `PurchasePicker`, `BagTable`, `AppShell`, `ThemeToggle`, `LocaleSwitch`. Commit.
-- [ ] **Task 6 — Kiểm chứng, đẩy lên.**
+- [x] **Task 6 — Kiểm chứng, đẩy lên.**
   - quy tắc "nút phải có tên" trong `verify-layout`;
   - cổng: test, tsc, lint, build;
   - trình duyệt: layout, grid, ledger, void, correct, users, screens;
