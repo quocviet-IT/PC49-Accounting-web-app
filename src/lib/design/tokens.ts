@@ -35,7 +35,7 @@ type Palette = {
 const LIGHT: Palette = {
   money: { positive: '#15803d', negative: '#b91c1c', zero: '#475569' },
   intent: {
-    primary: '#0f766e', primarySolid: '#0f766e',
+    primary: '#1d4ed8', primarySolid: '#1d4ed8',
     success: '#15803d', warning: '#b45309', danger: '#b91c1c',
   },
   text: {
@@ -44,7 +44,7 @@ const LIGHT: Palette = {
   },
   surface: {
     page: '#f6f7f9', card: '#ffffff', muted: '#f1f5f9', subtle: '#f8fafc',
-    sider: '#0f172a', siderActive: '#134e4a',
+    sider: '#0f172a', siderActive: '#1e3a8a',
   },
   border: { default: '#e2e8f0', subtle: '#f1f5f9', strong: '#cbd5e1' },
   chrome: {
@@ -52,15 +52,15 @@ const LIGHT: Palette = {
     textMuted: '#94a3b8', border: '#1e293b',
   },
   accent: {
-    wash: '#f0fdfa', tint: '#ecfdf9', ring: '#5eead4',
-    strong: '#115e59', onDark: '#5eead4',
+    wash: '#eff6ff', tint: '#dbeafe', ring: '#93c5fd',
+    strong: '#1e40af', onDark: '#93c5fd',
   },
 }
 
 const DARK: Palette = {
   money: { positive: '#4ade80', negative: '#f87171', zero: '#94a3b8' },
   intent: {
-    primary: '#2dd4bf', primarySolid: '#0f766e',
+    primary: '#60a5fa', primarySolid: '#2563eb',
     success: '#4ade80', warning: '#fbbf24', danger: '#f87171',
   },
   text: {
@@ -69,7 +69,7 @@ const DARK: Palette = {
   },
   surface: {
     page: '#0b1220', card: '#131c2e', muted: '#1b2740', subtle: '#1b2740',
-    sider: '#0b1220', siderActive: '#134e4a',
+    sider: '#0b1220', siderActive: '#1e3a8a',
   },
   border: { default: '#243044', subtle: '#1b2740', strong: '#334155' },
   chrome: {
@@ -77,8 +77,8 @@ const DARK: Palette = {
     textMuted: '#94a3b8', border: '#1e293b',
   },
   accent: {
-    wash: '#12312f', tint: '#0f2b29', ring: '#2dd4bf',
-    strong: '#5eead4', onDark: '#5eead4',
+    wash: '#172554', tint: '#1e3a8a', ring: '#60a5fa',
+    strong: '#93c5fd', onDark: '#93c5fd',
   },
 }
 

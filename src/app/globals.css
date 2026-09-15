@@ -5,8 +5,8 @@
   --pc-money-positive: #15803d;
   --pc-money-negative: #b91c1c;
   --pc-money-zero: #475569;
-  --pc-intent-primary: #0f766e;
-  --pc-intent-primarySolid: #0f766e;
+  --pc-intent-primary: #1d4ed8;
+  --pc-intent-primarySolid: #1d4ed8;
   --pc-intent-success: #15803d;
   --pc-intent-warning: #b45309;
   --pc-intent-danger: #b91c1c;
@@ -20,7 +20,7 @@
   --pc-surface-muted: #f1f5f9;
   --pc-surface-subtle: #f8fafc;
   --pc-surface-sider: #0f172a;
-  --pc-surface-siderActive: #134e4a;
+  --pc-surface-siderActive: #1e3a8a;
   --pc-border-default: #e2e8f0;
   --pc-border-subtle: #f1f5f9;
   --pc-border-strong: #cbd5e1;
@@ -29,19 +29,19 @@
   --pc-chrome-menuHover: #1e293b;
   --pc-chrome-textMuted: #94a3b8;
   --pc-chrome-border: #1e293b;
-  --pc-accent-wash: #f0fdfa;
-  --pc-accent-tint: #ecfdf9;
-  --pc-accent-ring: #5eead4;
-  --pc-accent-strong: #115e59;
-  --pc-accent-onDark: #5eead4;
+  --pc-accent-wash: #eff6ff;
+  --pc-accent-tint: #dbeafe;
+  --pc-accent-ring: #93c5fd;
+  --pc-accent-strong: #1e40af;
+  --pc-accent-onDark: #93c5fd;
 }
 
 :root[data-theme="dark"] {
   --pc-money-positive: #4ade80;
   --pc-money-negative: #f87171;
   --pc-money-zero: #94a3b8;
-  --pc-intent-primary: #2dd4bf;
-  --pc-intent-primarySolid: #0f766e;
+  --pc-intent-primary: #60a5fa;
+  --pc-intent-primarySolid: #2563eb;
   --pc-intent-success: #4ade80;
   --pc-intent-warning: #fbbf24;
   --pc-intent-danger: #f87171;
@@ -55,7 +55,7 @@
   --pc-surface-muted: #1b2740;
   --pc-surface-subtle: #1b2740;
   --pc-surface-sider: #0b1220;
-  --pc-surface-siderActive: #134e4a;
+  --pc-surface-siderActive: #1e3a8a;
   --pc-border-default: #243044;
   --pc-border-subtle: #1b2740;
   --pc-border-strong: #334155;
@@ -64,11 +64,11 @@
   --pc-chrome-menuHover: #1e293b;
   --pc-chrome-textMuted: #94a3b8;
   --pc-chrome-border: #1e293b;
-  --pc-accent-wash: #12312f;
-  --pc-accent-tint: #0f2b29;
-  --pc-accent-ring: #2dd4bf;
-  --pc-accent-strong: #5eead4;
-  --pc-accent-onDark: #5eead4;
+  --pc-accent-wash: #172554;
+  --pc-accent-tint: #1e3a8a;
+  --pc-accent-ring: #60a5fa;
+  --pc-accent-strong: #93c5fd;
+  --pc-accent-onDark: #93c5fd;
 }
 
 /* ------------------------------------------------- type and spacing scale */
