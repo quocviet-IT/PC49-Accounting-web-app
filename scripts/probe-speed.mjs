@@ -15,7 +15,7 @@ const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const HTML_TARGET_MS = 800
 const SIGN_IN_TARGET_MS = 4000
 const ROUTES = [
-  '/', '/gold-transactions?date=2026-01-08', '/prices?date=2026-01-08', '/inventory',
+  '/', '/gold-transactions', '/gold-transactions?date=2026-01-08', '/prices?date=2026-01-08', '/inventory',
   '/cash?period=2026-08', '/journal?period=2026-01', '/reports', '/refining', '/import',
   '/settings/reference',
 ]
