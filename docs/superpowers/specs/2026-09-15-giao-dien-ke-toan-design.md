@@ -92,13 +92,13 @@ Bốn lối tắt thành thẻ có icon màu chính, xếp lưới co giãn:
 ### Đã làm
 
 - Commit theo từng phần:
-  - `4461473` màu xanh dương;
-  - `d44d288` `IconAction`, `TxnTypeTag`;
-  - `d8ecc4e` sổ giao dịch vàng, form nhập, tồn kho, tổng quan;
-  - `3924fb4` tiền & ngân hàng, nạp dữ liệu, giá, báo cáo, quy đổi, thông báo lỗi tải;
-  - `8ef5bce` người dùng, kỳ kế toán, đổi mật khẩu, báo lỗi, phân kim, nút đổi ngôn ngữ;
-  - `9321f27` sửa cho đúng bảng icon (`Sparkles`, `ListPlus`) và Khoá kỳ màu đỏ;
-  - `50d1237` quy tắc nút phải có tên trong `verify-layout`.
+  - `a52162b` màu xanh dương;
+  - `2387592` `IconAction`, `TxnTypeTag`;
+  - `08a6848` sổ giao dịch vàng, form nhập, tồn kho, tổng quan;
+  - `04c2e48` tiền & ngân hàng, nạp dữ liệu, giá, báo cáo, quy đổi, thông báo lỗi tải;
+  - `11a499a` người dùng, kỳ kế toán, đổi mật khẩu, báo lỗi, phân kim, nút đổi ngôn ngữ;
+  - `ded8544` sửa cho đúng bảng icon (`Sparkles`, `ListPlus`) và Khoá kỳ màu đỏ;
+  - `fe59365` quy tắc nút phải có tên trong `verify-layout`.
 - Thẻ `<button>` tự vẽ còn đúng một chỗ: dòng chọn giao dịch ở màn Quy đổi, vì đó là dòng chọn chứ không phải nút hành động.
 - Ba chỗ vẫn là phần tử khác nhưng vẽ cùng cỡ với nút antd (cao 32px, bo 8px, viền và hover như nút mặc định):
   - hai nhãn chọn file (Nhập sao kê, Chọn file) là `label` bọc ô file, thêm icon `Upload`;
