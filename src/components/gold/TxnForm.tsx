@@ -26,6 +26,8 @@ const money = new Intl.NumberFormat('en-US', {
 type PaymentField = { amount: number | null; method: string | null }
 
 type Values = {
+  /** The day the transaction belongs to. */
+  txnDate: string
   txnType: string
   goldTypeCode: string
   qty: number | null
@@ -150,6 +152,7 @@ export function TxnForm({
 
   const initial: Values = useMemo(() => (correcting
     ? {
+        txnDate,
         txnType: correcting.txn_type,
         goldTypeCode: correcting.gold_type_code,
         qty: correcting.qty,
@@ -168,6 +171,7 @@ export function TxnForm({
         reason: t('txn.correctReason'),
       }
     : {
+        txnDate,
         txnType: 'PO',
         goldTypeCode: '',
         qty: null,
@@ -240,7 +244,7 @@ export function TxnForm({
 
     const body = {
       requestKey: requestKey.current,
-      txnDate,
+      txnDate: v.txnDate,
       txnType: v.txnType,
       goldTypeCode: v.goldTypeCode,
       uom: uomOf(v.goldTypeCode),
@@ -352,6 +356,17 @@ export function TxnForm({
           <h3 id="txn-details-heading" className={styles.sectionHeading}>
             {t('txn.form.details')}
           </h3>
+          <Row gutter={12}>
+          <Col xs={24} sm={8}>
+            {/* The ledger shows every day now, so the day is a field. It starts
+                on the day being looked at, or today; a correction keeps the
+                day of the row it replaces. */}
+            <Form.Item name="txnDate" label={t('txn.date')}
+                       rules={[{ required: true, message: t('txn.form.required') }]}>
+              <Input type="date" disabled={Boolean(correcting)} />
+            </Form.Item>
+          </Col>
+          </Row>
           <Row gutter={12}>
           <Col xs={24} sm={8}>
             <Form.Item name="txnType" label={t('txn.col.type')}
@@ -546,9 +561,6 @@ export function TxnForm({
           </Form.Item>
         </section>
 
-        <Typography.Paragraph type="secondary" className={styles.formDate}>
-          {t('txn.date')}: {txnDate}
-        </Typography.Paragraph>
       </Form>
 
       <Modal
