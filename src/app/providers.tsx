@@ -4,11 +4,9 @@ import { App, ConfigProvider, theme as antdTheme } from 'antd'
 import enUS from 'antd/locale/en_US'
 import viVN from 'antd/locale/vi_VN'
 import { antdThemeTokens } from '@/lib/design/tokens'
+import { antdThemeConfig } from '@/lib/design/antdTheme'
 import { useTheme } from '@/components/theme/ThemeProvider'
 import { useLocale } from '@/lib/i18n/provider'
-
-const SANS =
-  '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
 
 /**
  * App-wide Ant Design context.
@@ -24,7 +22,9 @@ const SANS =
 export function Providers({ children }: { children: React.ReactNode }) {
   const { theme } = useTheme()
   const { locale } = useLocale()
-  const { token, components } = antdThemeTokens(theme)
+  // Shared with scripts/antd-css.mjs, which writes the stylesheet these
+  // settings are painted with; two copies would drift.
+  const config = antdThemeConfig(theme, antdThemeTokens(theme))
 
   return (
     <ConfigProvider
@@ -43,14 +43,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
          * keys give the two themes distinct selectors, so insertion order
          * stops mattering.
          */
-        cssVar: { key: theme === 'dark' ? 'pc-dark' : 'pc-light' },
-        token: { ...token, borderRadius: 8, fontFamily: SANS, fontSize: 14, wireframe: false },
-        components: {
-          ...components,
-          // A dimension rather than a colour, so it stays here with the other
-          // non-colour settings. Spreading keeps the colours the tokens set.
-          Layout: { ...components.Layout, headerHeight: 56 },
-        },
+        cssVar: config.cssVar,
+        /*
+         * Components take their styles from the stylesheet scripts/antd-css.mjs
+         * writes (linked in layout.tsx) instead of writing them while they render. The writing cost every server render
+         * about a hundred milliseconds on the ledger (15-09) and put some 370 KB
+         * of CSS into every page. The theme's variables are still written at
+         * runtime, so the palette and the dark theme behave as before.
+         */
+        zeroRuntime: true,
+        token: config.token,
+        components: config.components,
       }}
     >
       <App>{children}</App>

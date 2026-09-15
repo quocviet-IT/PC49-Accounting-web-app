@@ -12,6 +12,7 @@
     "test:low-memory": "vitest run --config vitest.low-memory.config.mts",
     "test:watch": "vitest",
     "migrate": "node --env-file=.env.local scripts/migrate.mjs",
+    "antd:css": "node scripts/antd-css.mjs",
     "verify:live": "node --env-file=.env.local scripts/verify-live.mjs",
     "seed:users": "node --env-file=.env.local scripts/seed-test-users.mjs",
     "verify:rls": "node --env-file=.env.local scripts/verify-rls.mjs",
@@ -55,6 +56,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@ant-design/static-style-extract": "^2.1.0",
     "@electric-sql/pglite": "^0.5.8",
     "@types/node": "^20.19.43",
     "@types/pg": "^8.23.1",

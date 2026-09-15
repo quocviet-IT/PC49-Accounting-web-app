@@ -20,6 +20,9 @@ export async function proxy(request: NextRequest) {
   return response
 }
 
+// The antd stylesheet (public/antd/) is linked from every page, the sign-in
+// page included. Checked here, it was redirected to /login before anybody had
+// signed in, and the redirect was cached as long as the stylesheet itself.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|antd/|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }

@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/components/theme/ThemeProvider'
 import { Providers } from './providers'
 import { noFlashScript, parseThemeMode, THEME_STORAGE_KEY } from '@/lib/domain/theme'
 import type { Locale } from '@/lib/i18n'
+import { ANTD_STYLESHEET } from '@/lib/design/antdStylesheet'
 import './globals.css'
 
 export const metadata = {
@@ -34,6 +35,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           is correct and the mismatch is the entire point.
         */}
         <script dangerouslySetInnerHTML={{ __html: noFlashScript() }} />
+        {/*
+          Ant Design's component styles (zero-runtime: providers.tsx, and
+          scripts/antd-css.mjs, which writes them). A precedence of its own puts
+          this after every stylesheet Next adds for the app, pages included,
+          which is where antd's styles sat when antd wrote them into the page
+          itself. Where the two disagree at equal specificity antd's rule still
+          wins, so nothing on screen moves.
+        */}
+        <link rel="stylesheet" href={ANTD_STYLESHEET} precedence="antd" />
       </head>
       <body>
         <AntdRegistry>

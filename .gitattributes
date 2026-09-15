@@ -1,0 +1,4 @@
+# The antd stylesheet is named after a hash of its exact bytes
+# (scripts/antd-css.mjs), and it holds line breaks. Converting them on checkout,
+# as Windows does by default, would make the file disagree with its own name.
+public/antd/*.css -text
