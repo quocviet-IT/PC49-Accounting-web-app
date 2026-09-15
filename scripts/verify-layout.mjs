@@ -91,6 +91,16 @@ function survey() {
   const problems = []
   const overflow = document.documentElement.scrollWidth - vw
   if (overflow > 0) problems.push(`the page scrolls sideways by ${overflow}px`)
+  // A button drawn as an icon alone still needs a name. A tooltip is not one:
+  // a screen reader, or a check that presses buttons by name, finds nothing.
+  for (const b of document.querySelectorAll('button, [role="button"]')) {
+    const r = b.getBoundingClientRect()
+    if (r.width === 0 || r.height === 0 || getComputedStyle(b).visibility === 'hidden') continue
+    const named = (b.textContent ?? '').trim() !== ''
+      || ['aria-label', 'aria-labelledby', 'title'].some((a) => (b.getAttribute(a) ?? '').trim() !== '')
+      || b.querySelector('[aria-label]:not([aria-hidden="true"]), img[alt]:not([alt=""])')
+    if (!named) { problems.push(`${label(b)} is a button with no name`); break }
+  }
   const seen = new Set()
   for (const el of document.querySelectorAll('main *')) {
     const r = el.getBoundingClientRect()
