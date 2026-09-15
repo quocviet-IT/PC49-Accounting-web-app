@@ -139,6 +139,20 @@ describe('the gold ledger', () => {
     expect(await docs({ query: 'da giao' })).toEqual(['SALE-778'])
   })
 
+  it('treats a search of nothing but punctuation as no search at all', async () => {
+    expect(await docs({ query: ' - ' })).toEqual(await docs())
+  })
+
+  it('checks each transaction inside the query rather than calling a function per row', async () => {
+    // A SQL function that sets its own search_path is never inlined, so
+    // PostgreSQL called the predicate once per transaction: on 1062 rows that
+    // was about 75 ms of the page's 104 and 63 of the totals' 84 (15-09).
+    const plan = await db.query<{ 'QUERY PLAN': string }>(
+      `EXPLAIN SELECT count(*) FROM pc49.gold_txn t
+        WHERE pc49.gold_txn_ledger_match(t, NULL::date, NULL::date, NULL, NULL, NULL, NULL, NULL, NULL)`)
+    expect(plan.rows.map((r) => r['QUERY PLAN']).join(' ')).not.toContain('gold_txn_ledger_match')
+  })
+
   it('separates what may be corrected from what may not', async () => {
     expect(await docs({ status: 'locked' })).toEqual(['PU-001', 'DEP-001'])
     expect(await docs({ status: 'correctable' })).toEqual(['PO-003', 'PO-002', 'SALE-778', 'PO-001'])
