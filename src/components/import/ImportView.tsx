@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Tabs } from 'antd'
+import { Button, Tabs } from 'antd'
+import { BookCheck, ListChecks, Search, Undo2 } from 'lucide-react'
 import Link from 'next/link'
 import { useLocale } from '@/lib/i18n/provider'
 import type { MessageKey } from '@/lib/i18n'
@@ -192,36 +193,35 @@ export function ImportView({
           <div className={styles.actions}>
             {!selected.committedAt && (
               <>
-                <button
-                  type="button"
-                  className={styles.button}
+                <Button
+                  type="primary"
+                  icon={<BookCheck size={14} aria-hidden />}
                   disabled={pending || selected.validCount === 0}
                   onClick={() => run(() => commitBatch({ batchId: selected.id }))}
                 >
                   {t('imp.commit')}
-                </button>
+                </Button>
                 {selected.rejectedCount > 0 && (
-                  <button
-                    type="button"
-                    className={styles.quiet}
+                  <Button
+                    icon={<ListChecks size={14} aria-hidden />}
                     disabled={pending}
                     onClick={() =>
                       run(() => commitBatch({ batchId: selected.id, allowPartial: true }))}
                   >
                     {t('imp.commitPartial')}
-                  </button>
+                  </Button>
                 )}
               </>
             )}
             {selected.committedAt && (
-              <button
-                type="button"
-                className={styles.quiet}
+              <Button
+                danger
+                icon={<Undo2 size={14} aria-hidden />}
                 disabled={pending}
                 onClick={() => run(() => withdrawBatch({ batchId: selected.id }))}
               >
                 {t('imp.withdraw')}
-              </button>
+              </Button>
             )}
             {message && (
               <span className={failed ? styles.failed : styles.said}>{message}</span>
@@ -236,7 +236,7 @@ export function ImportView({
           <label htmlFor="asOf">{t('imp.asOf')}</label>
           <input id="asOf" name="asOf" type="date" defaultValue={asOf} />
           {selected && <input type="hidden" name="batch" value={selected.id} />}
-          <button type="submit" className={styles.quiet}>{t('imp.apply')}</button>
+          <Button htmlType="submit" icon={<Search size={14} aria-hidden />}>{t('imp.apply')}</Button>
           <StateFigure asOf={asOf} />
         </form>
 

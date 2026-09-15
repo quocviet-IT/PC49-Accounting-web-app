@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Button } from 'antd'
+import { History, Search } from 'lucide-react'
 import { useLocale } from '@/lib/i18n/provider'
 import { Page, Section, money, weight, ledger, Frame, LoadFailed } from '@/components/ledger/Ledger'
 import { saveGoldPrice, saveSpotPrice, carryPricesForward } from '@/app/(app)/settings/actions'
@@ -125,16 +127,15 @@ export function PriceGrid({
       <form className={styles.bar} method="get" action="/prices">
         <label htmlFor="date">{t('price.date')}</label>
         <input id="date" name="date" type="date" defaultValue={date} />
-        <button type="submit" className={styles.quiet}>{t('price.show')}</button>
-        <button
-          type="button"
-          className={styles.quiet}
+        <Button htmlType="submit" icon={<Search size={14} aria-hidden />}>{t('price.show')}</Button>
+        <Button
+          icon={<History size={14} aria-hidden />}
           disabled={pending}
           onClick={carry}
           title={previous}
         >
           {t('price.carry')}
-        </button>
+        </Button>
         <span className={ledger.muted}>
           {priced}/{rows.length} {t('price.priced')}
         </span>

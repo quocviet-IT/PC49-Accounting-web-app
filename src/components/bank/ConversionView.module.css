@@ -158,20 +158,6 @@
   padding-top: 4px;
 }
 
-.button {
-  font: inherit;
-  white-space: nowrap;
-  font-size: 13px;
-  padding: 5px 12px;
-  border: 1px solid var(--rule-strong);
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.button:hover { background: color-mix(in srgb, currentColor 6%, transparent); }
-.button:disabled { opacity: 0.5; cursor: default; }
-
 .summary {
   display: flex;
   gap: 32px;

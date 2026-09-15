@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Upload } from 'lucide-react'
 import { useLocale } from '@/lib/i18n/provider'
 import { stageFile, type StageResult } from '@/app/(app)/import/actions'
 import styles from './ImportView.module.css'
@@ -64,6 +65,7 @@ export function StageFile() {
           disabled={pending}
           onChange={(e) => choose(e.target.files?.[0])}
         />
+        <Upload size={14} aria-hidden />
         {pending ? t('imp.staging') : t('imp.stage')}
       </label>
 

@@ -42,6 +42,12 @@ function text(html: string): string {
   return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ')
 }
 
+/** What each button says, whatever markup the button wraps its label in. */
+function buttonLabels(html: string): string[] {
+  return [...html.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/g)]
+    .map((m) => text(m[1]).trim())
+}
+
 describe('cash: each section answers for its own read', async () => {
   const { CashView } = await import('@/components/cash/CashView')
   const base = {
@@ -70,9 +76,8 @@ describe('cash: each section answers for its own read', async () => {
                                     failed={{ recon: true }} />)
     // The button, not the word: the section heading is "Đối chiếu với sổ US",
     // so a bare substring check passes on a page that never offers the button.
-    const button = '>Đối chiếu</button>'
-    expect(ok).toContain(button)
-    expect(failed).not.toContain(button)
+    expect(buttonLabels(ok)).toContain('Đối chiếu')
+    expect(buttonLabels(failed)).not.toContain('Đối chiếu')
     expect(text(failed)).toContain(FAILED)
   })
 

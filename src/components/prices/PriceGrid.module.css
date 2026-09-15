@@ -23,31 +23,6 @@
   color: inherit;
 }
 
-.quiet {
-  font: inherit;
-  font-size: 12px;
-  padding: 4px 10px;
-  border: 1px solid var(--rule-strong);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.quiet:hover:not(:disabled) {
-  color: inherit;
-  border-color: currentColor;
-}
-
-.quiet:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 2px;
-}
-
-.quiet:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
 /* A price cell.
  *
  * It carries a real border. The first version had none until hover, on the

@@ -241,21 +241,3 @@
   font-size: 13px;
   color: var(--pc-money-negative);
 }
-
-.loadFailedRetry {
-  font: inherit;
-  font-size: 12px;
-  padding: 4px 12px;
-  border: 1px solid var(--pc-border-default);
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.loadFailedRetry:focus-visible {
-  outline: 2px solid var(--pc-intent-primary);
-  outline-offset: 1px;
-}
-
-.loadFailedRetry:disabled { opacity: 0.5; cursor: default; }

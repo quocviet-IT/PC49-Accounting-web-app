@@ -1,8 +1,7 @@
 /*
  * The import screen borrows the ledger's rules and typography. What it adds is
- * only what this screen needs and the others do not: a batch you can pick, a
- * row that disagrees with the source, and two buttons whose weight matches how
- * far each one goes.
+ * only what this screen needs and the others do not: a batch you can pick, and
+ * a row that disagrees with the source.
  */
 
 .pick {
@@ -45,55 +44,6 @@
   gap: 12px;
   flex-wrap: wrap;
   padding-top: 12px;
-}
-
-.button,
-.quiet {
-  font: inherit;
-  font-size: 12px;
-  padding: 5px 12px;
-  background: transparent;
-  cursor: pointer;
-}
-
-/* Writing to the books is the heavier of the two, so it carries the heavier
-   border and weight. Filling it with a colour would be the third signal on a
-   screen that already uses two. */
-.button {
-  font-weight: 650;
-  color: inherit;
-  border: 1px solid currentColor;
-  border-radius: 5px;
-  padding: 5px 12px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.quiet {
-  font-weight: 400;
-  color: var(--muted);
-  border: 1px solid var(--rule-strong);
-}
-
-.button:hover:not(:disabled) {
-  background: color-mix(in srgb, currentColor 8%, transparent);
-}
-
-.quiet:hover:not(:disabled) {
-  color: inherit;
-  border-color: currentColor;
-}
-
-.button:focus-visible,
-.quiet:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 2px;
-}
-
-.button:disabled,
-.quiet:disabled {
-  opacity: 0.45;
-  cursor: default;
 }
 
 .said,
@@ -143,7 +93,11 @@
   margin-bottom: 18px;
 }
 
+/* The same controls opened inside the date bar, which has its own spacing. */
+.asOf .stage { margin-bottom: 0; }
+
 .select {
+  min-height: 32px;
   font: inherit;
   font-size: 12px;
   padding: 4px 8px;
@@ -154,8 +108,29 @@
   cursor: pointer;
 }
 
-/* A label wrapping a hidden file input: the native control cannot be styled and
-   its own text cannot be translated. */
+/* A label wrapping a hidden file input, drawn to match the Ant Design buttons
+   beside it: the native control cannot be styled and its own text cannot be
+   translated. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 15px;
+  border: 1px solid var(--pc-border-default);
+  border-radius: 8px;
+  background: var(--pc-surface-card);
+  color: var(--pc-text-body);
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.button:hover {
+  color: var(--pc-intent-primary);
+  border-color: var(--pc-intent-primary);
+}
+
 .file {
   position: absolute;
   width: 1px;

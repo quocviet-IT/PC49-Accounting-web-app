@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { Button } from 'antd'
+import { ArrowLeft, Download, Play } from 'lucide-react'
 import { useLocale } from '@/lib/i18n/provider'
 import {
   Page, Section, Empty, Frame, Signed, Grams, money, weight, ledger, LoadFailed,
@@ -118,7 +120,7 @@ export function ReportView({
           )}
         </>
       )}
-      <button type="submit">{t('rep.run')}</button>
+      <Button htmlType="submit" icon={<Play size={14} aria-hidden />}>{t('rep.run')}</Button>
     </form>
   )
 
@@ -128,8 +130,8 @@ export function ReportView({
       noteKey={report.descriptionKey}
       actions={
         <span className={styles.actions}>
-          <Link className="pc-download" href="/reports">{t('rep.backToCentre')}</Link>
-          <a className="pc-download" href={exportHref}>{t('rep.export')}</a>
+          <Link className="pc-download" href="/reports"><ArrowLeft size={14} aria-hidden />{t('rep.backToCentre')}</Link>
+          <Button href={exportHref} icon={<Download size={14} aria-hidden />}>{t('rep.export')}</Button>
         </span>
       }
     >

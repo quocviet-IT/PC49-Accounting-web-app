@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Button } from 'antd'
+import { Check, PencilLine, X } from 'lucide-react'
 import { useLocale } from '@/lib/i18n/provider'
 import { setExpectedFigure } from '@/app/(app)/import/actions'
 import styles from './ImportView.module.css'
@@ -42,9 +44,9 @@ export function StateFigure({ asOf }: { asOf: string }) {
 
   if (!open) {
     return (
-      <button type="button" className={styles.quiet} onClick={() => setOpen(true)}>
+      <Button icon={<PencilLine size={14} aria-hidden />} onClick={() => setOpen(true)}>
         {t('imp.stateFigure')}
-      </button>
+      </Button>
     )
   }
 
@@ -69,13 +71,13 @@ export function StateFigure({ asOf }: { asOf: string }) {
       <input className={styles.select} aria-label={t('imp.whichSheet')}
              placeholder={t('imp.whichSheet')} value={note}
              onChange={(e) => setNote(e.target.value)} />
-      <button type="button" className={styles.button} disabled={pending} onClick={submit}>
+      <Button type="primary" icon={<Check size={14} aria-hidden />} loading={pending} onClick={submit}>
         {t('imp.saveFigure')}
-      </button>
-      <button type="button" className={styles.quiet} disabled={pending}
+      </Button>
+      <Button icon={<X size={14} aria-hidden />} disabled={pending}
               onClick={() => { setOpen(false); setError(null) }}>
         {t('imp.close')}
-      </button>
+      </Button>
       {error && <span className={styles.failed}>{error}</span>}
     </span>
   )

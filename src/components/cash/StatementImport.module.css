@@ -13,15 +13,20 @@
   margin-bottom: 16px;
 }
 
-/* A label wrapping a hidden file input: the native control cannot be styled and
-   its own text cannot be translated. */
+/* A label wrapping a hidden file input, drawn to match the Ant Design buttons
+   beside it: the native control cannot be styled and its own text cannot be
+   translated. */
 .button {
-  font-size: 12.5px;
-  padding: 5px 12px;
-  border: 1px solid var(--pc-border-strong);
-  border-radius: 6px;
-  color: var(--pc-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 15px;
+  border: 1px solid var(--pc-border-default);
+  border-radius: 8px;
   background: var(--pc-surface-card);
+  color: var(--pc-text-body);
+  font-size: 14px;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -56,12 +61,14 @@
 .failed { color: var(--pc-money-negative); max-width: 70ch; }
 
 /* Shared by the reconciliation control on the same screen: one field style, so
-   two rows of inputs on one page do not read as two different apps. */
+   two rows of inputs on one page do not read as two different apps. As tall as
+   the small buttons beside it, since it opens inside a table row. */
 .field {
+  height: 24px;
   font: inherit;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-  padding: 4px 8px;
+  padding: 0 8px;
   border: 1px solid var(--pc-border-default);
   border-radius: 5px;
   background: var(--pc-surface-card);

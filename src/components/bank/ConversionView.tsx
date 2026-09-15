@@ -1,6 +1,8 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import { Button } from 'antd'
+import { Calculator, Check, Plus } from 'lucide-react'
 import { useLocale } from '@/lib/i18n/provider'
 import { Page, Stat, money, ledger, Section, LoadFailed } from '@/components/ledger/Ledger'
 import { saveAllocation, suggestAllocation } from '@/app/(app)/bank-conversion/actions'
@@ -213,11 +215,11 @@ export function ConversionView({
                                  onChange={(e) => patch(row.key, { desc: e.target.value })} />
                         </td>
                         <td>
-                          <button type="button" className={styles.button}
+                          <Button size="small" icon={<Calculator size={14} aria-hidden />}
                                   disabled={!row.goldTypeCode || pending}
                                   onClick={() => suggest(row)}>
                             {t('conv.suggest')}
-                          </button>
+                          </Button>
                         </td>
                       </tr>
                     )
@@ -238,14 +240,14 @@ export function ConversionView({
               ))}
 
               <div className={styles.actions}>
-                <button type="button" className={styles.button}
+                <Button icon={<Plus size={14} aria-hidden />}
                         onClick={() => { setLines((r) => [...r, blank(nextKey)]); setNextKey((k) => k + 1) }}>
                   {t('conv.addLine')}
-                </button>
-                <button type="button" className={styles.button}
+                </Button>
+                <Button type="primary" icon={<Check size={14} aria-hidden />}
                         disabled={!complete || blocked || pending} onClick={save}>
                   {pending ? t('txn.saving') : t('conv.save')}
-                </button>
+                </Button>
                 {error && <span className={styles.error} data-testid="conv-error">{error}</span>}
               </div>
 

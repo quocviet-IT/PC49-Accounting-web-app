@@ -53,9 +53,10 @@
   margin-bottom: 18px;
 }
 
+/* The height of the button that runs the report, so the bar reads as one line. */
 .controls input,
-.controls select,
-.controls button {
+.controls select {
+  min-height: 32px;
   font: inherit;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
@@ -67,16 +68,9 @@
 }
 
 .controls select { max-width: 260px; }
-.controls button { cursor: pointer; }
-
-.controls button:hover {
-  color: var(--pc-intent-primary);
-  border-color: var(--pc-intent-primary);
-}
 
 .controls input:focus,
-.controls select:focus,
-.controls button:focus-visible {
+.controls select:focus {
   outline: 2px solid var(--pc-intent-primary);
   outline-offset: 1px;
 }

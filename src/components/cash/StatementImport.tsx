@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Upload } from 'lucide-react'
 import { useLocale } from '@/lib/i18n/provider'
 import { importBankStatement, type ImportResult } from '@/app/(app)/cash/actions'
 import styles from './StatementImport.module.css'
@@ -52,6 +53,7 @@ export function StatementImport() {
           disabled={pending}
           onChange={(e) => choose(e.target.files?.[0])}
         />
+        <Upload size={14} aria-hidden />
         {pending ? t('cash.importing') : t('cash.import')}
       </label>
 

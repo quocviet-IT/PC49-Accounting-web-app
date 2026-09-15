@@ -2,6 +2,8 @@
 
 import { useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import { Button } from 'antd'
+import { RefreshCw } from 'lucide-react'
 import { useLocale } from '@/lib/i18n/provider'
 import type { MessageKey } from '@/lib/i18n'
 import { PageHeader } from '@/components/PageHeader'
@@ -91,14 +93,14 @@ export function LoadFailed() {
   return (
     <div className={styles.loadFailed} role="alert">
       <p className={styles.loadFailedText}>{t('common.loadFailed')}</p>
-      <button
-        type="button"
-        className={styles.loadFailedRetry}
-        disabled={pending}
+      <Button
+        size="small"
+        icon={<RefreshCw size={14} aria-hidden />}
+        loading={pending}
         onClick={() => startTransition(() => router.refresh())}
       >
         {pending ? t('common.reloading') : t('common.retry')}
-      </button>
+      </Button>
     </div>
   )
 }

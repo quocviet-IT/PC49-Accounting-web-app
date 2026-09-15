@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Button } from 'antd'
+import { Check, Scale, X } from 'lucide-react'
 import { useLocale } from '@/lib/i18n/provider'
 import { money, ledger } from '@/components/ledger/Ledger'
 import { reconcileAccount } from '@/app/(app)/cash/actions'
@@ -49,9 +51,9 @@ export function Reconcile({
 
   if (!open) {
     return (
-      <button type="button" className={styles.button} onClick={() => setOpen(true)}>
+      <Button size="small" icon={<Scale size={14} aria-hidden />} onClick={() => setOpen(true)}>
         {t('cash.reconcile')}
-      </button>
+      </Button>
     )
   }
 
@@ -92,13 +94,13 @@ export function Reconcile({
           onChange={(e) => setReason(e.target.value)}
         />
       )}
-      <button type="button" className={styles.button} disabled={pending} onClick={submit}>
+      <Button size="small" type="primary" icon={<Check size={14} aria-hidden />} loading={pending} onClick={submit}>
         {t('refining.save')}
-      </button>
-      <button type="button" className={styles.button} disabled={pending}
+      </Button>
+      <Button size="small" icon={<X size={14} aria-hidden />} disabled={pending}
               onClick={() => { setOpen(false); setError(null) }}>
         {t('refining.cancel')}
-      </button>
+      </Button>
       {error && <span className={styles.failed}>{error}</span>}
     </span>
   )

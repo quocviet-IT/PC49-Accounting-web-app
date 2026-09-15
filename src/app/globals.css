@@ -439,15 +439,19 @@ html, body {
   .pc-shell__account-identity { display: none; }
 }
 
-/* A download offered beside a page title. It reads as an action without
-   competing with anything on the page, which is right for something used once a
-   month. */
+/* A link drawn as a default Ant Design button, for a link that has to stay a
+   Next.js link (a client-side navigation Ant's Button cannot make) and still
+   sit beside real buttons at the same size. */
 .pc-download {
-  font-size: 12.5px;
-  padding: 5px 12px;
-  border: 1px solid var(--pc-border-strong);
-  border-radius: 6px;
-  color: var(--pc-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 15px;
+  font-size: 14px;
+  border: 1px solid var(--pc-border-default);
+  border-radius: 8px;
+  color: var(--pc-text-body);
   background: var(--pc-surface-card);
   text-decoration: none;
   white-space: nowrap;
