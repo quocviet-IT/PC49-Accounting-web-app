@@ -17,16 +17,16 @@
 
 ## Tasks
 
-- [ ] **Task 1 — Màu xanh dương.** `tokens.ts` sáng + tối; sinh lại khối trong `globals.css`; `design-tokens` test xanh. Commit.
-- [ ] **Task 2 — `IconAction` + `TxnTypeTag`** (`src/components/ui/`), test trước. Commit.
-- [ ] **Task 3 — Màn hình vàng + Tổng quan.**
+- [x] **Task 1 — Màu xanh dương.** `tokens.ts` sáng + tối; sinh lại khối trong `globals.css`; `design-tokens` test xanh. Commit.
+- [x] **Task 2 — `IconAction` + `TxnTypeTag`** (`src/components/ui/`), test trước. Commit.
+- [x] **Task 3 — Màn hình vàng + Tổng quan.**
   - `TxnScreen`: `IconAction`, cột thao tác ghim phải, `TxnTypeTag`;
   - `TxnForm`, `InventoryView`;
   - `Overview`: thẻ lối tắt, nút thử lại/làm mới;
   - `TransactionCharts`.
   Commit.
-- [ ] **Task 4 — Tiền, quy đổi, nạp dữ liệu, giá, báo cáo:** `Reconcile`, `ConversionView`, `ImportView`, `StateFigure`, `PriceGrid`, `ReportView`, `Ledger` (`LoadFailed`). Bỏ CSS nút trong module. Commit.
-- [ ] **Task 5 — Cài đặt, báo lỗi, phân kim, khung app:** `UsersView`, `PeriodList`, `PasswordView`, `ReportDialog`, `LotDetail`, `LotList`, `PurchasePicker`, `BagTable`, `AppShell`, `ThemeToggle`, `LocaleSwitch`. Commit.
+- [x] **Task 4 — Tiền, quy đổi, nạp dữ liệu, giá, báo cáo:** `Reconcile`, `ConversionView`, `ImportView`, `StateFigure`, `PriceGrid`, `ReportView`, `Ledger` (`LoadFailed`). Bỏ CSS nút trong module. Commit.
+- [x] **Task 5 — Cài đặt, báo lỗi, phân kim, khung app:** `UsersView`, `PeriodList`, `PasswordView`, `ReportDialog`, `LotDetail`, `LotList`, `PurchasePicker`, `BagTable`, `AppShell`, `ThemeToggle`, `LocaleSwitch`. Commit.
 - [ ] **Task 6 — Kiểm chứng, đẩy lên.**
   - quy tắc "nút phải có tên" trong `verify-layout`;
   - cổng: test, tsc, lint, build;
