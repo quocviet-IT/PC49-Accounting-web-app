@@ -2,8 +2,10 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Lock, LockOpen } from 'lucide-react'
 import { useLocale } from '@/lib/i18n/provider'
 import { Page, Section, ledger, Frame, LoadFailed } from '@/components/ledger/Ledger'
+import { IconAction } from '@/components/ui/IconAction'
 import { setPeriodStatus } from '@/app/(app)/settings/actions'
 import styles from './Settings.module.css'
 
@@ -94,14 +96,12 @@ export function PeriodList({ rows, loadFailed = false }: {
                     {r.closedAt ? r.closedAt.slice(0, 10) : '—'}
                   </td>
                   <td>
-                    <button
-                      type="button"
-                      className={styles.quiet}
-                      disabled={busy === r.period}
+                    <IconAction
+                      icon={r.closed ? <LockOpen size={16} aria-hidden /> : <Lock size={16} aria-hidden />}
+                      label={t(r.closed ? 'period.reopen' : 'period.close')}
+                      loading={busy === r.period}
                       onClick={() => toggle(r)}
-                    >
-                      {t(r.closed ? 'period.reopen' : 'period.close')}
-                    </button>
+                    />
                   </td>
                 </tr>
               ))}

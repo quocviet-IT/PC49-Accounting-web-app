@@ -2,8 +2,11 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Button } from 'antd'
+import { Check, ClipboardCheck, Copy, KeyRound, Lock, LockOpen, UserPlus, X } from 'lucide-react'
 import { useLocale } from '@/lib/i18n/provider'
 import { Page, Section, Frame, LoadFailed } from '@/components/ledger/Ledger'
+import { IconAction } from '@/components/ui/IconAction'
 import ledger from '@/components/ledger/Ledger.module.css'
 import {
   changeRole, createUser, renameUser, restoreUser, resetPassword, suspendUser,
@@ -40,18 +43,18 @@ function OneTimePassword({ password, onDone }: { password: string; onDone: () =>
       </div>
       <p className={styles.secretNote}>{t('users.tempOnce')}</p>
       <div className={styles.row}>
-        <button
-          type="button"
-          className={styles.quiet}
+        <Button
+          type="primary"
+          icon={copied ? <ClipboardCheck size={14} aria-hidden /> : <Copy size={14} aria-hidden />}
           onClick={() => {
             void navigator.clipboard?.writeText(password).then(() => setCopied(true))
           }}
         >
           {copied ? t('users.copied') : t('users.copy')}
-        </button>
-        <button type="button" className={styles.quiet} onClick={onDone}>
+        </Button>
+        <Button icon={<Check size={14} aria-hidden />} onClick={onDone}>
           {t('users.done')}
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -69,9 +72,9 @@ function AddPerson({ onCreated }: { onCreated: (password: string) => void }) {
 
   if (!open) {
     return (
-      <button type="button" className={styles.primary} onClick={() => setOpen(true)}>
+      <Button type="primary" icon={<UserPlus size={14} aria-hidden />} onClick={() => setOpen(true)}>
         {t('users.add')}
-      </button>
+      </Button>
     )
   }
 
@@ -85,7 +88,7 @@ function AddPerson({ onCreated }: { onCreated: (password: string) => void }) {
               onChange={(e) => setRole(e.target.value)}>
         {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
       </select>
-      <button type="button" className={styles.primary} disabled={pending} onClick={() => {
+      <Button type="primary" icon={<Check size={14} aria-hidden />} loading={pending} onClick={() => {
         setError(null)
         startTransition(async () => {
           const result = await createUser({ email, fullName, role })
@@ -96,11 +99,11 @@ function AddPerson({ onCreated }: { onCreated: (password: string) => void }) {
         })
       }}>
         {t('users.save')}
-      </button>
-      <button type="button" className={styles.quiet} disabled={pending}
+      </Button>
+      <Button icon={<X size={14} aria-hidden />} disabled={pending}
               onClick={() => { setOpen(false); setError(null) }}>
         {t('users.cancel')}
-      </button>
+      </Button>
       {error && <span className={styles.failed}>{error}</span>}
     </div>
   )
@@ -204,31 +207,28 @@ export function UsersView({ people, meId, loadFailed = false }: {
                   <td>{p.createdAt.slice(0, 10)}</td>
                   <td className={styles.actions}>
                     {p.suspendedAt ? (
-                      <button type="button" className={styles.quiet} disabled={pending}
-                              onClick={() => run(() => restoreUser({ userId: p.id }))}>
-                        {t('users.reopen')}
-                      </button>
+                      <IconAction icon={<LockOpen size={16} aria-hidden />} label={t('users.reopen')}
+                                  disabled={pending}
+                                  onClick={() => run(() => restoreUser({ userId: p.id }))} />
                     ) : (
-                      <button type="button" className={styles.quiet} disabled={pending}
-                              onClick={() => {
-                                const reason = window.prompt(t('users.closeWhy'))
-                                if (reason === null) return
-                                run(() => suspendUser({ userId: p.id, reason }))
-                              }}>
-                        {t('users.close')}
-                      </button>
+                      <IconAction icon={<Lock size={16} aria-hidden />} label={t('users.close')}
+                                  danger disabled={pending}
+                                  onClick={() => {
+                                    const reason = window.prompt(t('users.closeWhy'))
+                                    if (reason === null) return
+                                    run(() => suspendUser({ userId: p.id, reason }))
+                                  }} />
                     )}
-                    <button type="button" className={styles.quiet} disabled={pending}
-                            onClick={() => {
-                              startTransition(async () => {
-                                const result = await resetPassword({ userId: p.id })
-                                if (!result.ok) { setError(result.message); return }
-                                setSecret(result.password)
-                                router.refresh()
-                              })
-                            }}>
-                      {t('users.reset')}
-                    </button>
+                    <IconAction icon={<KeyRound size={16} aria-hidden />} label={t('users.reset')}
+                                disabled={pending}
+                                onClick={() => {
+                                  startTransition(async () => {
+                                    const result = await resetPassword({ userId: p.id })
+                                    if (!result.ok) { setError(result.message); return }
+                                    setSecret(result.password)
+                                    router.refresh()
+                                  })
+                                }} />
                   </td>
                 </tr>
               ))}

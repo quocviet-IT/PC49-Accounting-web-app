@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Alert, Button, Space, Tag, Typography } from 'antd'
+import { Minus, Package, Plus } from 'lucide-react'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocale } from '@/lib/i18n/provider'
 import { money, weight } from '@/components/ledger/Ledger'
@@ -90,7 +91,7 @@ export function PurchasePicker({
           rowSelection={{ selectedRowKeys: dropping, onChange: setDropping }}
         />
         <Space style={{ marginTop: 8 }} wrap>
-          <Button disabled={busy || dropping.length === 0}
+          <Button icon={<Minus size={14} aria-hidden />} disabled={busy || dropping.length === 0}
                   onClick={() => run(() => unpickPurchases({ lotId, txnIds: dropping }))}>
             {t('refining.pick.remove')} ({dropping.length})
           </Button>
@@ -107,7 +108,7 @@ export function PurchasePicker({
             pagination={false}
           />
           <Space style={{ marginTop: 8 }} align="start" wrap>
-            <Button type="primary" disabled={busy}
+            <Button type="primary" icon={<Package size={14} aria-hidden />} disabled={busy}
                     onClick={() => run(() => bagsFromPicked({ lotId }))}>
               {t('refining.pick.toBags')}
             </Button>
@@ -128,7 +129,7 @@ export function PurchasePicker({
           rowSelection={{ selectedRowKeys: chosen, onChange: setChosen }}
         />
         <Space style={{ marginTop: 8 }} wrap>
-          <Button type="primary" disabled={busy || chosen.length === 0}
+          <Button type="primary" icon={<Plus size={14} aria-hidden />} disabled={busy || chosen.length === 0}
                   onClick={() => run(() => pickPurchases({ lotId, txnIds: chosen }))}>
             {t('refining.pick.add')} ({chosen.length})
           </Button>

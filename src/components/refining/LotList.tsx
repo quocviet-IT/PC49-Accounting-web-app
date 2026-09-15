@@ -3,13 +3,14 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Alert, Button, Select, Tag } from 'antd'
-import { Plus } from 'lucide-react'
+import { FolderOpen, Plus } from 'lucide-react'
 import { ListToolbar } from '@/components/ui/ListToolbar'
 import { matchesSearch } from '@/lib/ui/list'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocale } from '@/lib/i18n/provider'
 import { Page, LoadFailed, money, weight } from '@/components/ledger/Ledger'
 import { DataTable } from '@/components/ui/DataTable'
+import { IconAction } from '@/components/ui/IconAction'
 import { createLot } from '@/app/(app)/refining/actions'
 import type { LotRow, LotStatus } from './types'
 
@@ -73,9 +74,8 @@ export function LotList({ lots, loadFailed = false }: { lots: LotRow[]; loadFail
     {
       title: '', key: 'open', width: 64,
       render: (_: unknown, r) => (
-        <Button size="small" onClick={() => router.push(`/refining/${r.id}`)}>
-          {t('refining.open')}
-        </Button>
+        <IconAction icon={<FolderOpen size={16} aria-hidden />} label={t('refining.open')}
+                    onClick={() => router.push(`/refining/${r.id}`)} />
       ),
     },
   ]

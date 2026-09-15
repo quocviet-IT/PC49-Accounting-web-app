@@ -59,31 +59,6 @@
   box-shadow: inset 2px 0 0 var(--rule-strong);
 }
 
-.quiet {
-  font: inherit;
-  font-size: 12px;
-  padding: 3px 10px;
-  border: 1px solid var(--rule-strong);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.quiet:hover:not(:disabled) {
-  color: inherit;
-  border-color: currentColor;
-}
-
-.quiet:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 2px;
-}
-
-.quiet:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
 /* Same reasoning as the price grid: a parameter you may change should look
    like something you may change. */
 .cell {

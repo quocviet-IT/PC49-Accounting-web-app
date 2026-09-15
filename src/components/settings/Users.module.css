@@ -16,11 +16,13 @@
   align-items: center;
 }
 
+/* As tall as the buttons beside it. */
 .field {
+  height: 32px;
   border: 1px solid var(--pc-border-default);
   border-radius: 4px;
   background: var(--pc-surface-card);
-  padding: 6px 8px;
+  padding: 0 8px;
   font: inherit;
   font-size: 13px;
   color: inherit;
@@ -46,39 +48,6 @@
   background: var(--pc-accent-wash);
   outline: 2px solid var(--pc-intent-primary);
   outline-offset: -1px;
-}
-
-.primary {
-  font: inherit;
-  font-size: 13px;
-  padding: 6px 12px;
-  border: 1px solid var(--pc-intent-primary);
-  border-radius: 4px;
-  background: var(--pc-intent-primary);
-  color: var(--pc-surface-card);
-  cursor: pointer;
-}
-
-.primary:disabled { opacity: 0.5; cursor: default; }
-
-.quiet {
-  font: inherit;
-  font-size: 12px;
-  padding: 3px 9px;
-  border: 1px solid var(--pc-border-default);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--pc-text-faint);
-  cursor: pointer;
-}
-
-.quiet:hover:not(:disabled) { color: var(--pc-text-default); }
-.quiet:disabled { opacity: 0.45; cursor: default; }
-
-.quiet:focus-visible,
-.primary:focus-visible {
-  outline: 2px solid var(--pc-intent-primary);
-  outline-offset: 1px;
 }
 
 .actions {

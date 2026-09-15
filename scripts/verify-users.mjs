@@ -124,7 +124,7 @@ try {
   const row = page.locator('tr').filter({ hasText: NEW_EMAIL })
   await page.reload({ waitUntil: 'networkidle' })
   await page.locator('tr').filter({ hasText: NEW_EMAIL })
-    .locator('button', { hasText: 'Khoá' }).click()
+    .getByRole('button', { name: 'Khoá', exact: true }).click()
 
   const closed = await until(async () => {
     const r = await db.query(

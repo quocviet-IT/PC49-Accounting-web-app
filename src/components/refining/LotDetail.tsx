@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Alert, Button, Descriptions, Space, Steps, Tabs, Tag, Typography } from 'antd'
+import { ArrowLeft, FlaskConical, Lock, PackageCheck, Plus, Send } from 'lucide-react'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocale } from '@/lib/i18n/provider'
 import { Page, Section, LoadFailed, money, weight } from '@/components/ledger/Ledger'
@@ -109,7 +110,7 @@ export function LotDetail({
         : <Typography.Text type="secondary">—</Typography.Text>) },
     { title: '', key: 'act', width: 130,
       render: (_, s) => ((lot.status === 'ASSAYED' || lot.status === 'RECEIVED')
-        ? <Button size="small" onClick={() => setDialog({ kind: 'settle', share: s })}>{t('refining.receive')}</Button>
+        ? <Button size="small" icon={<PackageCheck size={14} aria-hidden />} onClick={() => setDialog({ kind: 'settle', share: s })}>{t('refining.receive')}</Button>
         : null) },
   ]
 
@@ -129,20 +130,20 @@ export function LotDetail({
       titleKey="refining.title"
       actions={
         <Space wrap>
-          <Link href="/refining">{t('refining.back')}</Link>
+          <Link className="pc-download" href="/refining"><ArrowLeft size={14} aria-hidden />{t('refining.back')}</Link>
           {lot.status === 'DRAFT' && (
-            <Button type="primary" disabled={houseBags.length === 0 || busy}
+            <Button type="primary" icon={<Send size={14} aria-hidden />} disabled={houseBags.length === 0 || busy}
                     onClick={() => setDialog({ kind: 'send' })}>
               {t('refining.to.SENT')}
             </Button>
           )}
           {lot.status === 'SENT' && (
-            <Button type="primary" disabled={busy} onClick={() => setDialog({ kind: 'assay' })}>
+            <Button type="primary" icon={<FlaskConical size={14} aria-hidden />} disabled={busy} onClick={() => setDialog({ kind: 'assay' })}>
               {t('refining.to.ASSAYED')}
             </Button>
           )}
           {lot.status === 'RECEIVED' && (
-            <Button type="primary" disabled={!allSettled || !canApprove || busy} onClick={close}
+            <Button type="primary" icon={<Lock size={14} aria-hidden />} disabled={!allSettled || !canApprove || busy} onClick={close}
                     title={!allSettled ? t('refining.closeHint') : undefined}>
               {t('refining.close')}
             </Button>
@@ -190,7 +191,7 @@ export function LotDetail({
         />
         {lot.status === 'DRAFT' && (
           <Space style={{ marginTop: 8 }}>
-            <Button onClick={() => setDialog({ kind: 'bag', bag: null })}>{t('refining.addBag')}</Button>
+            <Button icon={<Plus size={14} aria-hidden />} onClick={() => setDialog({ kind: 'bag', bag: null })}>{t('refining.addBag')}</Button>
           </Space>
         )}
       </Section>

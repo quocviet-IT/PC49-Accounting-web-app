@@ -3,7 +3,7 @@
 import { useCallback, useState, useTransition } from 'react'
 import { usePathname } from 'next/navigation'
 import { Button, Modal } from 'antd'
-import { TriangleAlert as WarningOutlined } from 'lucide-react'
+import { Check, Plus, Send, TriangleAlert as WarningOutlined, X } from 'lucide-react'
 import { findActivePage } from '@/lib/nav'
 import { useLocale } from '@/lib/i18n/provider'
 import { fileReport } from '@/app/(app)/feedback/actions'
@@ -137,26 +137,27 @@ export function ReportDialog() {
         // reach on a laptop screen.
         footer={sent ? (
           <span className={styles.buttons}>
-            <button type="button" className={styles.quiet} onClick={() => setSent(false)}>
+            <Button icon={<Plus size={14} aria-hidden />} onClick={() => setSent(false)}>
               {t('fb.another')}
-            </button>
-            <button type="button" className={styles.primary} onClick={close}>
+            </Button>
+            <Button type="primary" icon={<Check size={14} aria-hidden />} onClick={close}>
               {t('fb.done')}
-            </button>
+            </Button>
           </span>
         ) : (
           <span className={styles.buttons}>
-            <button type="button" className={styles.quiet} onClick={close} disabled={pending}>
+            <Button icon={<X size={14} aria-hidden />} onClick={close} disabled={pending}>
               {t('refining.cancel')}
-            </button>
-            <button
-              type="button"
-              className={styles.primary}
+            </Button>
+            <Button
+              type="primary"
+              icon={<Send size={14} aria-hidden />}
               onClick={submit}
+              loading={pending}
               disabled={pending || description.trim().length < 5}
             >
               {pending ? t('fb.sending') : t('fb.send')}
-            </button>
+            </Button>
           </span>
         )}
         width={520}

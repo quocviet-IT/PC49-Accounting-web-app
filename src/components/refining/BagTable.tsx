@@ -1,10 +1,12 @@
 'use client'
 
-import { Button, Space, Table, Tag, Typography } from 'antd'
+import { Space, Table, Tag, Typography } from 'antd'
+import { Pencil, Trash2 } from 'lucide-react'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocale } from '@/lib/i18n/provider'
 import { money, weight } from '@/components/ledger/Ledger'
 import { DataTable } from '@/components/ui/DataTable'
+import { IconAction } from '@/components/ui/IconAction'
 import type { Bag } from './types'
 
 /** Value conversion divides by 31.1 — VALUATION_GRAM_PER_OZ — never 31.105. */
@@ -94,11 +96,11 @@ export function SendTable({
   ]
   if (editable) {
     columns.push({
-      title: '', key: 'actions', width: 112,
+      title: '', key: 'actions', width: 84,
       render: (_, b) => (
-        <Space size={4}>
-          <Button size="small" onClick={() => onEdit?.(b)}>{t('refining.bag.edit')}</Button>
-          <Button size="small" danger onClick={() => onDelete?.(b)}>{t('refining.cancel')}</Button>
+        <Space size={2}>
+          <IconAction icon={<Pencil size={16} aria-hidden />} label={t('refining.bag.edit')} onClick={() => onEdit?.(b)} />
+          <IconAction icon={<Trash2 size={16} aria-hidden />} label={t('refining.cancel')} danger onClick={() => onDelete?.(b)} />
         </Space>
       ),
     })

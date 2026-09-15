@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Button } from 'antd'
+import { KeyRound } from 'lucide-react'
 import { useLocale } from '@/lib/i18n/provider'
 import { Page, Section, Frame } from '@/components/ledger/Ledger'
 import { changeMyPassword } from '@/app/password/actions'
@@ -65,10 +67,10 @@ export function PasswordView({ forced }: { forced: boolean }) {
               onChange={(e) => setAgain(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') submit() }}
             />
-            <button type="button" className={styles.primary} disabled={pending}
+            <Button type="primary" icon={<KeyRound size={14} aria-hidden />} loading={pending}
                     onClick={submit}>
               {t('pw.save')}
-            </button>
+            </Button>
             {error && <span className={styles.failed}>{error}</span>}
             {done && <span>{t('pw.done')}</span>}
           </div>
