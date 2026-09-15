@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { Button } from 'antd'
-import { Calculator, Check, Plus } from 'lucide-react'
+import { Check, ListPlus, Sparkles } from 'lucide-react'
 import { useLocale } from '@/lib/i18n/provider'
 import { Page, Stat, money, ledger, Section, LoadFailed } from '@/components/ledger/Ledger'
 import { saveAllocation, suggestAllocation } from '@/app/(app)/bank-conversion/actions'
@@ -215,7 +215,7 @@ export function ConversionView({
                                  onChange={(e) => patch(row.key, { desc: e.target.value })} />
                         </td>
                         <td>
-                          <Button size="small" icon={<Calculator size={14} aria-hidden />}
+                          <Button size="small" icon={<Sparkles size={14} aria-hidden />}
                                   disabled={!row.goldTypeCode || pending}
                                   onClick={() => suggest(row)}>
                             {t('conv.suggest')}
@@ -240,7 +240,7 @@ export function ConversionView({
               ))}
 
               <div className={styles.actions}>
-                <Button icon={<Plus size={14} aria-hidden />}
+                <Button icon={<ListPlus size={14} aria-hidden />}
                         onClick={() => { setLines((r) => [...r, blank(nextKey)]); setNextKey((k) => k + 1) }}>
                   {t('conv.addLine')}
                 </Button>

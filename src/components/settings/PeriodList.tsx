@@ -99,6 +99,7 @@ export function PeriodList({ rows, loadFailed = false }: {
                     <IconAction
                       icon={r.closed ? <LockOpen size={16} aria-hidden /> : <Lock size={16} aria-hidden />}
                       label={t(r.closed ? 'period.reopen' : 'period.close')}
+                      danger={!r.closed}
                       loading={busy === r.period}
                       onClick={() => toggle(r)}
                     />
