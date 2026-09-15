@@ -89,3 +89,42 @@ Migration chạy lên database thật **trước** khi đẩy code: bốn hàm c
 - Sắp xếp theo cột khác ngày; chọn nhiều giá trị trong một bộ lọc.
 - File `.xlsx` thật — `csv.ts` đã giải thích vì sao là CSV.
 - Màu nút, icon, bố cục chung — phần 3.
+
+## Kết quả sau khi deploy (15-09)
+
+Deploy commit `c62eebc`, `X-Vercel-Id: hkg1::sin1::…`. Migration 0068 đã chạy lên database thật trước khi đẩy code.
+
+Trên Production:
+- `verify:ledger` đạt cả 8 bước:
+  - mở sổ đếm 1.062 giao dịch, đúng như database;
+  - tháng 1/2026: 210 dòng, mua vào 906.304,00, cả hai khớp database;
+  - trang giữ ≤ 50 dòng;
+  - file Excel về 200, đủ 210 dòng;
+  - nút "Tháng này" chuyển sang `from=2026-09-01&to=2026-09-30`.
+- `verify:screens` đạt.
+
+Trên máy dev:
+- `verify:ledger` đạt; `verify:grid` (form nhập) đạt 22/22; `verify:layout` đạt 85/85.
+- 685 test, typecheck, lint, `next build` đều xanh.
+
+Thời gian hai hàm trong database thật, đo bằng `EXPLAIN ANALYZE`:
+- `gold_txn_ledger()` mặc định: 78 ms;
+- `gold_txn_ledger_totals()`: 56 ms;
+- ledger tháng 1: 60 ms.
+
+Trang gọi hai hàm song song, nên database chiếm khoảng 80 ms thời gian dựng trang.
+
+`probe:speed` trên Production, hai lần:
+
+| Màn hình | Lần 1: ngay sau deploy, máy đo đang chạy verify:layout | Lần 2: máy đo rảnh |
+|---|---|---|
+| Sổ giao dịch vàng (mặc định, tất cả) | 824 ms | 753 ms |
+| Giao dịch một ngày (`?date=2026-01-08`) | 761 ms | 787 ms |
+| Giá vàng | 402 ms | 760 ms |
+| Các màn hình khác | 397–623 ms | 367–605 ms |
+| Đăng nhập tới trang chủ | 8.071 ms | 3.225 ms |
+| Kết luận của script | `SPEED TARGETS NOT MET` | `SPEED TARGETS MET` |
+
+Lần 1 trả giá khởi động nguội ngay sau deploy (đã ghi ở phần 1) và máy đo đang bận. Ba màn hình nằm sát ngưỡng 800 ms: sổ mặc định, giao dịch một ngày, giá vàng. Còn chỗ làm nhanh thêm nếu cần:
+- tính `fold_search(p_query)` một lần thay vì mỗi dòng;
+- không gửi cả danh mục 600 khách trong trang, chỉ gợi ý khi gõ.
