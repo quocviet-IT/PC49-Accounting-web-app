@@ -81,3 +81,9 @@ export function amountOf(qty: number, price: number | null): number {
   if (price === null) return 0
   return Math.round(-qty * price * 100) / 100
 }
+
+/** A row of the whole ledger: a saved row with its day and its customer's phone. */
+export type LedgerRow = SavedRow & {
+  txn_date: string
+  partner_phone: string | null
+}

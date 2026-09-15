@@ -16,6 +16,7 @@ export const goldUi = {
     'txn.form.details': 'Thông tin giao dịch',
     'txn.form.correction': 'Lý do điều chỉnh',
     'txn.form.checkFields': 'Kiểm tra các trường được đánh dấu rồi thử lại.',
+    'txn.col.grams': 'Gram',
   },
   en: {
     'txn.filter.label': 'Transaction filters',
@@ -34,5 +35,6 @@ export const goldUi = {
     'txn.form.details': 'Transaction details',
     'txn.form.correction': 'Correction reason',
     'txn.form.checkFields': 'Check the highlighted fields and try again.',
+    'txn.col.grams': 'Grams',
   },
 } as const
