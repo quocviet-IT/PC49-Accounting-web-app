@@ -1,9 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Alert, Button, Input, Modal, Select, Space, Tag, Tooltip, Typography } from 'antd'
-import { Plus } from 'lucide-react'
+import { Download, Plus } from 'lucide-react'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocale } from '@/lib/i18n/provider'
 import { toGrams } from '@/lib/domain/units'
@@ -12,13 +12,24 @@ import { Page, Stat, Stats, LoadFailed, money, weight } from '@/components/ledge
 import { DataTable } from '@/components/ui/DataTable'
 import { ListToolbar } from '@/components/ui/ListToolbar'
 import { TxnForm } from './TxnForm'
-import { PAYMENT_METHODS, TXN_TYPES, type GoldTypeOption, type SavedRow } from './types'
+import { PAYMENT_METHODS, type GoldTypeOption, type LedgerRow } from './types'
 import {
-  filterGoldTransactions, type GoldTransactionFilters,
-} from './transactionFilters'
+  DEFAULT_PAGE_SIZE, LEDGER_TXN_TYPES, PAGE_SIZES, ledgerSearch, presetRange, singleDay,
+  type LedgerQuery, type Preset,
+} from './ledgerQuery'
 import styles from './Txn.module.css'
 
-export type { GoldTypeOption, SavedRow } from './types'
+export type { GoldTypeOption, SavedRow, LedgerRow } from './types'
+
+/** What the whole filter matched, not the page on screen (0068). */
+export type LedgerTotals = {
+  count: number
+  purchases: number
+  sales: number
+  grams: Record<string, number>
+}
+
+const PRESETS: Preset[] = ['today', 'last7', 'thisMonth', 'lastMonth', 'thisYear', 'all']
 
 /** Money going out of the till reads differently from money coming in. */
 function Money({ value }: { value: number }) {
@@ -27,30 +38,32 @@ function Money({ value }: { value: number }) {
 }
 
 /**
- * A day of trading: what has been recorded, and the way in to record more.
+ * The gold ledger: every transaction, newest first, filtered as asked.
  *
- * Drawn the way the accounting team already reads OneBook — a page header
- * carrying the one action that writes something, a filter strip saying what is
- * being looked at, and a table held to the width of its box underneath.
+ * It used to be one day at a time. The filter now lives in the address and is
+ * applied by the database, so a range of a year is as quick to open as a day,
+ * a view can be sent to somebody, and the file behind "Xuất Excel" holds
+ * exactly the rows the filter means.
  *
- * Entry happens on a form, not across a row. The grid this replaces put every
- * field of every unsaved draft on screen at once, so the fields were as narrow
- * as the column they lived in. Recording one purchase is one task; it gets one
- * dialog.
+ * Entry still happens on a form, not across a row: recording one purchase is
+ * one task, and it gets one dialog.
  */
 export function TxnScreen({
-  txnDate, goldTypes, salesPeople, partners, existing, loadFailed = false,
+  query, today, goldTypes, salesPeople, partners, rows, totals, loadFailed = false,
 }: {
-  txnDate: string
+  query: LedgerQuery
+  /** The server's date, so the quick ranges agree between server and browser. */
+  today: string
   goldTypes: GoldTypeOption[]
   salesPeople: string[]
   partners: { code: string; phone: string | null }[]
-  existing: SavedRow[]
+  rows: LedgerRow[]
+  totals: LedgerTotals
   /**
-   * The day's rows, or the gold types, did not arrive.
+   * The ledger, its totals, or the gold types did not arrive.
    *
-   * Nothing to type into is offered in that case. An empty screen on a day
-   * that actually has transactions invites somebody to enter them again, and a
+   * Nothing to type into is offered in that case. An empty list on a day that
+   * actually has transactions invites somebody to enter them again, and a
    * duplicated purchase is a real loss of money.
    */
   loadFailed?: boolean
@@ -59,98 +72,102 @@ export function TxnScreen({
   const router = useRouter()
 
   /** Open with no row for a fresh transaction, with a row to replace it. */
-  const [editing, setEditing] = useState<{ correcting: SavedRow | null } | null>(null)
-  const [voidRow, setVoidRow] = useState<SavedRow | null>(null)
+  const [editing, setEditing] = useState<{ correcting: LedgerRow | null } | null>(null)
+  const [voidRow, setVoidRow] = useState<LedgerRow | null>(null)
   const [voidReason, setVoidReason] = useState('')
   const [voiding, setVoiding] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
-  const [filters, setFilters] = useState<GoldTransactionFilters>({
-    query: '', txnType: null, goldTypeCode: null, staff: null,
-    paymentMethod: null, status: null,
-  })
+
+  // The search box keeps what is being typed; the address keeps what was
+  // searched. A search cleared from elsewhere (Xoá bộ lọc) clears the box too.
+  const [search, setSearch] = useState(query.q)
+  const [searched, setSearched] = useState(query.q)
+  if (query.q !== searched) {
+    setSearched(query.q)
+    if (query.q !== search.trim()) setSearch(query.q)
+  }
+
+  const go = (patch: Partial<LedgerQuery>) =>
+    router.push(`/gold-transactions${ledgerSearch(query, patch)}`)
+
+  // Searched once typing stops, not on every key.
+  useEffect(() => {
+    const q = search.trim()
+    if (q === query.q) return
+    const timer = setTimeout(
+      () => router.push(`/gold-transactions${ledgerSearch(query, { q })}`), 400)
+    return () => clearTimeout(timer)
+  }, [search, query, router])
 
   const goldName = (code: string) => {
     const g = goldTypes.find((x) => x.code === code)
     return g ? (locale === 'vi' ? g.name_vi : g.name_en) : code
   }
-  const phoneOf = (code: string | null) =>
-    partners.find((p) => p.code === code)?.phone ?? null
 
-  const partnerPhones = useMemo(
-    () => new Map(partners.map((partner) => [partner.code, partner.phone])),
-    [partners],
-  )
-  const filtered = useMemo(
-    () => filterGoldTransactions(existing, filters, partnerPhones),
-    [existing, filters, partnerPhones],
-  )
   const hasFilters = Boolean(
-    filters.query || filters.txnType || filters.goldTypeCode || filters.staff
-      || filters.paymentMethod || filters.status,
+    query.from || query.to || query.type || query.gold || query.staff
+      || query.method || query.status || query.q,
   )
-
-  function changeFilter<K extends keyof GoldTransactionFilters>(
-    key: K,
-    value: GoldTransactionFilters[K],
-  ) {
-    setFilters((current) => ({ ...current, [key]: value }))
-  }
-
-  function clearFilters() {
-    setFilters({
-      query: '', txnType: null, goldTypeCode: null, staff: null,
-      paymentMethod: null, status: null,
-    })
-  }
-
-  const totals = useMemo(() => {
-    const purchases = existing
-      .filter((r) => r.txn_type === 'PO' || r.txn_type === 'PO_VENDOR')
-      .reduce((s, r) => s - r.amount, 0)
-    const sales = existing
-      .filter((r) => r.txn_type === 'SALE' || r.txn_type === 'PICKUP')
-      .reduce((s, r) => s + r.amount, 0)
-    const movement = new Map<string, number>()
-    for (const r of existing) {
-      movement.set(r.gold_type_code,
-        (movement.get(r.gold_type_code) ?? 0) + toGrams(r.qty, r.uom))
-    }
-    return { purchases, sales, movement: [...movement].filter(([, g]) => g !== 0) }
-  }, [existing])
+  const clearFilters = () => router.push('/gold-transactions')
+  const activePreset = PRESETS.find((p) => {
+    const range = presetRange(p, today)
+    return range.from === query.from && range.to === query.to
+  })
 
   /**
-   * The day being looked at, and the only way to reach any other one.
+   * Which days are being looked at.
    *
-   * The date goes in the address so a day is a place: it survives a reload, it
-   * can be linked to from a report, and the back button returns to the day
-   * before. Nothing is typed on this screen without the form being open, so
-   * changing the day can no longer throw work away.
-   *
-   * A native date input rather than Ant Design's, because this is the control
-   * that has to keep working on the screen that says a read failed.
+   * Native date inputs rather than Ant Design's, because these are the
+   * controls that have to keep working on the screen that says a read failed.
    */
-  const datePicker = (
-    <label className="pc-date-field">
-      <span className="pc-date-label">{t('txn.date')}</span>
-      <input
-        type="date"
-        className="pc-date-input"
-        value={txnDate}
-        aria-label={t('txn.date')}
-        onChange={(e) => {
-          if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) {
-            router.push(`/gold-transactions?date=${e.target.value}`)
-          }
-        }}
-      />
-    </label>
+  const dateFilters = (
+    <div className={styles.dateRange} role="group" aria-label={t('txn.date')}>
+      <label className="pc-date-field">
+        <span className="pc-date-label">{t('txn.filter.from')}</span>
+        <input
+          type="date"
+          className="pc-date-input"
+          value={query.from ?? ''}
+          max={query.to ?? undefined}
+          aria-label={t('txn.filter.from')}
+          onChange={(e) => go({ from: e.target.value || null })}
+        />
+      </label>
+      <label className="pc-date-field">
+        <span className="pc-date-label">{t('txn.filter.to')}</span>
+        <input
+          type="date"
+          className="pc-date-input"
+          value={query.to ?? ''}
+          min={query.from ?? undefined}
+          aria-label={t('txn.filter.to')}
+          onChange={(e) => go({ to: e.target.value || null })}
+        />
+      </label>
+      <Space size={4} wrap>
+        {PRESETS.map((p) => (
+          <Button key={p} size="small" type={activePreset === p ? 'primary' : 'default'}
+                  onClick={() => go(presetRange(p, today))}>
+            {t(`txn.preset.${p}` as const)}
+          </Button>
+        ))}
+      </Space>
+    </div>
   )
 
   const newButton = (
     <Button type="primary" icon={<Plus size={16} aria-hidden />}
             onClick={() => setEditing({ correcting: null })}>
       {t('txn.new')}
+    </Button>
+  )
+
+  // The same filter, without the page: the file is every matching row.
+  const exportButton = (
+    <Button icon={<Download size={16} aria-hidden />}
+            href={`/gold-transactions/export${ledgerSearch(query, { page: 1, size: DEFAULT_PAGE_SIZE })}`}>
+      {t('txn.export')}
     </Button>
   )
 
@@ -166,10 +183,11 @@ export function TxnScreen({
   }
 
   if (loadFailed) {
-    // The heading and the date picker stay: somebody has to be able to see
-    // which day failed and go to another one without a reload.
+    // The heading and the date range stay: somebody has to be able to see what
+    // failed and look at another range without a reload.
     return (
-      <Page titleKey="txn.title" actions={datePicker}>
+      <Page titleKey="txn.title">
+        <div className={styles.failedFilters}>{dateFilters}</div>
         <LoadFailed />
       </Page>
     )
@@ -178,33 +196,22 @@ export function TxnScreen({
   // Widths are the design; the columns without one share what is left. Naming
   // a width on the figures is what stops a long customer name squeezing an
   // amount into two lines.
-  /*
-   * Nine columns, not eleven.
-   *
-   * Every column that declares a width takes it out of the two that do not,
-   * and a first cut declared nine of eleven: the customer column was left
-   * thirty pixels and drew "Chi Lan" as "Chi". So the facts that are read
-   * together are now shown together — the grade under the metal it describes,
-   * how it was settled under the amount settled — and the two columns holding
-   * names and prose get the room that frees up.
-   */
-  const columns: ColumnsType<SavedRow> = [
+  const columns: ColumnsType<LedgerRow> = [
+    { title: t('txn.date'), dataIndex: 'txn_date', width: 104 },
     {
       title: t('txn.col.doc'), dataIndex: 'doc_no', width: 132,
       render: (v: string | null) => v ?? '—',
     },
     {
-      title: t('txn.col.type'), dataIndex: 'txn_type', width: 84,
+      title: t('txn.col.type'), dataIndex: 'txn_type', width: 96,
       render: (v: string) => <Tag>{v}</Tag>,
     },
     {
       title: t('txn.col.partner'), dataIndex: 'partner_code', ellipsis: true,
-      render: (v: string | null) => (
+      render: (v: string | null, r) => (
         <>
           <div>{v ?? '—'}</div>
-          {/* Read off the customer, not off the row, so it is the same number
-              on every order they appear on. */}
-          {phoneOf(v) && <Typography.Text type="secondary">{phoneOf(v)}</Typography.Text>}
+          {r.partner_phone && <Typography.Text type="secondary">{r.partner_phone}</Typography.Text>}
         </>
       ),
     },
@@ -233,12 +240,8 @@ export function TxnScreen({
       render: (v: number, r) => (
         <>
           <div>{weight.format(v)}</div>
-          {/* Only when there is a conversion to show: a quantity already in
-              grams printed the same number twice. */}
           {r.uom !== 'GRAM' && (
-            <Typography.Text type="secondary">
-              {weight.format(toGrams(v, r.uom))} g
-            </Typography.Text>
+            <Typography.Text type="secondary">{weight.format(toGrams(v, r.uom))} g</Typography.Text>
           )}
         </>
       ),
@@ -281,8 +284,10 @@ export function TxnScreen({
     },
   ]
 
+  const grams = Object.entries(totals.grams)
+
   return (
-    <Page titleKey="txn.title" actions={newButton}>
+    <Page titleKey="txn.title" actions={<Space wrap>{exportButton}{newButton}</Space>}>
       {notice && (
         <Alert type="error" showIcon closable title={notice}
                onClose={() => setNotice(null)} style={{ marginBottom: 16 }} />
@@ -292,108 +297,118 @@ export function TxnScreen({
                onClose={() => setToast(null)} style={{ marginBottom: 16 }} />
       )}
 
+      {dateFilters}
+
       <ListToolbar
-        search={filters.query}
-        onSearch={(query) => changeFilter('query', query)}
+        search={search}
+        onSearch={setSearch}
         placeholder={t('txn.filter.search')}
-        count={filtered.length}
-        total={existing.length}
+        count={rows.length}
+        total={totals.count}
         onReset={hasFilters ? clearFilters : undefined}
       >
         <div className={styles.filters} role="group" aria-label={t('txn.filter.label')}>
-          {datePicker}
           <Select
             allowClear
             className={styles.filterSelect}
-            value={filters.txnType}
+            value={query.type}
             aria-label={t('txn.filter.type')}
             placeholder={t('txn.filter.type')}
-            options={TXN_TYPES.map((value) => ({ value, label: value }))}
-            onChange={(value) => changeFilter('txnType', value ?? null)}
+            options={LEDGER_TXN_TYPES.map((value) => ({ value, label: value }))}
+            onChange={(value) => go({ type: value ?? null })}
           />
           <Select
             allowClear
             showSearch
             optionFilterProp="label"
             className={styles.filterSelectWide}
-            value={filters.goldTypeCode}
+            value={query.gold}
             aria-label={t('txn.filter.gold')}
             placeholder={t('txn.filter.gold')}
             options={goldTypes.map((gold) => ({ value: gold.code, label: goldName(gold.code) }))}
-            onChange={(value) => changeFilter('goldTypeCode', value ?? null)}
+            onChange={(value) => go({ gold: value ?? null })}
           />
           <Select
             allowClear
             showSearch
             className={styles.filterSelect}
-            value={filters.staff}
+            value={query.staff}
             aria-label={t('txn.filter.staff')}
             placeholder={t('txn.filter.staff')}
             options={salesPeople.map((value) => ({ value, label: value }))}
-            onChange={(value) => changeFilter('staff', value ?? null)}
+            onChange={(value) => go({ staff: value ?? null })}
           />
           <Select
             allowClear
             className={styles.filterSelectWide}
-            value={filters.paymentMethod}
+            value={query.method}
             aria-label={t('txn.filter.payment')}
             placeholder={t('txn.filter.payment')}
             options={PAYMENT_METHODS.map((value) => ({ value, label: value }))}
-            onChange={(value) => changeFilter('paymentMethod', value ?? null)}
+            onChange={(value) => go({ method: value ?? null })}
           />
           <Select
             allowClear
             className={styles.filterSelectWide}
-            value={filters.status}
+            value={query.status}
             aria-label={t('txn.filter.status')}
             placeholder={t('txn.filter.status')}
             options={[
               { value: 'correctable', label: t('txn.filter.correctable') },
               { value: 'locked', label: t('txn.filter.locked') },
             ]}
-            onChange={(value) => changeFilter('status', value ?? null)}
+            onChange={(value) => go({ status: value ?? null })}
           />
         </div>
       </ListToolbar>
 
       <Stats>
+        <Stat labelKey="txn.total.count" value={totals.count.toLocaleString('en-US')}
+              note={t('txn.total.filtered')} />
         <Stat labelKey="txn.total.purchases" value={money.format(totals.purchases)}
-              note={t('txn.total.fullDay')} tone="out" />
+              note={t('txn.total.filtered')} tone="out" />
         <Stat labelKey="txn.total.sales" value={money.format(totals.sales)}
-              note={t('txn.total.fullDay')} tone="in" />
+              note={t('txn.total.filtered')} tone="in" />
       </Stats>
 
-      <div className={styles.summaryRow}>
-        {totals.movement.length > 0 && (
+      {grams.length > 0 && (
+        <div className={styles.summaryRow}>
           <Space size={4} wrap>
             <Typography.Text type="secondary">{t('txn.total.movement')}</Typography.Text>
-            {totals.movement.map(([code, grams]) => (
-              <Tag key={code} color={grams > 0 ? 'green' : 'red'}>
-                {goldName(code)} {weight.format(grams)} g
+            {grams.map(([code, g]) => (
+              <Tag key={code} color={g > 0 ? 'green' : 'red'}>
+                {goldName(code)} {weight.format(g)} g
               </Tag>
             ))}
           </Space>
-        )}
-        {hasFilters && (
-          <Typography.Text type="secondary">{t('txn.filter.totalsUnfiltered')}</Typography.Text>
-        )}
-      </div>
+        </div>
+      )}
 
-      <DataTable<SavedRow>
+      <DataTable<LedgerRow>
         rowKey="id"
         columns={columns}
-        dataSource={filtered}
-        emptyTitle={hasFilters ? t('txn.filter.empty') : t('txn.empty2')}
+        dataSource={rows}
+        emptyTitle={hasFilters ? t('txn.filter.empty') : t('txn.empty.all')}
         emptyAction={hasFilters
           ? <Button onClick={clearFilters}>{t('txn.filter.clear')}</Button>
           : newButton}
+        // The database pages; the table only shows where in the ledger it is.
+        pagination={{
+          current: query.page,
+          pageSize: query.size,
+          total: totals.count,
+          pageSizeOptions: [...PAGE_SIZES],
+          onChange: (page, size) => go(size !== query.size ? { size, page: 1 } : { page }),
+        }}
         style={{ marginTop: 16 }}
       />
 
       {editing && (
         <TxnForm
           open
-          txnDate={txnDate}
+          // Looking at one day, a new transaction goes on that day, as the day
+          // screen always did; otherwise on today. A correction keeps its day.
+          txnDate={editing.correcting?.txn_date ?? singleDay(query) ?? today}
           goldTypes={goldTypes}
           salesPeople={salesPeople}
           partners={partners}
@@ -423,7 +438,7 @@ export function TxnScreen({
         {voidRow && (
           <p>
             <Tag>{voidRow.txn_type}</Tag>
-            {goldName(voidRow.gold_type_code)} · {weight.format(voidRow.qty)}
+            {voidRow.txn_date} · {goldName(voidRow.gold_type_code)} · {weight.format(voidRow.qty)}
             {' · '}{money.format(voidRow.amount)}
           </p>
         )}

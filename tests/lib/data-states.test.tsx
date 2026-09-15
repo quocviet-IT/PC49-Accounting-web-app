@@ -144,9 +144,11 @@ describe('refining: a failed list must not invite a second lot', async () => {
 
 describe('gold entry: a day that did not load is not a blank day', async () => {
   const { TxnScreen } = await import('@/components/gold/TxnScreen')
+  const { parseLedgerQuery } = await import('@/components/gold/ledgerQuery')
   const base = {
-    txnDate: '2026-09-07', goldTypes: [], salesPeople: [], partners: [],
-    existing: [],
+    query: parseLedgerQuery({ date: '2026-09-07' }), today: '2026-09-07',
+    goldTypes: [], salesPeople: [], partners: [], rows: [],
+    totals: { count: 0, purchases: 0, sales: 0, grams: {} },
   }
 
   it('shows no grid to type into', () => {

@@ -107,3 +107,14 @@
     text-align: left;
   }
 }
+
+/* The days being looked at, above the other filters: the question asked first. */
+.dateRange {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+
+.failedFilters { margin-bottom: 16px; }
