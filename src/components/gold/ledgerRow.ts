@@ -33,6 +33,6 @@ export function toLedgerRow(r: Record<string, unknown>): LedgerRow {
     payments: payments.map((p) => ({ seq: Number(p.seq), amount: Number(p.amount), method: String(p.method) })),
     soldBy: soldBy.map((p) => ({ code: String(p.code), sharePct: Number(p.sharePct) })),
     revision: Number(r.revision ?? 1),
-    blockedReason: text(r.blocked_reason),
+    blockedCode: text(r.blocked_code),
   }
 }

@@ -27,8 +27,12 @@ export type SavedRow = {
   soldBy: { code: string; sharePct: number }[]
   /** What the screen was showing, so a correction can tell if it has moved. */
   revision: number
-  /** Why this row cannot be corrected here, or null if it can. */
-  blockedReason: string | null
+  /**
+   * Why this row cannot be corrected here, as the database's code
+   * (pc49.correction_blocked_code, 0071), or null if it can. The screen writes
+   * the sentence, in the reader's language.
+   */
+  blockedCode: string | null
 }
 
 /**

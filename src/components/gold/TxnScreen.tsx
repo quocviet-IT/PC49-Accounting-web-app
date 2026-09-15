@@ -8,6 +8,7 @@ import { IconAction } from '@/components/ui/IconAction'
 import { TxnTypeTag } from './TxnTypeTag'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocale } from '@/lib/i18n/provider'
+import type { MessageKey } from '@/lib/i18n'
 import { toGrams } from '@/lib/domain/units'
 import { voidTransaction } from '@/app/(app)/gold-transactions/actions'
 import { Page, Stat, Stats, LoadFailed, money, weight } from '@/components/ledger/Ledger'
@@ -101,6 +102,18 @@ export function TxnScreen({
       () => router.push(`/gold-transactions${ledgerSearch(query, { q })}`), 400)
     return () => clearTimeout(timer)
   }, [search, query, router])
+
+  /**
+   * Why a row cannot be corrected, in the reader's language. The database
+   * answers with a code; a code nobody has written a sentence for yet still
+   * reads as a refusal rather than as the code itself.
+   */
+  const blockedText = (code: string | null) => {
+    if (!code) return null
+    const key = ('txn.blocked.' + code) as MessageKey
+    const sentence = t(key)
+    return sentence === key ? t('txn.blocked.OTHER') : sentence
+  }
 
   const goldName = (code: string) => {
     const g = goldTypes.find((x) => x.code === code)
@@ -275,7 +288,7 @@ export function TxnScreen({
           {/* Greyed out with the reason rather than offered and then refused:
               the books may have closed over it. */}
           <IconAction icon={<Pencil size={16} aria-hidden />} label={t('txn.correct')}
-                      disabled={Boolean(r.blockedReason)} disabledReason={r.blockedReason}
+                      disabled={Boolean(r.blockedCode)} disabledReason={blockedText(r.blockedCode)}
                       onClick={() => setEditing({ correcting: r })} />
           <IconAction icon={<Ban size={16} aria-hidden />} label={t('txn.void')} danger
                       onClick={() => setVoidRow(r)} />

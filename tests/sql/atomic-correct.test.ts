@@ -158,14 +158,17 @@ describe('what must not be corrected this way', () => {
 
   it('says why, rather than offering a button that does nothing', async () => {
     const id = await save()
-    const free = await db.query<{ why: string | null }>(
-      `SELECT pc49.correction_blocked_reason($1) AS why`, [id])
-    expect(free.rows[0].why).toBeNull()
+    const why = async (txn: string) => (await db.query<{ code: string | null; reason: string | null }>(
+      `SELECT pc49.correction_blocked_code($1) AS code, pc49.correction_blocked_reason($1) AS reason`,
+      [txn])).rows[0]
+    expect(await why(id)).toEqual({ code: null, reason: null })
 
     await db.query(`SELECT pc49.void_gold_txn($1, 'huy')`, [id])
-    const blocked = await db.query<{ why: string }>(
-      `SELECT pc49.correction_blocked_reason($1) AS why`, [id])
-    expect(blocked.rows[0].why).toMatch(/already been cancelled/)
+    // The screen is given the code and says it in the reader's language (0071);
+    // the English sentence stays for the refusal that correcting raises.
+    expect(await why(id)).toEqual({ code: 'VOIDED', reason: 'this transaction has already been cancelled' })
+    expect(await why('00000000-0000-0000-0000-000000000000'))
+      .toEqual({ code: 'NOT_FOUND', reason: 'there is no such transaction' })
   })
 })
 

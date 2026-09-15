@@ -40,7 +40,7 @@ const sale: LedgerRow = {
   gold_type_code: 'RP', scrap_detail: null, gold_pct: null, uom: 'LUONG', qty: -1,
   unit_price: 5425, amount: 5425, remarks: null,
   payments: [{ seq: 1, amount: 5425, method: 'CASH' }],
-  soldBy: [{ code: 'T.Quỳnh', sharePct: 100 }], revision: 1, blockedReason: null,
+  soldBy: [{ code: 'T.Quỳnh', sharePct: 100 }], revision: 1, blockedCode: null,
 }
 
 describe('the gold ledger screen', () => {
@@ -63,6 +63,16 @@ describe('the gold ledger screen', () => {
     expect(html).toContain('137')
     expect(html).toContain('101,130.00')
     expect(html).toContain('15,830.00')
+  })
+
+  it('says in the reader’s language why a row cannot be corrected', () => {
+    // The database answers with a code; the sentence is the screen's to write.
+    const leg = { ...sale, id: '2', doc_no: 'PC49-2601-029', blockedCode: 'CONVERSION_LEG' }
+    const html = renderToStaticMarkup(
+      <LocaleProvider initialLocale="vi"><TxnScreen {...base} rows={[leg]} /></LocaleProvider>)
+    expect(html).toContain('data-tip="Đây là một vế của lần quy đổi; hãy sửa lần quy đổi đó"')
+    expect(html).not.toContain('one leg of a conversion')
+    expect(html).not.toContain('CONVERSION_LEG')
   })
 
   it('offers the file of what is being looked at', () => {

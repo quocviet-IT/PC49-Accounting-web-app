@@ -10,7 +10,7 @@ const sale: LedgerRow = {
   unit_price: 5425, amount: 5425, remarks: 'Giao, "gấp"',
   payments: [{ seq: 1, amount: 1600, method: 'ZELLE' }, { seq: 2, amount: 3825, method: 'CASH' }],
   soldBy: [{ code: 'T.Quỳnh', sharePct: 80 }, { code: 'L.Thanh', sharePct: 20 }],
-  revision: 1, blockedReason: null,
+  revision: 1, blockedCode: null,
 }
 
 const gold = (code: string) => (code === 'RP' ? 'Rồng Phụng' : code)

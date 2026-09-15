@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
 import { asRole, createTestDb } from '../support/db'
+import { dictionary } from '@/lib/i18n/dictionary'
 
 const CLERK = '00000000-0000-0000-0000-0000000000c1'
 
@@ -12,7 +13,7 @@ const MARKED =
 const PLAIN = ('a'.repeat(17) + 'e'.repeat(11) + 'i'.repeat(5) + 'o'.repeat(17)
   + 'u'.repeat(11) + 'y'.repeat(5) + 'd').repeat(2)
 
-type Row = { id: string; doc_no: string; total_count: string; blocked_reason: string | null }
+type Row = { id: string; doc_no: string; total_count: string; blocked_code: string | null }
 
 let db: PGlite
 
@@ -41,7 +42,7 @@ const params = (f: Filters) => [f.from ?? null, f.to ?? null, f.type ?? null, f.
 
 async function ledger(f: Filters = {}) {
   const r = await db.query<Row>(
-    `SELECT id, doc_no, total_count::text, blocked_reason
+    `SELECT id, doc_no, total_count::text, blocked_code
        FROM pc49.gold_txn_ledger(${ARGS}, p_limit => $9, p_offset => $10)`,
     [...params(f), f.limit === undefined ? 50 : f.limit, f.offset ?? 0])
   return r.rows
@@ -156,8 +157,22 @@ describe('the gold ledger', () => {
   it('separates what may be corrected from what may not', async () => {
     expect(await docs({ status: 'locked' })).toEqual(['PU-001', 'DEP-001'])
     expect(await docs({ status: 'correctable' })).toEqual(['PO-003', 'PO-002', 'SALE-778', 'PO-001'])
-    const rows = await ledger({ query: 'DEP-001' })
-    expect(rows[0].blocked_reason).toMatch(/pickup/)
+    // A code, not a sentence: the screen says it in the reader's language (0071).
+    expect((await ledger({ query: 'DEP-001' }))[0].blocked_code).toBe('DEPOSIT_PICKED_UP')
+    expect((await ledger({ query: 'PU-001' }))[0].blocked_code).toBe('DEPOSIT_PICKUP')
+  })
+
+  it('has words in both languages for every reason a row may not be corrected', async () => {
+    // Read off the function itself, so a reason added to the database with no
+    // words on the screen fails here instead of falling back to the general one.
+    const def = await db.query<{ src: string }>(
+      `SELECT pg_get_functiondef('pc49.correction_blocked_code(uuid)'::regprocedure) AS src`)
+    const codes = [...def.rows[0].src.matchAll(/RETURN '([A-Z_]+)'/g)].map((m) => m[1])
+    expect(codes).toHaveLength(8)
+    for (const code of codes) {
+      expect(dictionary.vi).toHaveProperty([`txn.blocked.${code}`])
+      expect(dictionary.en).toHaveProperty([`txn.blocked.${code}`])
+    }
   })
 
   it('pages without changing the count of what matched', async () => {
