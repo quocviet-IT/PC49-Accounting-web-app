@@ -621,6 +621,35 @@ html, body {
 .pc-data-table .ant-table-tbody > tr > td { padding-top: 10px; padding-bottom: 10px; }
 .pc-result-count { font-size: 12px; color: var(--pc-text-secondary); padding: 7px 0; white-space: nowrap; }
 .pc-list-search.ant-input-affix-wrapper { width: 280px; max-width: 100%; }
+
+/* The name of an icon-only action (IconAction), shown beside it while it is
+   pointed at or focused. To the left, because these sit in the last column of
+   a table, where a label above the first row would be cut off by the table's
+   edge. Drawn here rather than by a Tooltip component, which cost the ledger
+   more to render than anything else on its rows. */
+.pc-icon-action-tip { position: relative; display: inline-flex; }
+
+.pc-icon-action-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 6px);
+  z-index: 20;
+  transform: translateY(-50%);
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--pc-text-heading);
+  color: var(--pc-surface-card);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.pc-icon-action-tip:hover::after,
+.pc-icon-action-tip:focus-within::after { opacity: 1; }
 .pc-filter-bar__controls { flex: 1; }
 .pc-filter-select { min-width: 150px; }
 .pc-tabs .ant-tabs-nav { margin-bottom: 20px; }

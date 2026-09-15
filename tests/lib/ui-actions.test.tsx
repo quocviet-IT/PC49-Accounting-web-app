@@ -19,6 +19,18 @@ describe('an action shown as an icon', () => {
     expect(html).toContain('ant-btn-dangerous')
     expect(html).toContain('disabled')
   })
+
+  it('shows its name while pointed at, or why it cannot be pressed', () => {
+    // Drawn by the stylesheet from data-tip, so a page with a hundred of these
+    // does not render a hundred Tooltip components on the server.
+    const plain = renderToStaticMarkup(<IconAction icon={<Pencil size={16} />} label="Sửa" />)
+    expect(plain).toContain('data-tip="Sửa"')
+    expect(plain).not.toContain('ant-tooltip')
+    const blocked = renderToStaticMarkup(
+      <IconAction icon={<Pencil size={16} />} label="Sửa" disabled disabledReason="Kỳ đã khoá" />)
+    expect(blocked).toContain('data-tip="Kỳ đã khoá"')
+    expect(blocked).toContain('aria-label="Sửa"')
+  })
 })
 
 describe('the colour of a transaction type', () => {
