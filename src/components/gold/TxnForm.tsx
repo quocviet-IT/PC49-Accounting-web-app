@@ -5,7 +5,7 @@ import {
   Alert, AutoComplete, Button, Col, Form, Input, InputNumber, Modal,
   Row, Select, Typography,
 } from 'antd'
-import { Plus, Trash2 } from 'lucide-react'
+import { Check, ListPlus, Plus, Trash2, X } from 'lucide-react'
 import { useLocale } from '@/lib/i18n/provider'
 import type { Uom } from '@/lib/domain/units'
 import {
@@ -300,13 +300,17 @@ export function TxnForm({
       mask={{ closable: false }}
       destroyOnHidden
       footer={[
-        <Button key="close" onClick={requestClose}>{t('txn.form.close')}</Button>,
+        <Button key="close" icon={<X size={16} aria-hidden />} onClick={requestClose}>
+          {t('txn.form.close')}
+        </Button>,
         !correcting && (
-          <Button key="more" loading={saving} onClick={() => submit(true)}>
+          <Button key="more" icon={<ListPlus size={16} aria-hidden />} loading={saving}
+                  onClick={() => submit(true)}>
             {t('txn.form.saveMore')}
           </Button>
         ),
-        <Button key="save" type="primary" loading={saving} onClick={() => submit(false)}>
+        <Button key="save" type="primary" icon={<Check size={16} aria-hidden />} loading={saving}
+                onClick={() => submit(false)}>
           {t('txn.save')}
         </Button>,
       ]}

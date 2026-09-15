@@ -1,7 +1,11 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useTransition, type ReactNode } from 'react'
 import Link from 'next/link'
+import { Button } from 'antd'
+import {
+  ArrowLeftRight, ChartNoAxesCombined, CircleDollarSign, RefreshCw, Upload,
+} from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useLocale } from '@/lib/i18n/provider'
 import type { MessageKey } from '@/lib/i18n'
@@ -69,9 +73,9 @@ function StatState({
     return (
       <div className={styles.failed}>
         <Stat labelKey={labelKey} value="—" note={t('common.loadFailed')} />
-        <button type="button" className={styles.retry} onClick={onRetry}>
+        <Button size="small" icon={<RefreshCw size={14} aria-hidden />} onClick={onRetry}>
           {t('common.retry')}
-        </button>
+        </Button>
       </div>
     )
   }
@@ -118,11 +122,17 @@ export function Overview({
   // move you to a different set of figures.
   const retry = () => startTransition(() => router.refresh())
 
-  const actions: { key: string; href: string; labelKey: MessageKey; show: boolean }[] = [
-    { key: 'txn', href: '/gold-transactions', labelKey: 'home.do.newTxn', show: links.newTxn },
-    { key: 'price', href: '/prices', labelKey: 'home.do.prices', show: links.prices },
-    { key: 'bank', href: '/cash', labelKey: 'home.do.bankImport', show: links.bankImport },
-    { key: 'rep', href: '/reports', labelKey: 'home.do.reports', show: links.reports },
+  const actions: {
+    key: string; href: string; labelKey: MessageKey; icon: ReactNode; show: boolean
+  }[] = [
+    { key: 'txn', href: '/gold-transactions', labelKey: 'home.do.newTxn',
+      icon: <ArrowLeftRight size={18} />, show: links.newTxn },
+    { key: 'price', href: '/prices', labelKey: 'home.do.prices',
+      icon: <CircleDollarSign size={18} />, show: links.prices },
+    { key: 'bank', href: '/cash', labelKey: 'home.do.bankImport',
+      icon: <Upload size={18} />, show: links.bankImport },
+    { key: 'rep', href: '/reports', labelKey: 'home.do.reports',
+      icon: <ChartNoAxesCombined size={18} />, show: links.reports },
   ]
 
   return (
@@ -136,9 +146,9 @@ export function Overview({
         {priceDate && priceDate !== asOf && (
           <span className={styles.meta}>{t('home.priceDate')}: {priceDate}</span>
         )}
-        <button type="button" className={styles.retry} disabled={pending} onClick={retry}>
+        <Button size="small" icon={<RefreshCw size={14} aria-hidden />} loading={pending} onClick={retry}>
           {pending ? t('common.reloading') : t('common.refresh')}
-        </button>
+        </Button>
       </div>
 
       <Stats>
@@ -169,7 +179,8 @@ export function Overview({
         <div className={styles.quick}>
           {actions.filter((a) => a.show).map((a) => (
             <Link key={a.key} href={a.href} className={styles.quickAction}>
-              {t(a.labelKey)}
+              <span className={styles.quickIcon} aria-hidden="true">{a.icon}</span>
+              <span>{t(a.labelKey)}</span>
             </Link>
           ))}
         </div>
@@ -213,9 +224,9 @@ export function Overview({
           {recent.state === 'error' ? (
             <div className={styles.failed}>
               <p className={styles.failedText}>{t('common.loadFailed')}</p>
-              <button type="button" className={styles.retry} onClick={retry}>
+              <Button size="small" icon={<RefreshCw size={14} aria-hidden />} onClick={retry}>
                 {t('common.retry')}
-              </button>
+              </Button>
             </div>
           ) : recent.state !== 'ready' || recent.value.length === 0 ? (
             <p className={ledger.note}>{t('home.recentNone')}</p>

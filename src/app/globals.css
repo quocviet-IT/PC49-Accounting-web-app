@@ -473,8 +473,7 @@ html, body {
   color: var(--pc-text-secondary);
 }
 
-.pc-month input,
-.pc-month button {
+.pc-month input {
   font: inherit;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
@@ -485,15 +484,7 @@ html, body {
   color: inherit;
 }
 
-.pc-month button { cursor: pointer; }
-
-.pc-month button:hover {
-  color: var(--pc-intent-primary);
-  border-color: var(--pc-intent-primary);
-}
-
-.pc-month input:focus,
-.pc-month button:focus-visible {
+.pc-month input:focus {
   outline: 2px solid var(--pc-intent-primary);
   outline-offset: 1px;
 }

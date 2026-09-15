@@ -1,6 +1,8 @@
 'use client'
 
 import { useId } from 'react'
+import { Button } from 'antd'
+import { RefreshCw, Search } from 'lucide-react'
 import { money } from '@/components/ledger/Ledger'
 import { useLocale } from '@/lib/i18n/provider'
 import type { MessageKey } from '@/lib/i18n'
@@ -49,7 +51,9 @@ export function TransactionCharts({
     return (
       <div className={styles.chartState} role="alert">
         <p className={styles.failedText}>{t('home.activityFailed')}</p>
-        <button type="button" className={styles.retry} onClick={onRetry}>{t('common.retry')}</button>
+        <Button size="small" icon={<RefreshCw size={14} aria-hidden />} onClick={onRetry}>
+          {t('common.retry')}
+        </Button>
       </div>
     )
   }
@@ -78,7 +82,9 @@ export function TransactionCharts({
       <form method="get" className={styles.chartPeriod}>
         <label htmlFor="activityEnd">{t('home.activityEnd')}</label>
         <input id="activityEnd" name="activityEnd" type="date" defaultValue={end} max={today} />
-        <button type="submit">{t('home.activityApply')}</button>
+        <Button htmlType="submit" icon={<Search size={14} aria-hidden />}>
+          {t('home.activityApply')}
+        </Button>
         <span className={styles.meta}>{scope}</span>
       </form>
       <div className={styles.charts}>

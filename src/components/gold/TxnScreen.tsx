@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Alert, Button, Input, Modal, Select, Space, Tag, Tooltip, Typography } from 'antd'
-import { Download, Plus } from 'lucide-react'
+import { Alert, Button, Input, Modal, Select, Space, Tag, Typography } from 'antd'
+import { Ban, Download, Pencil, Plus } from 'lucide-react'
+import { IconAction } from '@/components/ui/IconAction'
+import { TxnTypeTag } from './TxnTypeTag'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocale } from '@/lib/i18n/provider'
 import { toGrams } from '@/lib/domain/units'
@@ -203,8 +205,8 @@ export function TxnScreen({
       render: (v: string | null) => v ?? '—',
     },
     {
-      title: t('txn.col.type'), dataIndex: 'txn_type', width: 96,
-      render: (v: string) => <Tag>{v}</Tag>,
+      title: t('txn.col.type'), dataIndex: 'txn_type', width: 112,
+      render: (v: string) => <TxnTypeTag type={v} />,
     },
     {
       title: t('txn.col.partner'), dataIndex: 'partner_code', ellipsis: true,
@@ -265,20 +267,18 @@ export function TxnScreen({
     },
     { title: t('txn.col.remarks'), dataIndex: 'remarks', ellipsis: true },
     {
-      title: t('txn.col.actions'), key: 'actions', width: 124,
+      // Icons pinned to the right: the words on every row pushed this column
+      // off a 1440px screen, so Sửa could not be pressed without scrolling.
+      title: t('txn.col.actions'), key: 'actions', width: 84, fixed: 'right',
       render: (_: unknown, r) => (
-        <Space size={4}>
+        <Space size={2}>
           {/* Greyed out with the reason rather than offered and then refused:
               the books may have closed over it. */}
-          <Tooltip title={r.blockedReason ?? ''}>
-            <Button size="small" disabled={Boolean(r.blockedReason)}
-                    onClick={() => setEditing({ correcting: r })}>
-              {t('txn.correct')}
-            </Button>
-          </Tooltip>
-          <Button size="small" danger onClick={() => setVoidRow(r)}>
-            {t('txn.void')}
-          </Button>
+          <IconAction icon={<Pencil size={16} aria-hidden />} label={t('txn.correct')}
+                      disabled={Boolean(r.blockedReason)} disabledReason={r.blockedReason}
+                      onClick={() => setEditing({ correcting: r })} />
+          <IconAction icon={<Ban size={16} aria-hidden />} label={t('txn.void')} danger
+                      onClick={() => setVoidRow(r)} />
         </Space>
       ),
     },
@@ -437,7 +437,7 @@ export function TxnScreen({
         <p>{t('txn.voidWhy')}</p>
         {voidRow && (
           <p>
-            <Tag>{voidRow.txn_type}</Tag>
+            <TxnTypeTag type={voidRow.txn_type} />
             {voidRow.txn_date} · {goldName(voidRow.gold_type_code)} · {weight.format(voidRow.qty)}
             {' · '}{money.format(voidRow.amount)}
           </p>

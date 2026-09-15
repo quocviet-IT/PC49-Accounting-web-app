@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Table, Tabs, type TableColumnsType } from 'antd'
+import { Button, Table, Tabs, type TableColumnsType } from 'antd'
+import { Search } from 'lucide-react'
 import { useLocale } from '@/lib/i18n/provider'
 import { matchesSearch } from '@/lib/ui/list'
 import { Page, Empty, Grams, money, weight, ledger, LoadFailed } from '@/components/ledger/Ledger'
@@ -61,7 +62,7 @@ export function InventoryView({ rows, period, asOf, movements, stockFailed = fal
   const holdingsPanel = <div className={styles.panel}>
     <form className={`pc-month ${styles.dateForm}`} method="get" action="/inventory">
       <label htmlFor="asOf">{t('inv.asOf')}</label><input id="asOf" name="asOf" type="date" defaultValue={asOf} />
-      <input type="hidden" name="period" value={period} /><button type="submit">{t('inv.show')}</button>
+      <input type="hidden" name="period" value={period} /><Button htmlType="submit" icon={<Search size={14} aria-hidden />}>{t('inv.show')}</Button>
     </form>
     {shown.length === 0 ? <Empty /> : <>
       <ListToolbar search={stockSearch} onSearch={setStockSearch} placeholder={t('inv.searchGold')} count={filteredStock.length} total={shown.length} onReset={stockSearch ? () => setStockSearch('') : undefined} />
@@ -72,7 +73,7 @@ export function InventoryView({ rows, period, asOf, movements, stockFailed = fal
   const movementPanel = <div className={styles.panel}>
     <form className={`pc-month ${styles.dateForm}`} method="get" action="/inventory">
       <label htmlFor="period">{t('common.period')}</label><input id="period" name="period" type="month" defaultValue={period} />
-      <button type="submit">{t('inv.show')}</button>
+      <Button htmlType="submit" icon={<Search size={14} aria-hidden />}>{t('inv.show')}</Button>
     </form>
     <p className={ledger.note}>{t('inv.movementNote')}</p>
     {movementFailed ? <LoadFailed /> : moved.length === 0 ? <Empty /> : <>

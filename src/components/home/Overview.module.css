@@ -42,21 +42,6 @@
   color: var(--pc-money-negative);
 }
 
-.retry {
-  font: inherit;
-  font-size: var(--pc-font-label);
-  padding: var(--pc-space-1) var(--pc-space-3);
-  border: 1px solid var(--pc-border-default);
-  border-radius: var(--pc-radius-control);
-  background: transparent;
-  color: var(--pc-text-secondary);
-  cursor: pointer;
-}
-
-.retry:hover:not(:disabled) { color: var(--pc-text-default); }
-.retry:disabled { opacity: 0.5; cursor: default; }
-
-.retry:focus-visible,
 .kpiLink:focus-visible,
 .quickAction:focus-visible,
 .attentionLink:focus-visible {
@@ -82,28 +67,45 @@
    link underneath it could never be seen. */
 .kpiLink:hover > * { background: var(--pc-surface-subtle); }
 
+/* The shortcuts, as cards: an icon in the primary colour and the task in
+   words, so the four read as things to do rather than as a row of links. */
 .quick {
-  display: flex;
-  gap: var(--pc-space-2);
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--pc-space-3);
   margin: var(--pc-space-4) 0;
 }
 
 .quickAction {
-  font-size: var(--pc-font-body);
-  line-height: var(--pc-line-body);
-  padding: var(--pc-space-2) var(--pc-space-4);
-  border: 1px solid var(--pc-border-default);
-  border-radius: var(--pc-radius-control);
-  background: var(--pc-surface-card);
-  color: var(--pc-text-default);
-  text-decoration: none;
-  min-height: var(--pc-control-height);
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  gap: var(--pc-space-3);
+  padding: var(--pc-space-3) var(--pc-space-4);
+  border: 1px solid var(--pc-border-default);
+  border-radius: var(--pc-radius-frame);
+  background: var(--pc-surface-card);
+  color: var(--pc-text-body);
+  font-size: var(--pc-font-body);
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.quickAction:hover { border-color: var(--pc-intent-primary); }
+.quickAction:hover {
+  border-color: var(--pc-intent-primary);
+  background: var(--pc-accent-wash);
+}
+
+.quickIcon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--pc-accent-tint);
+  color: var(--pc-intent-primary);
+}
 
 /*
  * Two thirds for what happened, one third for what is waiting. Attention is
@@ -184,10 +186,10 @@
   line-height: var(--pc-line-label);
 }
 
-.chartPeriod input,
-.chartPeriod button {
-  min-height: var(--pc-control-height);
-  padding: var(--pc-space-2) var(--pc-space-3);
+/* The height of the button beside it, so the two sit on one line. */
+.chartPeriod input {
+  height: 32px;
+  padding: 0 var(--pc-space-3);
   border: 1px solid var(--pc-border-default);
   border-radius: var(--pc-radius-control);
   background: var(--pc-surface-card);
@@ -195,16 +197,15 @@
   font: inherit;
 }
 
-.chartPeriod button {
-  cursor: pointer;
-}
-
-.chartPeriod button:hover { border-color: var(--pc-intent-primary); }
-
-.chartPeriod input:focus-visible,
-.chartPeriod button:focus-visible {
+.chartPeriod input:focus-visible {
   outline: 2px solid var(--pc-intent-primary);
   outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  /* A finger is not a mouse pointer: both grow to the touch height together. */
+  .chartPeriod input,
+  .chartPeriod button { height: auto; min-height: var(--pc-control-height); }
 }
 
 .chartPanel {
