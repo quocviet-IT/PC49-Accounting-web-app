@@ -1,5 +1,7 @@
 'use client'
 
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
+
 import { useMemo, useState, useTransition } from 'react'
 import { Button } from 'antd'
 import { Check, ListPlus, Sparkles } from 'lucide-react'
@@ -86,7 +88,8 @@ export function ConversionView({
   function suggest(row: Line) {
     if (!selected || !row.goldTypeCode) return
     startTransition(async () => {
-      const s = await suggestAllocation(selected.amount, row.goldTypeCode, selected.txnDate)
+      const s = await settleAction(() => suggestAllocation(selected.amount, row.goldTypeCode, selected.txnDate))
+      if (isThrew(s)) { setError(describeThrew(s, t)); return }
       if (!s) { setError(t('conv.noPrice')); return }
       patch(row.key, {
         qty: String(s.qty),
@@ -113,7 +116,7 @@ export function ConversionView({
   function save() {
     if (!selected) return
     startTransition(async () => {
-      const result = await saveAllocation({
+      const result = await settleAction(() => saveAllocation({
         cashTxnId: selected.id,
         lines: lines
           .filter((l) => l.goldTypeCode && Number(l.qty) && Number(l.unitPrice))
@@ -126,8 +129,8 @@ export function ConversionView({
             productDesc: l.desc || null,
             confirmed: l.confirmed,
           })),
-      })
-      if (!result.ok) setError(result.message)
+      }))
+      if (!result.ok) setError(isThrew(result) ? describeThrew(result, t) : result.message)
       else setError(null)
     })
   }

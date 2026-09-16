@@ -1,6 +1,6 @@
 'use client'
 
-import { settleAction, type ActionThrew } from '@/lib/ui/settleAction'
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -147,11 +147,6 @@ export function TxnForm({
    * accountant can meet at this counter are said in Vietnamese; anything else
    * passes through unchanged rather than being guessed at.
    */
-  /** What to say when a save never answered at all, rather than refusing. */
-  const threwText = (r: ActionThrew) => (r.reason === 'STALE' ? t('common.actionStale')
-    : r.reason === 'NETWORK' ? t('common.actionNetwork')
-      : `${t('common.actionFailed')} ${r.message}`)
-
   const readable = (message: string) => (
     /no journal lines|no payments recorded/.test(message) ? t('txn.err.noPayments')
       : /is not a valid movement for .*no such flow rule/.test(message) ? t('txn.err.flowRule')
@@ -283,7 +278,7 @@ export function TxnForm({
     setSaving(false)
 
     if (!result.ok) {
-      setError('reason' in result ? threwText(result) : readable(result.message))
+      setError(isThrew(result) ? describeThrew(result, t) : readable(result.message))
       topRef.current?.scrollIntoView({ block: 'nearest' })
       return
     }

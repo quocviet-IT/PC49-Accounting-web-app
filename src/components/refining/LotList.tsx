@@ -1,5 +1,7 @@
 'use client'
 
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
+
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Alert, Button, Select, Tag } from 'antd'
@@ -37,9 +39,9 @@ export function LotList({ lots, loadFailed = false }: { lots: LotRow[]; loadFail
   async function openLot() {
     setOpening(true)
     setError(null)
-    const result = await createLot({})
+    const result = await settleAction(() => createLot({}))
     setOpening(false)
-    if (!result.ok) { setError(result.message); return }
+    if (!result.ok) { setError(isThrew(result) ? describeThrew(result, t) : result.message); return }
     router.push(`/refining/${result.lotId}`)
   }
 

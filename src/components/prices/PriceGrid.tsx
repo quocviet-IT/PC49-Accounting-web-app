@@ -1,5 +1,7 @@
 'use client'
 
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
+
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from 'antd'
@@ -76,12 +78,15 @@ export function PriceGrid({
 
     setSaving(row.code)
     setError(null)
-    const result = await saveGoldPrice({
+    const result = await settleAction(() => saveGoldPrice({
       priceDate: date, goldTypeCode: row.code,
       marketPrice: market, avgPurchasePrice: avg,
-    })
+    }))
     setSaving(null)
-    if (!result.ok) { setError(`${row.code}: ${result.message}`); return }
+    if (!result.ok) {
+      setError(`${row.code}: ${isThrew(result) ? describeThrew(result, t) : result.message}`)
+      return
+    }
     setDraft((d) => {
       const next = { ...d }
       delete next[key(row.code, 'market')]
@@ -97,9 +102,12 @@ export function PriceGrid({
 
     setSaving(row.metal)
     setError(null)
-    const result = await saveSpotPrice({ priceDate: date, metal: row.metal, spotPerOz: perOz })
+    const result = await settleAction(() => saveSpotPrice({ priceDate: date, metal: row.metal, spotPerOz: perOz }))
     setSaving(null)
-    if (!result.ok) { setError(`${row.metal}: ${result.message}`); return }
+    if (!result.ok) {
+      setError(`${row.metal}: ${isThrew(result) ? describeThrew(result, t) : result.message}`)
+      return
+    }
     setDraft((d) => {
       const next = { ...d }
       delete next[key(row.metal, 'spot')]
@@ -111,9 +119,9 @@ export function PriceGrid({
   function carry() {
     setError(null); setSaid(null)
     startTransition(async () => {
-      const result = await carryPricesForward({ from: previous, to: date })
+      const result = await settleAction(() => carryPricesForward({ from: previous, to: date }))
       if (result.ok) { setSaid(result.message ?? null); router.refresh() }
-      else setError(result.message)
+      else setError(isThrew(result) ? describeThrew(result, t) : result.message)
     })
   }
 

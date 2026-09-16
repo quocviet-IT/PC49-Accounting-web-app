@@ -1,5 +1,7 @@
 'use client'
 
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
+
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Alert, Button, Space, Tag, Typography } from 'antd'
@@ -41,9 +43,9 @@ export function PurchasePicker({
 
   async function run(fn: () => Promise<{ ok: boolean; message?: string }>) {
     setBusy(true); setError(null)
-    const r = await fn()
+    const r = await settleAction(fn)
     setBusy(false)
-    if (!r.ok) { setError(r.message ?? 'failed'); return }
+    if (!r.ok) { setError(isThrew(r) ? describeThrew(r, t) : (r.message ?? 'failed')); return }
     setChosen([]); setDropping([])
     router.refresh()
   }

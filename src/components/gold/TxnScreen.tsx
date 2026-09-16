@@ -1,5 +1,7 @@
 'use client'
 
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
+
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Alert, Button, Input, Modal, Select, Space, Tag, Typography } from 'antd'
@@ -189,9 +191,9 @@ export function TxnScreen({
   async function confirmVoid() {
     if (!voidRow) return
     setVoiding(true)
-    const result = await voidTransaction({ id: voidRow.id, reason: voidReason })
+    const result = await settleAction(() => voidTransaction({ id: voidRow.id, reason: voidReason }))
     setVoiding(false)
-    if (!result.ok) { setNotice(result.message); return }
+    if (!result.ok) { setNotice(isThrew(result) ? describeThrew(result, t) : result.message); return }
     setVoidRow(null)
     setVoidReason('')
     router.refresh()

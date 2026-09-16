@@ -1,5 +1,7 @@
 'use client'
 
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
+
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from 'antd'
@@ -33,8 +35,8 @@ export function PasswordView({ forced }: { forced: boolean }) {
     // about this form rather than about the account.
     if (password !== again) { setError(t('pw.mismatch')); return }
     startTransition(async () => {
-      const result = await changeMyPassword({ password })
-      if (!result.ok) { setError(result.message); return }
+      const result = await settleAction(() => changeMyPassword({ password }))
+      if (!result.ok) { setError(isThrew(result) ? describeThrew(result, t) : result.message); return }
       setDone(true)
       setPassword(''); setAgain('')
       router.refresh()

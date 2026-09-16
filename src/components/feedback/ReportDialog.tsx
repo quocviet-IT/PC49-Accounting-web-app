@@ -1,5 +1,7 @@
 'use client'
 
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
+
 import { useCallback, useState, useTransition } from 'react'
 import { usePathname } from 'next/navigation'
 import { Button, Modal } from 'antd'
@@ -94,7 +96,7 @@ export function ReportDialog() {
   function submit() {
     setError(null)
     startTransition(async () => {
-      const result = await fileReport({
+      const result = await settleAction(() => fileReport({
         kind,
         impact,
         description,
@@ -104,8 +106,8 @@ export function ReportDialog() {
         pageRoute: pathname,
         pageTitle: page ? t(page.labelKey) : undefined,
         screenshot: includeShot ? shot : null,
-      })
-      if (!result.ok) { setError(result.message); return }
+      }))
+      if (!result.ok) { setError(isThrew(result) ? describeThrew(result, t) : result.message); return }
       // Said plainly either way. A reporter who believes a picture went with
       // their report, when none did, is worse off than one who knows.
       setSentNote(

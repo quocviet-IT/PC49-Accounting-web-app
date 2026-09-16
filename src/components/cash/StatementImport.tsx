@@ -1,5 +1,7 @@
 'use client'
 
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
+
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Upload } from 'lucide-react'
@@ -29,10 +31,13 @@ export function StatementImport() {
     setResult(null)
     startTransition(async () => {
       const csv = await file.text()
-      const outcome = await importBankStatement({
+      const settled = await settleAction(() => importBankStatement({
         fileName: file.name,
         csv,
-      })
+      }))
+      const outcome: ImportResult = isThrew(settled)
+        ? { ok: false, message: describeThrew(settled, t) }
+        : settled
       setResult(outcome)
       // The unmatched queue below is server-rendered, so it only moves on a
       // refresh.

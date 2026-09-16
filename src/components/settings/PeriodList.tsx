@@ -1,5 +1,7 @@
 'use client'
 
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
+
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Lock, LockOpen } from 'lucide-react'
@@ -40,10 +42,10 @@ export function PeriodList({ rows, loadFailed = false }: {
     setError(null)
     setBusy(row.period)
     startTransition(async () => {
-      const result = await setPeriodStatus({ period: row.period, close: !row.closed })
+      const result = await settleAction(() => setPeriodStatus({ period: row.period, close: !row.closed }))
       setBusy(null)
       if (result.ok) router.refresh()
-      else setError(`${row.period}: ${result.message}`)
+      else setError(`${row.period}: ${isThrew(result) ? describeThrew(result, t) : result.message}`)
     })
   }
 

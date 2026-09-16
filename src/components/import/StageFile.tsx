@@ -1,5 +1,7 @@
 'use client'
 
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
+
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Upload } from 'lucide-react'
@@ -36,7 +38,10 @@ export function StageFile() {
     setResult(null)
     startTransition(async () => {
       const csv = await file.text()
-      const outcome = await stageFile({ source, fileName: file.name, csv })
+      const settled = await settleAction(() => stageFile({ source, fileName: file.name, csv }))
+      const outcome: StageResult = isThrew(settled)
+        ? { ok: false, message: describeThrew(settled, t) }
+        : settled
       setResult(outcome)
       if (outcome.ok) router.refresh()
       if (input.current) input.current.value = ''

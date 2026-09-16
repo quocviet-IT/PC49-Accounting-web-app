@@ -1,5 +1,7 @@
 'use client'
 
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
+
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -81,16 +83,16 @@ export function LotDetail({
 
   async function removeBag(bag: Bag) {
     setBusy(true)
-    const r = await deleteBag({ lotId: lot!.id, lineId: bag.id })
+    const r = await settleAction(() => deleteBag({ lotId: lot!.id, lineId: bag.id }))
     setBusy(false)
-    done(r)
+    done(isThrew(r) ? { ok: false, message: describeThrew(r, t) } : r)
   }
 
   async function close() {
     setBusy(true)
-    const r = await closeLot({ lotId: lot!.id })
+    const r = await settleAction(() => closeLot({ lotId: lot!.id }))
     setBusy(false)
-    done(r)
+    done(isThrew(r) ? { ok: false, message: describeThrew(r, t) } : r)
   }
 
   const owedBy = (s: OwnerShare) => owedGram(s, receipts)

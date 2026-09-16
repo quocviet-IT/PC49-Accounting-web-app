@@ -74,11 +74,26 @@ async function cleanUp() {
                    AND entity_id NOT IN (SELECT id::text FROM pc49.journal_entry)`)
 }
 
+/**
+ * Clicks an option in whichever dropdown is open.
+ *
+ * Scrolled to and pressed rather than waited on: a dropdown opened near the
+ * bottom of the dialog is drawn partly outside the dialog's scrolling body, and
+ * an option down there never counts as visible, so a plain click waits until it
+ * times out. That was the third payment line's method, one run in two.
+ */
+async function pickOption(page, option) {
+  const choice = page.locator('.ant-select-dropdown:visible .ant-select-item-option')
+    .filter({ hasText: option }).first()
+  await choice.waitFor({ state: 'attached' })
+  await choice.scrollIntoViewIfNeeded().catch(() => {})
+  await choice.click({ force: true })
+}
+
 /** Picks an option from one of the form's dropdowns. */
 async function selectOption(page, form, label, option) {
   await form.getByLabel(label, { exact: true }).first().click()
-  await page.locator('.ant-select-dropdown:visible .ant-select-item-option')
-    .filter({ hasText: option }).first().click()
+  await pickOption(page, option)
 }
 
 try {
@@ -123,8 +138,7 @@ try {
   check('and another when the counter asks for one', second === true)
   await lines().nth(1).fill('700')
   await settle.getByLabel('Hình thức', { exact: true }).nth(1).click()
-  await page.locator('.ant-select-dropdown:visible .ant-select-item-option')
-    .filter({ hasText: 'BANKWIRE' }).first().click()
+  await pickOption(page, 'BANKWIRE')
 
   // And a third, which is where the screen used to stop (0046).
   await addLine.click()
@@ -132,8 +146,7 @@ try {
   check('a third line is allowed, where the two columns used to stop', third === true)
   await lines().nth(2).fill('300')
   await settle.getByLabel('Hình thức', { exact: true }).nth(2).click()
-  await page.locator('.ant-select-dropdown:visible .ant-select-item-option')
-    .filter({ hasText: 'ZELLE' }).first().click()
+  await pickOption(page, 'ZELLE')
 
   await form.getByRole('button', { name: 'Lưu', exact: true }).first().click()
 

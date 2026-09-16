@@ -1,5 +1,7 @@
 'use client'
 
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
+
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from 'antd'
@@ -91,8 +93,8 @@ function AddPerson({ onCreated }: { onCreated: (password: string) => void }) {
       <Button type="primary" icon={<Check size={14} aria-hidden />} loading={pending} onClick={() => {
         setError(null)
         startTransition(async () => {
-          const result = await createUser({ email, fullName, role })
-          if (!result.ok) { setError(result.message); return }
+          const result = await settleAction(() => createUser({ email, fullName, role }))
+          if (!result.ok) { setError(isThrew(result) ? describeThrew(result, t) : result.message); return }
           onCreated(result.password)
           setOpen(false); setEmail(''); setFullName(''); setRole('KT')
           router.refresh()
@@ -136,8 +138,11 @@ export function UsersView({ people, meId, loadFailed = false }: {
   function run(work: () => Promise<{ ok: boolean; message?: string }>) {
     setError(null)
     startTransition(async () => {
-      const result = await work()
-      if (!result.ok) { setError(result.message ?? 'Không thực hiện được'); return }
+      const result = await settleAction(work)
+      if (!result.ok) {
+        setError(isThrew(result) ? describeThrew(result, t) : (result.message ?? 'Không thực hiện được'))
+        return
+      }
       router.refresh()
     })
   }
@@ -223,8 +228,11 @@ export function UsersView({ people, meId, loadFailed = false }: {
                                 disabled={pending}
                                 onClick={() => {
                                   startTransition(async () => {
-                                    const result = await resetPassword({ userId: p.id })
-                                    if (!result.ok) { setError(result.message); return }
+                                    const result = await settleAction(() => resetPassword({ userId: p.id }))
+                                    if (!result.ok) {
+                                      setError(isThrew(result) ? describeThrew(result, t) : result.message)
+                                      return
+                                    }
                                     setSecret(result.password)
                                     router.refresh()
                                   })

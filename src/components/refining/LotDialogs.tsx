@@ -1,5 +1,7 @@
 'use client'
 
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
+
 import { useEffect, useState } from 'react'
 import { Alert, Form, Input, InputNumber, Modal, Select, Table, Typography } from 'antd'
 import { useLocale } from '@/lib/i18n/provider'
@@ -20,7 +22,8 @@ function useSpot(date: string | undefined) {
   useEffect(() => {
     let live = true
     if (!date) return
-    spotOn(date).then((s) => { if (live) setSpot(s) })
+    // A prefill that did not arrive is not a failure: the figures can be typed.
+    spotOn(date).then((s) => { if (live) setSpot(s) }).catch(() => {})
     return () => { live = false }
   }, [date])
   return spot
@@ -36,15 +39,19 @@ function useSpot(date: string | undefined) {
  * dialog and reloads the lot as it always did.
  */
 function useSave(onDone: Done) {
+  const { t } = useLocale()
   const [saving, setSaving] = useState(false)
   const [refused, setRefused] = useState<string | null>(null)
 
   async function run(action: () => Promise<Result>) {
     setSaving(true)
     setRefused(null)
-    const r = await action()
+    // Settled rather than awaited bare: a save that throws — the page older
+    // than the server after a redeploy — used to leave the dialog spinning
+    // with nothing said.
+    const r = await settleAction(action)
     setSaving(false)
-    if (!r.ok) { setRefused(r.message); return }
+    if (!r.ok) { setRefused(isThrew(r) ? describeThrew(r, t) : r.message); return }
     onDone(r)
   }
 

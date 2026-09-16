@@ -1,5 +1,7 @@
 'use client'
 
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
+
 import { useState } from 'react'
 import { Tabs } from 'antd'
 import { useRouter } from 'next/navigation'
@@ -62,9 +64,12 @@ export function ReferenceView({
     if (value === p.value) { setDraft((d) => { const n = { ...d }; delete n[p.key]; return n }); return }
 
     setBusy(p.key); setError(null)
-    const result = await saveSystemParam({ key: p.key, value })
+    const result = await settleAction(() => saveSystemParam({ key: p.key, value }))
     setBusy(null)
-    if (!result.ok) { setError(`${p.key}: ${result.message}`); return }
+    if (!result.ok) {
+      setError(`${p.key}: ${isThrew(result) ? describeThrew(result, t) : result.message}`)
+      return
+    }
     setDraft((d) => { const n = { ...d }; delete n[p.key]; return n })
     router.refresh()
   }

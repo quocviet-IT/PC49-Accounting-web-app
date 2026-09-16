@@ -37,3 +37,23 @@ export async function settleAction<T>(call: () => Promise<T>): Promise<T | Actio
     return { ok: false, reason: 'SERVER', message }
   }
 }
+
+/**
+ * Whether an answer is a call that never answered, as opposed to what the
+ * action itself said. An action's own refusal carries the database's reason,
+ * which each screen already words its own way; only a throw needs the shared
+ * sentence below.
+ */
+export function isThrew(answer: unknown): answer is ActionThrew {
+  return typeof answer === 'object' && answer !== null
+    && (answer as { ok?: unknown }).ok === false && 'reason' in answer
+}
+
+type ThrewKey = 'common.actionStale' | 'common.actionNetwork' | 'common.actionFailed'
+
+/** The sentence a screen shows when a call never answered, in its own language. */
+export function describeThrew(threw: ActionThrew, t: (key: ThrewKey) => string): string {
+  if (threw.reason === 'STALE') return t('common.actionStale')
+  if (threw.reason === 'NETWORK') return t('common.actionNetwork')
+  return `${t('common.actionFailed')} ${threw.message}`
+}

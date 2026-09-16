@@ -1,5 +1,7 @@
 'use client'
 
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
+
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -175,8 +177,8 @@ function Triage({ id, status }: { id: string; status: string }) {
     // nothing is sent until the box is filled.
     if (to === 'DECLINED' && said === '') return
     startTransition(async () => {
-      const result = await triageReport({ id, status: to, note: said || null })
-      if (!result.ok) { setError(result.message); return }
+      const result = await settleAction(() => triageReport({ id, status: to, note: said || null }))
+      if (!result.ok) { setError(isThrew(result) ? describeThrew(result, t) : result.message); return }
       if (said) setSaved(said)
       router.refresh()
     })

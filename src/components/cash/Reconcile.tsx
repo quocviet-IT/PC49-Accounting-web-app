@@ -1,5 +1,7 @@
 'use client'
 
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
+
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from 'antd'
@@ -39,11 +41,11 @@ export function Reconcile({
   function submit() {
     setError(null)
     startTransition(async () => {
-      const result = await reconcileAccount({
+      const result = await settleAction(() => reconcileAccount({
         recDate, cashAccountCode: accountCode,
         usClosing: Number(theirs), status, reason: reason || null,
-      })
-      if (!result.ok) { setError(result.message); return }
+      }))
+      if (!result.ok) { setError(isThrew(result) ? describeThrew(result, t) : result.message); return }
       setOpen(false); setTheirs(''); setReason('')
       router.refresh()
     })

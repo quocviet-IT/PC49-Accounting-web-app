@@ -1,5 +1,7 @@
 'use client'
 
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
+
 import { useState, useTransition } from 'react'
 import { Button, Tabs } from 'antd'
 import { BookCheck, ListChecks, Search, Undo2 } from 'lucide-react'
@@ -84,9 +86,9 @@ export function ImportView({
   function run(action: () => Promise<{ ok: boolean; message: string }>) {
     setMessage(null)
     startTransition(async () => {
-      const result = await action()
+      const result = await settleAction(action)
       setFailed(!result.ok)
-      setMessage(result.message)
+      setMessage(isThrew(result) ? describeThrew(result, t) : result.message)
     })
   }
 

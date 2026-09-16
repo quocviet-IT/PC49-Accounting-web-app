@@ -11,7 +11,7 @@
  * can fix themselves — a page older than the server — is named as such.
  */
 import { describe, it, expect } from 'vitest'
-import { settleAction } from '@/lib/ui/settleAction'
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
 
 type Saved = { ok: true; docNo: string } | { ok: false; message: string }
 
@@ -51,5 +51,42 @@ describe('calling a server action from a screen', () => {
   it('reads a thrown value that is not an error', async () => {
     const r = await settleAction(throws('boom'))
     expect(r).toEqual({ ok: false, reason: 'SERVER', message: 'boom' })
+  })
+})
+
+describe('telling a throw from an answer', () => {
+  it('knows a call that never answered', async () => {
+    expect(isThrew(await settleAction(throws(new TypeError('Failed to fetch'))))).toBe(true)
+  })
+
+  it('leaves an action’s own refusal to the screen that asked', () => {
+    // A refusal carries the database's reason, which each screen already words
+    // in its own way; only a throw needs the shared sentence.
+    expect(isThrew({ ok: false, message: 'period 2026-09 is closed' })).toBe(false)
+  })
+
+  it('is not fooled by answers that are not results at all', () => {
+    expect(isThrew(null)).toBe(false)
+    expect(isThrew(120.5)).toBe(false)
+    expect(isThrew({ GOLD: null, PLATINUM: null })).toBe(false)
+  })
+})
+
+describe('what a screen says when a call never answered', () => {
+  const t = (key: string) => `[${key}]`
+
+  it('asks for a reload when the page is older than the server', () => {
+    expect(describeThrew({ ok: false, reason: 'STALE', message: 'Server Action "x" was not found' }, t))
+      .toBe('[common.actionStale]')
+  })
+
+  it('asks for the connection to be checked when the request never arrived', () => {
+    expect(describeThrew({ ok: false, reason: 'NETWORK', message: 'Failed to fetch' }, t))
+      .toBe('[common.actionNetwork]')
+  })
+
+  it('passes on what the server said when it fell over', () => {
+    expect(describeThrew({ ok: false, reason: 'SERVER', message: 'An unexpected response was received' }, t))
+      .toBe('[common.actionFailed] An unexpected response was received')
   })
 })

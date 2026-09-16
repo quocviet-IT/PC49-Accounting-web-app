@@ -1,5 +1,7 @@
 'use client'
 
+import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
+
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from 'antd'
@@ -32,11 +34,11 @@ export function StateFigure({ asOf }: { asOf: string }) {
   function submit() {
     setError(null)
     startTransition(async () => {
-      const result = await setExpectedFigure({
+      const result = await settleAction(() => setExpectedFigure({
         asOf, metric, metricKey: key.trim(), expected: Number(expected),
         sourceNote: note || null,
-      })
-      if (!result.ok) { setError(result.message); return }
+      }))
+      if (!result.ok) { setError(isThrew(result) ? describeThrew(result, t) : result.message); return }
       setKey(''); setExpected(''); setNote('')
       router.refresh()
     })
