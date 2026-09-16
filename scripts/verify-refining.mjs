@@ -273,6 +273,20 @@ try {
   const sendForm = page.getByRole('dialog').last()
   await sendForm.waitFor()
   await sendForm.getByLabel('Ngày', { exact: true }).fill(SENT)
+
+  // Pressed with no spot price, which this day has none of: the save is
+  // refused, and the reason has to be legible where the button was pressed.
+  // It used to be written into the page behind the dialog, where the only
+  // thing anybody could see was a button that did nothing.
+  await sendForm.getByRole('button', { name: /Gửi đi/ }).click()
+  const refusal = await until(async () => {
+    const said = (await sendForm.locator('.ant-alert-error').allTextContents()).join(' ').trim()
+    return said || null
+  }, { timeout: 10000 })
+  check('a refused save says why, in the dialog it was pressed in',
+    (refusal ?? '').includes('no spot price recorded'),
+    (refusal ?? '(the dialog said nothing)').slice(0, 70))
+
   await sendForm.getByLabel('Spot /oz — Gold', { exact: true }).fill('4800')
   await sendForm.getByRole('button', { name: /Gửi đi/ }).click()
   const sent = await untilRowIs(db,

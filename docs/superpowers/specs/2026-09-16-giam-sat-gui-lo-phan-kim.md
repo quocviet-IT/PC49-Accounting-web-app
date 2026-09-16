@@ -60,7 +60,7 @@ Sửa xong quyền, script đi tiếp và tắc ở bước "Nhập kết quả 
 - **Bằng chứng:** nội dung gửi lên là `"lineId":"$undefined"` cho từng túi, và màn hình *có* báo "Invalid input: expected string, received undefined" — nhưng ô báo lỗi nằm **sau hộp thoại đang mở**, nên người dùng không đọc được.
 - **Vì sao:** bảng assay chỉ dựng ô nhập cho hai số (trọng lượng và tuổi vàng sau assay). Form chỉ giữ những trường nó có dựng ô, nên mã túi rơi mất trên đường gửi đi. Nghĩa là **mọi lần nhập kết quả assay đều hỏng kể từ lúc dựng lại trang lô (10-09)**.
 - **Cách sửa:** tách phép dựng dữ liệu gửi đi thành một hàm thuần (`assayLines`), lấy mã túi từ danh sách túi chứ không từ form; ô nào không gõ thì giữ nguyên số lúc gửi, đúng như hộp thoại đang hiện. Có 4 test cho hàm này.
-- **Còn nợ, nên làm sau:** khi lưu hỏng, lời báo lỗi hiện sau hộp thoại. Nên hiện ngay trong hộp thoại, vì hiện giờ người dùng chỉ thấy "bấm không ăn".
+- **Sửa tiếp ngay sau đó:** lời báo lỗi khi lưu hỏng giờ hiện **trong** hộp thoại vừa bấm, không còn nằm sau nó. Cả bốn hộp thoại của màn Phân kim — gửi đi, assay, nhận về, túi — dùng chung một cách lưu: lưu hỏng thì giữ lý do tại chỗ, chỉ khi lưu được mới đóng hộp thoại và nạp lại lô. `verify:refining` thêm một bước tự gây lỗi thật (bấm Gửi khi ngày đó chưa có giá spot) và đòi lý do phải đọc được ngay trong hộp thoại.
 
 ## Kèm theo: viết lại `verify:refining`
 
@@ -79,7 +79,7 @@ Script đi tới bước cuối rồi tắc: bấm "Đóng lô" không đóng.
 
 ## Kết quả
 
-- `verify:refining` chạy trọn vòng đời bằng tài khoản giám sát trên bản build production: **24/24 xanh**, dọn sạch dữ liệu thử (0 lô, 0 giao dịch, 0 khách mới).
+- `verify:refining` chạy trọn vòng đời bằng tài khoản giám sát trên bản build production: **25/25 xanh**, dọn sạch dữ liệu thử (0 lô, 0 giao dịch, 0 khách mới). Bản đẩy lên lần đầu (`4d0b70c`) đạt 24/24 trên Production; mục thứ 25 là bước kiểm tra lời báo lỗi hiện trong hộp thoại, thêm sau đó.
 - Ba lỗi tìm được trong cùng một lần viết lại script, đều là thứ người dùng gặp mà test cũ không thấy, vì test cũ chạy bằng quyền chủ database và không bấm vào màn hình:
   1. giám sát không gửi được lô — migration 0072;
   2. không ai lưu được kết quả assay — `assayLines`;

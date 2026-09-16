@@ -26,6 +26,31 @@ function useSpot(date: string | undefined) {
   return spot
 }
 
+/**
+ * A save that says why it was refused where the person who pressed it is looking.
+ *
+ * A refusal used to be handed straight to the page behind the dialog, which put
+ * the reason in an alert underneath the open modal. From the desk the button
+ * simply did nothing, twice, and then somebody rang. The dialog keeps its own
+ * refusal now; only a save that worked is passed on, and the page closes the
+ * dialog and reloads the lot as it always did.
+ */
+function useSave(onDone: Done) {
+  const [saving, setSaving] = useState(false)
+  const [refused, setRefused] = useState<string | null>(null)
+
+  async function run(action: () => Promise<Result>) {
+    setSaving(true)
+    setRefused(null)
+    const r = await action()
+    setSaving(false)
+    if (!r.ok) { setRefused(r.message); return }
+    onDone(r)
+  }
+
+  return { saving, refused, run }
+}
+
 // ------------------------------------------------------------------ send
 
 export function SendDialog({ open, lotId, onClose, onDone }: {
@@ -35,7 +60,7 @@ export function SendDialog({ open, lotId, onClose, onDone }: {
   const [form] = Form.useForm<{ date: string; spotGold: number | null; spotPt: number | null }>()
   const date = Form.useWatch('date', form)
   const spot = useSpot(date)
-  const [saving, setSaving] = useState(false)
+  const { saving, refused, run } = useSave(onDone)
 
   // The day's figures from the price table, offered before they are confirmed.
   useEffect(() => {
@@ -46,16 +71,16 @@ export function SendDialog({ open, lotId, onClose, onDone }: {
 
   async function submit() {
     const v = await form.validateFields()
-    setSaving(true)
-    const r = await sendLot({ lotId, date: v.date, spotGoldPerOz: v.spotGold, spotPtPerOz: v.spotPt })
-    setSaving(false)
-    onDone(r)
+    await run(() => sendLot({
+      lotId, date: v.date, spotGoldPerOz: v.spotGold, spotPtPerOz: v.spotPt,
+    }))
   }
 
   return (
     <Modal open={open} title={t('refining.send.title')} onCancel={onClose} onOk={submit}
            okText={t('refining.send.confirm')} okButtonProps={{ loading: saving, danger: true }}
            cancelText={t('refining.cancel')} destroyOnHidden>
+      {refused && <Alert type="error" showIcon title={refused} style={{ marginBottom: 12 }} />}
       <Form form={form} layout="vertical" initialValues={{ date: today(), spotGold: null, spotPt: null }}>
         <Form.Item name="date" label={t('refining.onDate')} rules={[{ required: true }]}>
           <Input type="date" />
@@ -85,7 +110,7 @@ export function AssayDialog({ open, lotId, bags, onClose, onDone }: {
   const [form] = Form.useForm<{ date: string; spotGold: number | null; spotPt: number | null; rows: AssayRow[] }>()
   const date = Form.useWatch('date', form)
   const spot = useSpot(date)
-  const [saving, setSaving] = useState(false)
+  const { saving, refused, run } = useSave(onDone)
 
   useEffect(() => {
     if (!spot) return
@@ -103,19 +128,17 @@ export function AssayDialog({ open, lotId, bags, onClose, onDone }: {
 
   async function submit() {
     const v = await form.validateFields()
-    setSaving(true)
-    const r = await recordAssay({
+    await run(() => recordAssay({
       lotId, date: v.date, spotGoldPerOz: v.spotGold, spotPtPerOz: v.spotPt,
       lines: assayLines(bags, v.rows ?? []),
-    })
-    setSaving(false)
-    onDone(r)
+    }))
   }
 
   return (
     <Modal open={open} width={760} title={t('refining.assay.title')} onCancel={onClose} onOk={submit}
            okText={t('refining.save')} okButtonProps={{ loading: saving }}
            cancelText={t('refining.cancel')} destroyOnHidden>
+      {refused && <Alert type="error" showIcon title={refused} style={{ marginBottom: 12 }} />}
       <Typography.Paragraph type="secondary">{t('refining.assay.hint')}</Typography.Paragraph>
       <Form form={form} layout="vertical"
             initialValues={{ date: today(), spotGold: null, spotPt: null, rows: initialRows }}>
@@ -167,26 +190,24 @@ export function SettleDialog({ open, lotId, share, onClose, onDone }: {
   const { t } = useLocale()
   const [form] = Form.useForm<{ date: string; kind: 'METAL' | 'CASH'; qty: number | null; amount: number | null }>()
   const kind = Form.useWatch('kind', form)
-  const [saving, setSaving] = useState(false)
+  const { saving, refused, run } = useSave(onDone)
   const owed = share ? Math.max(0, share.assayWeightGram - share.receivedGram) : 0
 
   async function submit() {
     if (!share) return
     const v = await form.validateFields()
-    setSaving(true)
-    const r = await recordReceipt({
+    await run(() => recordReceipt({
       lotId, ownerCode: share.ownerCode, date: v.date, settleKind: v.kind,
       qtyGram: v.kind === 'METAL' ? Number(v.qty) : null,
       amountUsd: v.kind === 'CASH' ? Number(v.amount) : null,
-    })
-    setSaving(false)
-    onDone(r)
+    }))
   }
 
   return (
     <Modal open={open} title={`${t('refining.settle.title')} · ${share?.ownerCode ?? ''}`}
            onCancel={onClose} onOk={submit} okText={t('refining.save')}
            okButtonProps={{ loading: saving }} cancelText={t('refining.cancel')} destroyOnHidden>
+      {refused && <Alert type="error" showIcon title={refused} style={{ marginBottom: 12 }} />}
       <Typography.Paragraph type="secondary">{t('refining.settle.hint')}</Typography.Paragraph>
       <Form form={form} layout="vertical"
             initialValues={{ date: today(), kind: 'METAL', qty: owed > 0 ? owed : null, amount: null }}>
@@ -223,24 +244,22 @@ export function BagDialog({ open, lotId, bag, goldTypes, onClose, onDone }: {
 }) {
   const { locale, t } = useLocale()
   const [form] = Form.useForm<{ owner: string; goldType: string; desc: string; gross: number | null; pct: number | null }>()
-  const [saving, setSaving] = useState(false)
+  const { saving, refused, run } = useSave(onDone)
 
   async function submit() {
     const v = await form.validateFields()
-    setSaving(true)
-    const r = bag
-      ? await updateBag({ lotId, lineId: bag.id, grossWeightGram: Number(v.gross),
-                          goldPct: v.pct ?? null, sourceDesc: v.desc || null })
-      : await addBag({ lotId, ownerCode: v.owner, goldTypeCode: v.goldType, sourceDesc: v.desc || null,
-                       grossWeightGram: Number(v.gross), goldPct: v.pct ?? null })
-    setSaving(false)
-    onDone(r)
+    await run(() => (bag
+      ? updateBag({ lotId, lineId: bag.id, grossWeightGram: Number(v.gross),
+                    goldPct: v.pct ?? null, sourceDesc: v.desc || null })
+      : addBag({ lotId, ownerCode: v.owner, goldTypeCode: v.goldType, sourceDesc: v.desc || null,
+                 grossWeightGram: Number(v.gross), goldPct: v.pct ?? null })))
   }
 
   return (
     <Modal open={open} title={bag ? t('refining.bag.edit') : t('refining.addBag')}
            onCancel={onClose} onOk={submit} okText={t('refining.save')}
            okButtonProps={{ loading: saving }} cancelText={t('refining.cancel')} destroyOnHidden>
+      {refused && <Alert type="error" showIcon title={refused} style={{ marginBottom: 12 }} />}
       <Typography.Paragraph type="secondary">
         {bag ? t('refining.bag.editHint') : t('refining.addBagHint')}
       </Typography.Paragraph>
