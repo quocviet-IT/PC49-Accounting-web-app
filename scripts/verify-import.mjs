@@ -80,9 +80,17 @@ try {
   // has to show. Until this control existed the comparison could only be set up
   // in SQL — the reconciliation was testable and unusable.
   await page.goto(`${BASE}/import?asOf=${AS_OF}`, { waitUntil: 'networkidle' })
+  // The reconciliation is a tab of its own, and every tab of this screen is
+  // rendered whether or not it is the one on top. So the control below is in
+  // the page the whole time while nobody can see it, and clicking it waits for
+  // ever: the tab has to be brought forward first, the way a reader would.
+  await page.getByRole('tab', { name: /Đối chiếu/ }).click()
+
   // Opened once: the panel stays open after a save, which is right — figures
   // are stated several at a time, from one sheet.
-  await page.locator('button', { hasText: 'Khai con số bảng tính' }).first().click()
+  const stateFigure = page.locator('button').filter({ hasText: 'Khai con số bảng tính' }).first()
+  await stateFigure.waitFor({ state: 'visible', timeout: 15000 })
+  await stateFigure.click()
   for (const [key, figure] of [['PT', '120'], ['SG', '95']]) {
     const keyField = page.getByLabel('Mã', { exact: true })
     // The panel clears itself after a save, so the next entry has to wait for
@@ -120,13 +128,21 @@ try {
     `${AS_OF},ML,4`,
     `${AS_OF},NOTAGOLD,9`,
   ].join('\n'), 'utf8')
+  // The file tab is never the one on top — the screen opens on the batches, or
+  // on the batch being looked at — and every tab is rendered whether or not it
+  // is showing. So the controls below sit in the page where nobody can see
+  // them, and a click on one waits for ever.
+  await page.getByRole('tab', { name: 'Tệp', exact: true }).click()
   await page.selectOption('#stage-source', 'OPENING_INVENTORY')
   await page.locator('input[type="file"]').setInputFiles(stagedFile)
   // Wait for the outcome, not for a stopwatch. The pattern needs the count in
   // front of it: "Số dòng" on its own is also a column heading that is always
   // on the page, so waiting for that returns instantly and reads too early.
-  await page.getByText(/\d+ Số dòng · /).first()
-    .waitFor({ state: 'visible', timeout: 20000 })
+  // Present rather than visible: what a staged file adds up to is written in
+  // the list of batches, which is a tab of its own, and the check below reads
+  // it out of the page rather than off the screen.
+  await page.waitForFunction(
+    () => /\d+ Số dòng · /.test(document.body.textContent ?? ''), null, { timeout: 20000 })
   const stagedSaid = (await page.locator('body').textContent()) ?? ''
   check('a file can be staged from the screen, and is judged on the way in',
     /2 Số dòng/.test(stagedSaid) && /1 Nhận được/.test(stagedSaid) && /1 Bị loại/.test(stagedSaid),
@@ -169,9 +185,13 @@ try {
   await page.getByText(/rows written/).first()
     .waitFor({ state: 'visible', timeout: 20000 })
   // The status badge is server-rendered, so it lands after the message the
-  // action returned. Both are read below, so both are waited for.
-  await page.getByText('Ghi thiếu dòng').first()
-    .waitFor({ state: 'visible', timeout: 20000 })
+  // action returned. Both are read below, so both are waited for — but the
+  // badge belongs to the list of batches, which is a tab of its own, and every
+  // tab of this screen is rendered whether or not it is the one showing. So it
+  // is waited for as the text below reads it: present, not visible.
+  await page.waitForFunction(
+    () => (document.body.textContent ?? '').includes('Ghi thiếu dòng'),
+    null, { timeout: 20000 })
 
   const after = (await page.locator('body').textContent()) ?? ''
   check('the screen says what it wrote and what it left',

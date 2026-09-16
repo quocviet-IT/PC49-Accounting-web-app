@@ -62,6 +62,21 @@ await check('row level security on every pc49 table',
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'pc49' AND c.relkind = 'r' AND NOT c.relrowsecurity`, 0)
 
+// The client's ledger starts in December 2025. Every browser check writes on
+// dates years before that so it can find its own rows again and take them away
+// afterwards — so anything left down there is a check that did not finish
+// tidying up, and it is in the client's books until somebody notices.
+//
+// On 16-09 a refining check crashed between sending a lot and clearing up, and
+// left two transfer legs behind. Thirty grams of scrap sat in the books for an
+// afternoon, and turned up as a thirty-gram hole in an import reconciliation
+// that was reading a completely different screen.
+await check('nothing in the books is dated before the ledger begins',
+  `SELECT (SELECT count(*)::int FROM pc49.gold_txn WHERE txn_date < '2025-01-01')
+        + (SELECT count(*)::int FROM pc49.inventory_movement WHERE move_date < '2025-01-01')
+        + (SELECT count(*)::int FROM pc49.journal_entry WHERE period < '2025-01')
+        + (SELECT count(*)::int FROM pc49.refining_lot WHERE sent_date < '2025-01-01') AS n`, 0)
+
 // The costing rule, exercised on the live database with the figures from the
 // workbooks, inside a transaction that is rolled back — the way the ledger
 // check below has always done it.

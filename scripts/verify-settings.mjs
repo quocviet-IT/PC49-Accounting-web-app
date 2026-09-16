@@ -61,7 +61,7 @@ async function signIn(page, email, password) {
 
 try {
   // ---- The accountant types the day's prices -------------------------------
-  const ctx = await browser.newContext()
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   const page = await openPage(ctx)
   await signIn(page, 'accountant@ctyhp.vn', PASSWORD.KT)
 
@@ -72,10 +72,19 @@ try {
   check('the accountant reaches settings, for the import card',
     ((await page.locator('aside').first().textContent()) ?? '').includes('Cấu hình'))
 
-  await page.locator('aside .ant-menu-submenu-title', { hasText: 'Vàng' }).first().click()
-  await page.waitForTimeout(500)
-  check('the accountant is offered the price screen',
-    ((await page.locator('aside').first().textContent()) ?? '').includes('Giá vàng'))
+  // Opened until it is open, rather than clicked once and hoped. The sidebar
+  // arrives server-rendered, so a click that lands before React has attached to
+  // it does nothing at all — and a group that never opened reads exactly like a
+  // screen the accountant is not offered.
+  const aside = page.locator('aside').first()
+  const goldGroup = page.locator('aside .ant-menu-submenu-title').filter({ hasText: 'Vàng' }).first()
+  let offered = ((await aside.textContent()) ?? '').includes('Giá vàng')
+  for (let i = 0; i < 10 && !offered; i += 1) {
+    await goldGroup.click({ timeout: 5000 }).catch(() => {})
+    await page.waitForTimeout(600)
+    offered = ((await aside.textContent()) ?? '').includes('Giá vàng')
+  }
+  check('the accountant is offered the price screen', offered)
 
   await page.goto(`${BASE}/prices?date=${DAY}`, { waitUntil: 'networkidle' })
   check('the screen lists every active gold type',
@@ -156,7 +165,7 @@ try {
   await ctx.close()
 
   // ---- The supervisor closes a month --------------------------------------
-  const gsCtx = await browser.newContext()
+  const gsCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   const gs = await openPage(gsCtx)
   await signIn(gs, 'supervisor@ctyhp.vn', PASSWORD.GS_US)
 
@@ -217,7 +226,7 @@ try {
   await gsCtx.close()
 
   // ---- The owner is offered none of it -------------------------------------
-  const ocCtx = await browser.newContext()
+  const ocCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   const oc = await openPage(ocCtx)
   await signIn(oc, 'owner@ctyhp.vn', PASSWORD.OC)
   for (const path of ['/prices', '/settings', '/settings/periods', '/settings/reference']) {
@@ -228,7 +237,7 @@ try {
   await ocCtx.close()
 
   // ---- Reference data is the administrator's -------------------------------
-  const adCtx = await browser.newContext()
+  const adCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   const ad = await openPage(adCtx)
   await signIn(ad, 'admin@ctyhp.vn', PASSWORD.ADMIN)
   const adHub = await ad.goto(`${BASE}/settings`, { waitUntil: 'networkidle' })

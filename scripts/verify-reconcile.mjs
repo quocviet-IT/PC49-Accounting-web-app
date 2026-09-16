@@ -70,6 +70,11 @@ try {
   // button with the panel — so a row found *by* that button stops matching the
   // moment it is clicked. The field labels carry the account code and are
   // unique on the page, so they need no row scope at all.
+  // The reconciliations sit in a tab of their own, and every tab of this screen
+  // is rendered whether or not it is the one showing. So the row below is in
+  // the page the whole time while nobody can see it, and a click on it waits
+  // for ever. The tab is brought forward first, the way a reader would.
+  await page.getByRole('tab', { name: /Đối chiếu/ }).click()
   await page.locator('tr').filter({ hasText: '3388' })
     .getByRole('button', { name: 'Đối chiếu', exact: true }).first().click()
   await page.getByLabel(`Sổ US ${ACCOUNT}`, { exact: true }).fill('49750')

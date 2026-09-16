@@ -140,6 +140,10 @@ try {
   await kt.locator('.ant-modal-wrap').waitFor({ state: 'hidden' })
   await kt.getByRole('link', { name: 'Báo lỗi', exact: true }).click()
   await kt.waitForURL(`${BASE}/feedback`)
+  // The address changes before the page it names has been drawn, and the two
+  // checks below read the page. So the report itself is what is waited for.
+  await kt.waitForFunction((said) => (document.body.textContent ?? '').includes(said),
+    SAID, { timeout: 20000 }).catch(() => {})
   const mine = (await kt.locator('body').textContent()) ?? ''
   check('and can see it afterwards, without being an administrator',
     mine.includes(SAID) && mine.includes('Mới'))

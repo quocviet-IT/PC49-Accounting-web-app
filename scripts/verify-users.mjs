@@ -61,8 +61,15 @@ try {
     const el = page.locator('code')
     return (await el.count()) > 0 ? (await el.first().textContent())?.trim() : null
   })
+  // When it does not appear, say what the screen said instead. A refusal sits
+  // beside the button; a check that reports only "never appeared" sends whoever
+  // runs it to the wrong end of the system looking for the reason.
+  const said = shown ? '' : (await page.locator('span, p').evaluateAll((els) => els
+    .filter((e) => /failed|error/i.test(e.className) && (e.textContent ?? '').trim())
+    .map((e) => (e.textContent ?? '').trim()))).join(' | ').slice(0, 90)
   check('the temporary password is shown, once', (shown ?? '').length >= 10,
-    shown ? `${shown.length} characters` : '(never appeared)')
+    shown ? `${shown.length} characters` : (said || '(never appeared, and the screen said nothing)'))
+  if (!shown) throw new Error('no password was issued, so there is nobody to sign in as')
 
   const made = await db.query(
     `SELECT u.full_name, u.role::text AS role, u.must_change_password AS must
