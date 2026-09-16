@@ -17,6 +17,7 @@ import {
   LOT_STAGES, type Bag, type BandTotal, type GoldOption, type Lot, type OwnerShare,
   type Purchase, type Receipt,
 } from './types'
+import { everybodySettled, owedGram } from './settled'
 
 type Dialog =
   | { kind: 'send' }
@@ -92,8 +93,8 @@ export function LotDetail({
     done(r)
   }
 
-  const owedBy = (s: OwnerShare) => Math.max(0, Math.round((s.assayWeightGram - s.receivedGram) * 10000) / 10000)
-  const allSettled = shares.length > 0 && shares.every((s) => owedBy(s) === 0)
+  const owedBy = (s: OwnerShare) => owedGram(s, receipts)
+  const allSettled = everybodySettled(shares, receipts)
 
   const shareColumns: ColumnsType<OwnerShare> = [
     { title: t('refining.owner'), dataIndex: 'ownerCode', width: 120,

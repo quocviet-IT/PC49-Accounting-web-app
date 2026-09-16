@@ -8,6 +8,7 @@ import {
   addBag, recordAssay, recordReceipt, sendLot, spotOn, updateBag, type Result,
 } from '@/app/(app)/refining/actions'
 import type { Bag, GoldOption, OwnerShare } from './types'
+import { assayLines } from './assayLines'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -105,9 +106,7 @@ export function AssayDialog({ open, lotId, bags, onClose, onDone }: {
     setSaving(true)
     const r = await recordAssay({
       lotId, date: v.date, spotGoldPerOz: v.spotGold, spotPtPerOz: v.spotPt,
-      lines: (v.rows ?? []).map((x) => ({
-        lineId: x.lineId, assayWeightGram: Number(x.assayWeightGram), assayPct: Number(x.assayPct),
-      })),
+      lines: assayLines(bags, v.rows ?? []),
     })
     setSaving(false)
     onDone(r)

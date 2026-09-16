@@ -966,3 +966,92 @@ describe('what the accountant may do to a bag', () => {
     ).rejects.toThrow(/already (been )?sent|not a draft/i)
   })
 })
+
+describe('what the supervisor may do to a lot', () => {
+  // Every test above runs as the database owner, which no policy applies to.
+  // These run as the supervisor does, which is how the screen runs.
+  const GS = '00000000-0000-4000-8000-00000000d15c'
+  const STRANGER = '00000000-0000-4000-8000-00000000dead'
+
+  beforeAll(async () => {
+    await db.exec(`
+      INSERT INTO auth.users (id, email) VALUES ('${GS}', 'gs-lots@ctyhp.vn');
+      INSERT INTO pc49.app_user (id, full_name, role) VALUES ('${GS}', 'Giam sat', 'GS_US');
+    `)
+  })
+
+  async function houseBag(lotId: string, seq = 1): Promise<void> {
+    await db.query(
+      `INSERT INTO pc49.refining_lot_line
+         (lot_id, seq, owner_code, metal, gold_type_code, source_desc, gross_weight_gram, gold_pct)
+       VALUES ($1, $2, 'PC49', 'GOLD', 'SG', '10-18k/grs', 100, 0.6)`, [lotId, seq])
+  }
+
+  async function assayed(lotId: string): Promise<void> {
+    await db.query(`UPDATE pc49.refining_lot
+                       SET status = 'ASSAYED', assay_date = '2026-01-25',
+                           spot_gold_per_oz_assay = 5333
+                     WHERE id = $1`, [lotId])
+    await db.query(`UPDATE pc49.refining_lot_line
+                       SET assay_weight_gram = 60, assay_pct = 0.99 WHERE lot_id = $1`, [lotId])
+  }
+
+  it('sends one, and the metal leaves the vault on their word', async () => {
+    // The supervisor may open a lot, bag it and close it — but the legs 0056
+    // books are gold transactions, which only the accountant may write. So
+    // "Gửi đi" came back "new row violates row-level security policy for table
+    // gold_txn" and the lot stayed a draft. Since 0072 the lot books them.
+    const lot = await newLot('S26.GS1')
+    await houseBag(lot)
+    await asRole(db, GS, () => send(lot))
+    const r = await db.query<{ s: string; legs: string }>(
+      `SELECT l.status::text AS s,
+              (SELECT count(*)::text FROM pc49.gold_txn t
+                WHERE t.refining_lot_id = l.id AND t.txn_type = 'TRANSFER_OUT') AS legs
+         FROM pc49.refining_lot l WHERE l.id = $1`, [lot])
+    expect(r.rows[0].s).toBe('SENT')
+    expect(Number(r.rows[0].legs)).toBe(1)
+  })
+
+  it('and records what came back', async () => {
+    const lot = await newLot('S26.GS2')
+    await houseBag(lot)
+    await asRole(db, GS, () => send(lot))
+    await assayed(lot)
+    await asRole(db, GS, () =>
+      db.query(`SELECT pc49.receive_refining($1, '2026-01-30'::date, 'PC49', 60, 140)`, [lot]))
+    const r = await db.query<{ s: string; g: string }>(
+      `SELECT l.status::text AS s,
+              (SELECT sum(qty_gram)::text FROM pc49.refining_receipt WHERE lot_id = l.id) AS g
+         FROM pc49.refining_lot l WHERE l.id = $1`, [lot])
+    expect(r.rows[0].s).toBe('RECEIVED')
+    expect(Number(r.rows[0].g)).toBe(60)
+  })
+
+  it('while a signed-in stranger is told no', async () => {
+    // receive_refining writes with the owner's rights since 0072, so it says
+    // for itself who may ask it to rather than leaving it to the table.
+    const lot = await newLot('S26.GS3')
+    await houseBag(lot)
+    await asRole(db, GS, () => send(lot))
+    await assayed(lot)
+    await expect(asRole(db, STRANGER, () =>
+      db.query(`SELECT pc49.receive_refining($1, '2026-01-30'::date, 'PC49', 10, 140)`, [lot])),
+    ).rejects.toThrow(/not allowed/i)
+  })
+
+  it('and nobody signed in at all cannot reach it', async () => {
+    const lot = await newLot('S26.GS4')
+    await houseBag(lot)
+    await asRole(db, GS, () => send(lot))
+    await assayed(lot)
+    await db.exec('SET ROLE anon')
+    try {
+      await expect(
+        db.query(`SELECT pc49.receive_refining($1, '2026-01-30'::date, 'PC49', 10, 140)`, [lot]),
+      ).rejects.toThrow(/permission denied/i)
+    } finally {
+      await db.exec('RESET ROLE')
+    }
+  })
+})
