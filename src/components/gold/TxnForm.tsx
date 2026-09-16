@@ -1,5 +1,7 @@
 'use client'
 
+import { settleAction, type ActionThrew } from '@/lib/ui/settleAction'
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert, AutoComplete, Button, Col, Form, Input, InputNumber, Modal,
@@ -145,6 +147,11 @@ export function TxnForm({
    * accountant can meet at this counter are said in Vietnamese; anything else
    * passes through unchanged rather than being guessed at.
    */
+  /** What to say when a save never answered at all, rather than refusing. */
+  const threwText = (r: ActionThrew) => (r.reason === 'STALE' ? t('common.actionStale')
+    : r.reason === 'NETWORK' ? t('common.actionNetwork')
+      : `${t('common.actionFailed')} ${r.message}`)
+
   const readable = (message: string) => (
     /no journal lines|no payments recorded/.test(message) ? t('txn.err.noPayments')
       : /is not a valid movement for .*no such flow rule/.test(message) ? t('txn.err.flowRule')
@@ -261,17 +268,25 @@ export function TxnForm({
     }
 
     setSaving(true)
-    const result: SaveResult = correcting
-      ? await correctTransaction({
+    // Settled rather than awaited bare. A save that throws instead of answering —
+    // the page built by an earlier deployment, or the connection gone — used to
+    // leave both Save buttons spinning for ever, with nothing written and
+    // nothing said (16-09, the first afternoon after two redeploys).
+    const result = await settleAction((): Promise<SaveResult> => (correcting
+      ? correctTransaction({
           ...body,
           originalId: correcting.id,
           expectedRevision: correcting.revision,
           reason: v.reason,
         })
-      : await saveTransaction(body)
+      : saveTransaction(body)))
     setSaving(false)
 
-    if (!result.ok) { setError(readable(result.message)); return }
+    if (!result.ok) {
+      setError('reason' in result ? threwText(result) : readable(result.message))
+      topRef.current?.scrollIntoView({ block: 'nearest' })
+      return
+    }
     // The money is on the books. Something beside it — filing the customer —
     // may not be, and that is a different sentence: shown against a
     // transaction that saved, never as a failure to save.
