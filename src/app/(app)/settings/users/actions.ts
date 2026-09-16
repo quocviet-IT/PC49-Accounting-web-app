@@ -23,9 +23,21 @@ import { createServerSupabase } from '@/lib/supabase/server'
 function authAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('the server is missing its Supabase credentials')
+  if (!url || !key) return null
   return createClient(url, key, { auth: { persistSession: false } })
 }
+
+/**
+ * What these paths say when the server has no service credentials.
+ *
+ * Missing credentials used to throw. An error thrown inside a server action
+ * reaches the browser as a bare 500, and a screen has nothing to show for one:
+ * on Production, pressing Save to add a colleague did nothing, said nothing and
+ * left the administrator with a form that would not close. A refusal has to
+ * read as a refusal, and name the thing that is missing.
+ */
+const NO_CREDENTIALS =
+  'this server has no Supabase service credentials, so logins cannot be created or reset here'
 
 /** Refuses unless the caller is a signed-in administrator. */
 async function requireAdmin(): Promise<{ id: string } | null> {
@@ -79,6 +91,8 @@ export async function createUser(input: unknown): Promise<NewUserResult> {
   const password = temporaryPassword()
   const admin = authAdmin()
 
+  if (!admin) return { ok: false, message: NO_CREDENTIALS }
+
   const { data, error } = await admin.auth.admin.createUser({
     email, password, email_confirm: true,
   })
@@ -120,6 +134,8 @@ export async function resetPassword(input: unknown): Promise<NewUserResult> {
 
   const password = temporaryPassword()
   const admin = authAdmin()
+
+  if (!admin) return { ok: false, message: NO_CREDENTIALS }
 
   const { error } = await admin.auth.admin.updateUserById(parsed.data.userId, { password })
   if (error) return { ok: false, message: error.message }
