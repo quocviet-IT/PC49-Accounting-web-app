@@ -63,20 +63,30 @@ await check('row level security on every pc49 table',
     WHERE n.nspname = 'pc49' AND c.relkind = 'r' AND NOT c.relrowsecurity`, 0)
 
 // The costing rule, exercised on the live database with the figures from the
-// workbooks, then cleaned up.
-await c.query(`
-  INSERT INTO pc49.gold_price_daily (price_date, gold_type_code, market_price, avg_purchase_price)
-  VALUES ('2026-01-30', '9999', 5893.156626506024, 6763.272727),
-         ('2026-01-31', '9999', 5893.156626506024, NULL)
-  ON CONFLICT (price_date, gold_type_code) DO UPDATE
-    SET market_price = excluded.market_price, avg_purchase_price = excluded.avg_purchase_price`)
+// workbooks, inside a transaction that is rolled back — the way the ledger
+// check below has always done it.
+//
+// It used to write the two prices and then delete every price row for those two
+// days, whatever gold type it belonged to. Those are days in the client's own
+// ledger: a day somebody had entered prices for would have lost them, silently,
+// to a check that only meant to read. Nothing here is written outside a
+// transaction now.
+await c.query('BEGIN')
+try {
+  await c.query(`
+    INSERT INTO pc49.gold_price_daily (price_date, gold_type_code, market_price, avg_purchase_price)
+    VALUES ('2026-01-30', '9999', 5893.156626506024, 6763.272727),
+           ('2026-01-31', '9999', 5893.156626506024, NULL)
+    ON CONFLICT (price_date, gold_type_code) DO UPDATE
+      SET market_price = excluded.market_price, avg_purchase_price = excluded.avg_purchase_price`)
 
-await check('cogs_price uses the purchase price when there was one',
-  `SELECT round(pc49.cogs_price('2026-01-30', '9999'), 6)::text AS v`, '6763.272727')
-await check('cogs_price falls back to market price',
-  `SELECT round(pc49.cogs_price('2026-01-31', '9999'), 6)::text AS v`, '5893.156627')
-
-await c.query(`DELETE FROM pc49.gold_price_daily WHERE price_date IN ('2026-01-30','2026-01-31')`)
+  await check('cogs_price uses the purchase price when there was one',
+    `SELECT round(pc49.cogs_price('2026-01-30', '9999'), 6)::text AS v`, '6763.272727')
+  await check('cogs_price falls back to market price',
+    `SELECT round(pc49.cogs_price('2026-01-31', '9999'), 6)::text AS v`, '5893.156627')
+} finally {
+  await c.query('ROLLBACK')
+}
 
 // The ledger, exercised end to end on the live database and then rolled back.
 await c.query('BEGIN')
