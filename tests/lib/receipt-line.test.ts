@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   fineGrams, lineFromSaved, linePayload, paymentGap, pricedByFine, receiptTotal, relate,
-  signedQty, type Figures,
+  signFollowsType, signedQty, type Figures,
 } from '@/components/gold/receiptLine'
 import { amountOf, type ReceiptLine } from '@/components/gold/types'
 import { SIX_ITEMS } from '../support/receipt'
@@ -11,6 +11,11 @@ const figures = (over: Partial<Figures>): Figures => ({
 })
 
 describe('the sign of a quantity', () => {
+  it('signs a deposit the way it signs a sale', () => {
+    expect(signedQty('DEPOSIT', 1)).toBe(-1)
+    expect(signFollowsType('DEPOSIT')).toBe(true)
+  })
+
   it('comes from the type where the table already fixes it', () => {
     expect(signedQty('PO', 5)).toBe(5)
     expect(signedQty('PO_VENDOR', -5)).toBe(5)

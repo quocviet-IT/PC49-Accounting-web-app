@@ -9,14 +9,14 @@ export const SINGLE_LINE_TYPES = new Set(['DEPOSIT', 'PICKUP'])
 
 /**
  * The receipt types whose sign the table already fixes (0012): a purchase
- * brings gold in, a sale or a pickup takes it out. On these a quantity is
+ * brings gold in, a sale, a deposit or a pickup takes it out. On these a quantity is
  * typed without a sign and the type supplies it; six items on one receipt were
  * six chances to forget a minus, and the database refused each. Every other
  * type keeps the sign it is typed with, because there the sign is the only
  * thing saying whether the gold is on its way in or out.
  */
 const INWARD = new Set(['PO', 'PO_VENDOR'])
-const OUTWARD = new Set(['SALE', 'PICKUP'])
+const OUTWARD = new Set(['SALE', 'PICKUP', 'DEPOSIT'])
 
 export function signFollowsType(txnType: string): boolean {
   return INWARD.has(txnType) || OUTWARD.has(txnType)

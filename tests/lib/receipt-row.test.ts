@@ -65,6 +65,22 @@ describe('what was paid later, and what is owed', () => {
   })
 })
 
+describe('a deposit and its pickup on the ledger', () => {
+  it('reads what the order comes to, what was put down, and when it was collected', () => {
+    const row = toReceiptRow({
+      receipt_key: 'd1', txn_date: '2026-09-08', txn_type: 'DEPOSIT', lines: [], payments: [], sold_by: [],
+      deposit: { role: 'deposit', orderValue: '5300.00', paid: '1000.00', settledBy: 'PICKUP',
+                 pickupDate: '2026-09-15', pickupDoc: 'PC49-2609-020' },
+    })
+    expect(row.deposit).toEqual({
+      role: 'deposit', orderValue: 5300, paid: 1000, settledBy: 'PICKUP', pickupDate: '2026-09-15',
+      pickupDoc: 'PC49-2609-020', depositDate: null, depositDoc: null,
+    })
+    expect(toReceiptRow({ receipt_key: 'x', txn_date: '2026-09-08', txn_type: 'SALE', lines: [],
+      payments: [], sold_by: [] }).deposit).toBeNull()
+  })
+})
+
 describe('what a receipt is called in the gold column', () => {
   it('is the gold type for one item', () => {
     expect(goldSummary({ lines: [line({})] }, gold, say)).toBe('Vàng vụn')

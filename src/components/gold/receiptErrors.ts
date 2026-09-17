@@ -69,6 +69,14 @@ export function describeRefusal(message: string, t: Translate): string {
   const standing = /RECEIPT_HAS_SETTLEMENTS: (\d+)/.exec(message)
   if (standing) return t('receipt.err.hasSettlements').replace('{0}', standing[1])
 
+  // A pickup's refusals (0087).
+  if (/PICKUP_NOT_DEPOSIT/.test(message)) return t('pickup.err.notDeposit')
+  const taken = /PICKUP_TAKEN: (\d{4}-\d{2}-\d{2})/.exec(message)
+  if (taken) return t('pickup.err.taken').replace('{0}', taken[1])
+  const beforeDeposit = /PICKUP_DATE: deposit (\d{4}-\d{2}-\d{2})/.exec(message)
+  if (beforeDeposit) return t('pickup.err.date').replace('{0}', beforeDeposit[1])
+  if (/PICKUP_NO_PRICE/.test(message)) return t('pickup.err.noPrice')
+
   const short = /PAYMENT_SHORT: item (\d+)/.exec(message)
   if (short) return t('receipt.err.paymentShort').replace('{0}', short[1])
 

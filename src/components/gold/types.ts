@@ -95,6 +95,22 @@ export type Settlement = {
   note: string | null
 }
 
+/** A deposit's order and its collection, on the row of either (0087). */
+export type DepositInfo = {
+  role: 'deposit' | 'pickup'
+  /** What the order comes to; null when nobody recorded it. */
+  orderValue: number | null
+  /** What was put down with the deposit. */
+  paid: number
+  /** On a deposit: PICKUP or CANCEL once settled, and when, under which number. */
+  settledBy: string | null
+  pickupDate: string | null
+  pickupDoc: string | null
+  /** On a pickup: when the deposit was taken, under which number. */
+  depositDate: string | null
+  depositDoc: string | null
+}
+
 /**
  * One receipt of the ledger (pc49.gold_receipt_ledger, 0076).
  *
@@ -129,4 +145,6 @@ export type ReceiptRow = {
   settlements?: Settlement[]
   /** What is still owed on it; nothing when absent (0084). */
   owed?: number
+  /** Set on a deposit or a pickup (0087). */
+  deposit?: DepositInfo | null
 }

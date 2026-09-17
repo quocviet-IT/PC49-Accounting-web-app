@@ -48,6 +48,15 @@ describe('a refusal from the books, in the reader’s language', () => {
       .toBe(say('receipt.err.hasSettlements').replace('{0}', '2'))
   })
 
+  it('says what is wrong with a pickup', () => {
+    expect(describeRefusal('PICKUP_NOT_DEPOSIT: only a deposit …', say)).toBe(say('pickup.err.notDeposit'))
+    expect(describeRefusal('PICKUP_TAKEN: 2026-06-10; this deposit …', say))
+      .toBe(say('pickup.err.taken').replace('{0}', '2026-06-10'))
+    expect(describeRefusal('PICKUP_DATE: deposit 2026-06-02, picked up …', say))
+      .toBe(say('pickup.err.date').replace('{0}', '2026-06-02'))
+    expect(describeRefusal('PICKUP_NO_PRICE: nobody recorded …', say)).toBe(say('pickup.err.noPrice'))
+  })
+
   it('passes anything else through as it came', () => {
     expect(describeRefusal('the period 2019-10 is closed', say)).toBe('the period 2019-10 is closed')
   })

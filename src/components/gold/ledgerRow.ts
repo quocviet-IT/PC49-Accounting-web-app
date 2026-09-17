@@ -1,6 +1,6 @@
 import type { Uom } from '@/lib/domain/units'
 import type { MessageKey } from '@/lib/i18n'
-import type { ReceiptLine, ReceiptRow } from './types'
+import type { DepositInfo, ReceiptLine, ReceiptRow } from './types'
 
 // Numbers arrive from the API as numbers or as strings depending on their
 // column type, so every figure goes through Number once, here.
@@ -50,6 +50,20 @@ export function toReceiptRow(r: Record<string, unknown>): ReceiptRow {
       note: text(s.note),
     })),
     owed: Number(r.owed ?? 0),
+    deposit: r.deposit ? toDepositInfo(r.deposit as Record<string, unknown>) : null,
+  }
+}
+
+function toDepositInfo(d: Record<string, unknown>): DepositInfo {
+  return {
+    role: d.role === 'pickup' ? 'pickup' : 'deposit',
+    orderValue: figure(d.orderValue),
+    paid: Number(d.paid ?? 0),
+    settledBy: text(d.settledBy),
+    pickupDate: text(d.pickupDate),
+    pickupDoc: text(d.pickupDoc),
+    depositDate: text(d.depositDate),
+    depositDoc: text(d.depositDoc),
   }
 }
 
