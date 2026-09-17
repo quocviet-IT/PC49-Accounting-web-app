@@ -25,6 +25,7 @@ import pg from 'pg'
 import { openPage, signIn } from './support/page.mjs'
 import { accountFor } from './support/accounts.mjs'
 import { untilRowIs } from './support/until.mjs'
+import { removeReceipts } from './support/receipts.mjs'
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const url = process.env.SUPABASE_DB_URL
@@ -62,6 +63,7 @@ async function cleanUp() {
     await db.query('DELETE FROM pc49.gold_txn_sales_person WHERE txn_id = $1', [t.id])
     await db.query('DELETE FROM pc49.gold_txn WHERE id = $1', [t.id])
   }
+  await removeReceipts(db, DAY)
   // Naming a customer on a row files them in the catalogue, so the check has
   // to take its invented one back out.
   await db.query(
@@ -165,11 +167,18 @@ try {
   check('and only then is the original cancelled, with the reason kept',
     voided !== null && /600/.test(voided.why ?? ''), voided?.why ?? '')
 
-  // The replacement says what it replaces, so the pair can be read back later.
+  // The replacement is a receipt that says which receipt it replaces, under
+  // the same number, so the pair can be read back later (0075).
   const linked = await db.query(
-    'SELECT corrects_txn_id::text AS c FROM pc49.gold_txn WHERE id = $1', [fixed?.id])
-  check('and the replacement records which row it replaced',
-    linked.rows[0]?.c === wrong.id, linked.rows[0]?.c ?? '(not linked)')
+    `SELECT fr.corrects_receipt_id::text AS corrects, wt.receipt_id::text AS original,
+            ft.doc_no = wt.doc_no AS same_number
+       FROM pc49.gold_txn ft JOIN pc49.gold_receipt fr ON fr.id = ft.receipt_id
+       CROSS JOIN pc49.gold_txn wt
+      WHERE ft.id = $1 AND wt.id = $2`, [fixed?.id, wrong.id])
+  check('and the replacement records which receipt it replaced',
+    Boolean(linked.rows[0]?.original) && linked.rows[0]?.corrects === linked.rows[0]?.original,
+    linked.rows[0]?.corrects ?? '(not linked)')
+  check('under the same number', linked.rows[0]?.same_number === true)
 
   // ---- And the books agree --------------------------------------------------
   const stock = await db.query(

@@ -39,7 +39,8 @@
     "verify:layout": "node --env-file=.env.local scripts/verify-layout.mjs",
     "probe:speed": "node --env-file=.env.local scripts/probe-speed.mjs",
     "verify:loading": "node --env-file=.env.local scripts/verify-loading.mjs",
-    "verify:ledger": "node --env-file=.env.local scripts/verify-ledger.mjs"
+    "verify:ledger": "node --env-file=.env.local scripts/verify-ledger.mjs",
+    "verify:receipt": "node --env-file=.env.local scripts/verify-receipt.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",

@@ -29,6 +29,7 @@ import pg from 'pg'
 import { openPage, signIn } from './support/page.mjs'
 import { accountFor } from './support/accounts.mjs'
 import { until, untilRow, untilRowIs } from './support/until.mjs'
+import { removeReceipts } from './support/receipts.mjs'
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const url = process.env.SUPABASE_DB_URL
@@ -61,6 +62,7 @@ async function cleanUp() {
     await db.query('DELETE FROM pc49.gold_txn_sales_person WHERE txn_id = $1', [t.id])
     await db.query('DELETE FROM pc49.gold_txn WHERE id = $1', [t.id])
   }
+  await removeReceipts(db, DAY)
   await db.query(
     `DELETE FROM pc49.partner WHERE code = $1
        AND code NOT IN (SELECT DISTINCT partner_code FROM pc49.gold_txn WHERE partner_code IS NOT NULL)`,

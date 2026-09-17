@@ -23,6 +23,7 @@ import pg from 'pg'
 import { chromium } from 'playwright'
 import { openPage, signIn } from './support/page.mjs'
 import { accountFor } from './support/accounts.mjs'
+import { removeReceipts } from './support/receipts.mjs'
 
 const BASE = process.env.PC49_BASE_URL ?? 'http://localhost:3000'
 const DAY = '2019-03-16'
@@ -62,6 +63,7 @@ async function cleanUp() {
       await db.query('DELETE FROM pc49.journal_entry WHERE id = $1', [row.journal_entry_id])
     }
   }
+  await removeReceipts(db, DAY, PARTNER)
   await db.query(
     `DELETE FROM pc49.partner WHERE code = $1
        AND code NOT IN (SELECT DISTINCT partner_code FROM pc49.gold_txn WHERE partner_code IS NOT NULL)`,
@@ -112,7 +114,7 @@ async function shownIn(form, label) {
 async function fillPurchase(form, { total = '250' } = {}) {
   await selectOption(form, 'Loại vàng', 'Vàng vụn')
   await form.getByLabel('Số lượng', { exact: true }).fill('4.5')
-  await form.getByLabel('Tổng tiền', { exact: true }).fill(total)
+  await form.getByLabel('Thành tiền', { exact: true }).fill(total)
   await form.getByLabel('Khách / NCC', { exact: true }).fill(PARTNER)
   await form.getByLabel('Số tiền', { exact: true }).first().fill(total)
 }
