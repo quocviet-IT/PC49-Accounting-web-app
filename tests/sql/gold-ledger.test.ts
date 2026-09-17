@@ -168,7 +168,7 @@ describe('the gold ledger', () => {
     const def = await db.query<{ src: string }>(
       `SELECT pg_get_functiondef('pc49.correction_blocked_code(uuid)'::regprocedure) AS src`)
     const codes = [...def.rows[0].src.matchAll(/RETURN '([A-Z_]+)'/g)].map((m) => m[1])
-    expect(codes).toHaveLength(8)
+    expect(codes).toHaveLength(9)
     for (const code of codes) {
       expect(dictionary.vi).toHaveProperty([`txn.blocked.${code}`])
       expect(dictionary.en).toHaveProperty([`txn.blocked.${code}`])

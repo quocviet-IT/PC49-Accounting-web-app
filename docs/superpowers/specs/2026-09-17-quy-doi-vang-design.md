@@ -60,7 +60,7 @@ Mỗi vế là một dòng `gold_txn` có `conversion_id`, như 26 phiên cũ:
 | `RA_RP` (Ra RP) | `RA_RP`, số lượng âm, chỉ Vàng Grain | `RA_RP`, số lượng dương, chỉ Rồng Phụng |
 
 - Thành tiền 0, không đơn giá. Ghi sổ bằng `post_gold_txn` như hiện nay: một bút toán theo trọng lượng.
-- Tồn kho đi theo `inventory_movement` như mọi giao dịch.
+- Tồn kho đi theo `inventory_movement` như mọi giao dịch. Sửa kèm: `record_inventory_movement` (0021) ghi thêm `AT_REFINERY` cho **mọi** `TRANSFER_OUT`, nên một lần đổi Grain ra Rồng Phụng làm tổng vàng sở hữu tăng đúng số gram đã đổi. Từ nay chỉ vế có `refining_lot_id` mới vào `AT_REFINERY`.
 - Quy tắc luồng vàng (trigger 0012) vẫn kiểm từng vế.
 - `line_no` đánh số trong từng bên: RA 1, 2…; VÀO 1, 2….
 - Người nhập gõ số lượng không dấu; bên RA hay VÀO quyết định dấu.
