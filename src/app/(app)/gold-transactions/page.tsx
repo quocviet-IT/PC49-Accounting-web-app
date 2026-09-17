@@ -27,7 +27,8 @@ export default async function GoldTransactionsPage({
   const supabase = await createServerSupabase()
   const args = rpcArgs(query)
 
-  const [goldTypesResult, salesResult, partnerResult, ledgerResult, totalsResult] =
+  const [goldTypesResult, salesResult, partnerResult, ledgerResult, totalsResult,
+    flowResult, toleranceResult] =
     await Promise.all([
       supabase.from('gold_type')
         .select('code, name_vi, name_en, native_uom')
@@ -43,6 +44,12 @@ export default async function GoldTransactionsPage({
         { ...args, p_limit: query.size, p_offset: (query.page - 1) * query.size }),
       // The totals of the whole filter, not of the page on screen.
       supabase.rpc('gold_receipt_ledger_totals', args),
+      // What the conversion form may offer on each side, and how far apart the
+      // two sides may be before a reason is asked for.
+      supabase.from('gold_flow_rule').select('gold_type_code, txn_type')
+        .in('txn_type', ['TRANSFER_IN', 'TRANSFER_OUT']),
+      supabase.from('system_param').select('value')
+        .eq('key', 'CONVERSION_WEIGHT_TOLERANCE_PCT').maybeSingle(),
     ])
 
   const totals = ((totalsResult.data ?? []) as Record<string, unknown>[])[0]
@@ -57,6 +64,8 @@ export default async function GoldTransactionsPage({
       goldTypes={(goldTypesResult.data ?? []) as GoldTypeOption[]}
       salesPeople={(salesResult.data ?? []).map((s: { code: string }) => s.code)}
       partners={(partnerResult.data ?? []) as { code: string; phone: string | null }[]}
+      flowRules={(flowResult.data ?? []) as { gold_type_code: string; txn_type: string }[]}
+      tolerancePct={Number(toleranceResult.data?.value ?? 0.5)}
       rows={((ledgerResult.data ?? []) as Record<string, unknown>[]).map(toReceiptRow)}
       totals={{
         count: Number(totals?.receipt_count ?? 0),

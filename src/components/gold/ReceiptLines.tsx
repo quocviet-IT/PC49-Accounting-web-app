@@ -36,7 +36,9 @@ export function ReceiptLines({ row, goldName }: {
           const fine = fineGrams(l.uom, l.qty, l.gold_pct)
           return (
             <tr key={l.id}>
-              <td className={styles.num}>{l.lineNo}</td>
+              <td className={styles.num}>
+                {l.side ? `${t(l.side === 'out' ? 'conversion.side.out' : 'conversion.side.in')} ${l.lineNo}` : l.lineNo}
+              </td>
               <td>{l.itemDesc ?? '—'}</td>
               <td>{goldName(l.gold_type_code)}{l.scrap_detail ? ` · ${l.scrap_detail}` : ''}</td>
               <td className={styles.num}>{weight.format(l.qty)} {l.uom}</td>

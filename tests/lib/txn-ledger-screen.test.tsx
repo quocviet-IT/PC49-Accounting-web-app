@@ -103,4 +103,25 @@ describe('the gold ledger screen', () => {
     expect(html).toContain('-2,850.00')
     expect(html).toContain('Số phiếu')
   })
+
+  it('lists a conversion as one row: its kind, gold out into gold in, grams moved', () => {
+    const conversion: ReceiptRow = {
+      ...sale, key: 'c1', doc_no: 'PC49-2606-040', txn_type: 'TRANSFER_OUT', amount: 0,
+      remarks: 'Transfer 637.5gr vang Grain ra 17L VRP', payments: [], soldBy: [],
+      conversion: { id: 'c1', kind: 'TRANSFER', varianceNote: 'x', varianceReason: 'hao hut' },
+      lines: [
+        { ...sale.lines[0], id: 'o', side: 'out', gold_type_code: 'GRAIN', uom: 'GRAM', qty: -637.5,
+          unit_price: null, amount: 0, blockedCode: 'CONVERSION_LEG' },
+        { ...sale.lines[0], id: 'i', side: 'in', gold_type_code: 'RP', uom: 'LUONG', qty: 17,
+          unit_price: null, amount: 0, blockedCode: 'CONVERSION_LEG' },
+      ],
+    }
+    const html = text(<TxnScreen {...base} rows={[conversion]}
+      totals={{ count: 1, purchases: 0, sales: 0, grams: {} }} />)
+    expect(html).toContain('Quy đổi vàng')
+    expect(html).toContain('PC49-2606-040')
+    expect(html).toContain('GRAIN → Rồng Phụng')
+    expect(html).toContain('637.50 g')
+    expect(html).toContain('Lệch cân')
+  })
 })

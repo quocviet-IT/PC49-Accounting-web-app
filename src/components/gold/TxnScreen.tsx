@@ -5,17 +5,18 @@ import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Alert, Button, Input, Modal, Select, Space, Tag, Typography } from 'antd'
-import { Ban, Download, Pencil, Plus } from 'lucide-react'
+import { ArrowLeftRight, Ban, Download, Pencil, Plus } from 'lucide-react'
 import { IconAction } from '@/components/ui/IconAction'
 import { TxnTypeTag } from './TxnTypeTag'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocale } from '@/lib/i18n/provider'
 import { toGrams } from '@/lib/domain/units'
-import { voidReceipt } from '@/app/(app)/gold-transactions/actions'
+import { voidConversion, voidReceipt } from '@/app/(app)/gold-transactions/actions'
 import { Page, Stat, Stats, LoadFailed, money, weight } from '@/components/ledger/Ledger'
 import { DataTable } from '@/components/ui/DataTable'
 import { ListToolbar } from '@/components/ui/ListToolbar'
 import { ReceiptForm } from './ReceiptForm'
+import { ConversionForm } from './ConversionForm'
 import { ReceiptLines } from './ReceiptLines'
 import { goldSummary } from './ledgerRow'
 import { blockedSentence, describeRefusal } from './receiptErrors'
@@ -56,6 +57,7 @@ function Money({ value }: { value: number }) {
  */
 export function TxnScreen({
   query, today, goldTypes, salesPeople, partners, rows, totals, loadFailed = false,
+  flowRules = [], tolerancePct = 0.5,
 }: {
   query: LedgerQuery
   /** The server's date, so the quick ranges agree between server and browser. */
@@ -65,6 +67,10 @@ export function TxnScreen({
   partners: { code: string; phone: string | null }[]
   rows: ReceiptRow[]
   totals: LedgerTotals
+  /** Which gold may go out and come in on a transfer, for the conversion form. */
+  flowRules?: { gold_type_code: string; txn_type: string }[]
+  /** CONVERSION_WEIGHT_TOLERANCE_PCT. */
+  tolerancePct?: number
   /**
    * The ledger, its totals, or the gold types did not arrive. Nothing to type
    * into is offered then: an empty list invites somebody to enter the day again.
@@ -76,6 +82,8 @@ export function TxnScreen({
 
   /** Open with no receipt for a fresh one, with a receipt to replace it. */
   const [editing, setEditing] = useState<{ correcting: ReceiptRow | null } | null>(null)
+  /** Open with no row for a fresh conversion, with a conversion row to replace it. */
+  const [converting, setConverting] = useState<{ correcting: ReceiptRow | null } | null>(null)
   const [voidRow, setVoidRow] = useState<ReceiptRow | null>(null)
   const [voidReason, setVoidReason] = useState('')
   const [voiding, setVoiding] = useState(false)
@@ -164,6 +172,14 @@ export function TxnScreen({
     </Button>
   )
 
+  // "cai transfer dau?" (17-09): converting gold is entered beside a receipt.
+  const convertButton = (
+    <Button icon={<ArrowLeftRight size={16} aria-hidden />}
+            onClick={() => setConverting({ correcting: null })}>
+      {t('txn.newConversion')}
+    </Button>
+  )
+
   // The same filter, without the page: the file is every matching receipt.
   const exportButton = (
     <Button icon={<Download size={16} aria-hidden />}
@@ -175,7 +191,8 @@ export function TxnScreen({
   async function confirmVoid() {
     if (!voidRow) return
     setVoiding(true)
-    const result = await settleAction(() => voidReceipt({ key: voidRow.key, reason: voidReason }))
+    const input = { key: voidRow.key, reason: voidReason }
+    const result = await settleAction(() => (voidRow.conversion ? voidConversion(input) : voidReceipt(input)))
     setVoiding(false)
     if (!result.ok) {
       setNotice(isThrew(result) ? describeThrew(result, t) : describeRefusal(result.message, t))
@@ -207,7 +224,11 @@ export function TxnScreen({
     },
     {
       title: t('txn.col.type'), dataIndex: 'txn_type', width: 112,
-      render: (v: string) => <TxnTypeTag type={v} />,
+      render: (v: string, r) => (r.conversion
+        ? <Tag color="purple" className="pc-txn-type">
+            {t(r.conversion.kind === 'RA_RP' ? 'conversion.kind.RA_RP' : 'conversion.kind.TRANSFER')}
+          </Tag>
+        : <TxnTypeTag type={v} />),
     },
     {
       title: t('txn.col.partner'), dataIndex: 'partner_code', ellipsis: true,
@@ -243,6 +264,12 @@ export function TxnScreen({
     {
       title: t('txn.col.qty'), key: 'qty', width: 104, align: 'right',
       render: (_: unknown, r) => {
+        if (r.conversion) {
+          // The weight that changed kind: the grams that went out.
+          const out = r.lines.filter((l) => l.side === 'out')
+            .reduce((sum, l) => sum + Math.abs(toGrams(l.qty, l.uom)), 0)
+          return <>{weight.format(out)} g</>
+        }
         const only = onlyItem(r)
         if (!only) {
           // Items counted in different units add up in grams.
@@ -263,12 +290,12 @@ export function TxnScreen({
       title: t('txn.col.price'), key: 'price', width: 92, align: 'right',
       render: (_: unknown, r) => {
         const only = onlyItem(r)
-        return only && only.unit_price !== null ? money.format(only.unit_price) : '—'
+        return !r.conversion && only && only.unit_price !== null ? money.format(only.unit_price) : '—'
       },
     },
     {
       title: t('txn.col.amount'), dataIndex: 'amount', width: 136, align: 'right',
-      render: (v: number, r) => (
+      render: (v: number, r) => (r.conversion ? '—' : (
         <>
           <div><Money value={v} /></div>
           {r.payments.map((p) => (
@@ -277,9 +304,21 @@ export function TxnScreen({
             </Typography.Text>
           ))}
         </>
+      )),
+    },
+    {
+      title: t('txn.col.remarks'), dataIndex: 'remarks', ellipsis: true,
+      render: (v: string | null, r) => (
+        <>
+          {r.conversion?.varianceNote && (
+            <Tag color="orange" title={r.conversion.varianceReason ?? r.conversion.varianceNote}>
+              {t('conversion.variance')}
+            </Tag>
+          )}
+          {v ?? ''}
+        </>
       ),
     },
-    { title: t('txn.col.remarks'), dataIndex: 'remarks', ellipsis: true },
     {
       // Icons pinned to the right, so Sửa can be pressed without scrolling.
       title: t('txn.col.actions'), key: 'actions', width: 84, fixed: 'right',
@@ -288,7 +327,9 @@ export function TxnScreen({
           <IconAction icon={<Pencil size={16} aria-hidden />} label={t('txn.correct')}
                       disabled={Boolean(r.blockedCode)}
                       disabledReason={blockedSentence(r.blockedCode, t)}
-                      onClick={() => setEditing({ correcting: r })} />
+                      onClick={() => (r.conversion
+                        ? setConverting({ correcting: r })
+                        : setEditing({ correcting: r }))} />
           <IconAction icon={<Ban size={16} aria-hidden />} label={t('txn.void')} danger
                       onClick={() => setVoidRow(r)} />
         </Space>
@@ -299,7 +340,7 @@ export function TxnScreen({
   const grams = Object.entries(totals.grams)
 
   return (
-    <Page titleKey="txn.title" actions={<Space wrap>{exportButton}{newButton}</Space>}>
+    <Page titleKey="txn.title" actions={<Space wrap>{exportButton}{convertButton}{newButton}</Space>}>
       {notice && (
         <Alert type="error" showIcon closable title={notice}
                onClose={() => setNotice(null)} style={{ marginBottom: 16 }} />
@@ -435,6 +476,26 @@ export function TxnScreen({
           onSaved={(docNo, stayOpen) => {
             setToast(docNo ? `${t('txn.form.savedAs')} ${docNo}` : t('txn.saved'))
             if (!stayOpen) setEditing(null)
+            router.refresh()
+          }}
+        />
+      )}
+
+      {converting && (
+        <ConversionForm
+          open
+          // A correction keeps its day; a fresh conversion takes the day being
+          // looked at, or today.
+          convDate={converting.correcting?.txn_date ?? singleDay(query) ?? today}
+          goldTypes={goldTypes}
+          partners={partners}
+          flowRules={flowRules}
+          tolerancePct={tolerancePct}
+          correcting={converting.correcting}
+          onClose={() => setConverting(null)}
+          onSaved={(docNo, stayOpen) => {
+            setToast(docNo ? `${t('txn.form.savedAs')} ${docNo}` : t('txn.saved'))
+            if (!stayOpen) setConverting(null)
             router.refresh()
           }}
         />
