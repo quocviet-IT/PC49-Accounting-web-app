@@ -198,3 +198,107 @@ describe('saving a conversion', () => {
     await expect(saveConversion('supervisor', conversionPayload(GRAIN_TO_RP), GS)).rejects.toThrow()
   })
 })
+
+async function correctConversion(key: string, original: string, revision: number, body: string,
+  reason = 'bot 1 oz Other'): Promise<SavedConversion & { replaced?: string }> {
+  const r = await asRole(db, KT, () => db.query<{ r: SavedConversion & { replaced?: string } }>(
+    `SELECT pc49.correct_gold_conversion($1, $2, $3, $4, $5::jsonb) AS r`,
+    [key, original, revision, reason, body]))
+  return r.rows[0].r
+}
+
+async function voidConversion(original: string, reason = 'nhap trung'): Promise<number> {
+  const r = await asRole(db, KT, () => db.query<{ n: number }>(
+    `SELECT pc49.void_gold_conversion($1, $2) AS n`, [original, reason]))
+  return r.rows[0].n
+}
+
+const revisionOfConversion = async (id: string) => (await db.query<{ revision: number }>(
+  `SELECT revision FROM pc49.gold_conversion WHERE id = $1`, [id])).rows[0].revision
+
+const liveLegs = async (conversionId: string) => (await db.query<{ n: string }>(
+  `SELECT count(*)::text AS n FROM pc49.gold_txn WHERE conversion_id = $1 AND voided_at IS NULL`,
+  [conversionId])).rows[0].n
+
+/** Nini without the ounce of Other, made up with 31.105 g of Grain. */
+const niniCorrected = conversionPayload({
+  ...NINI,
+  in: [NINI.in[0], { goldTypeCode: 'GRAIN', uom: 'GRAM', qty: 56.7 }, { goldTypeCode: 'GRAIN', uom: 'GRAM', qty: 31.105 }],
+})
+
+describe('correcting a conversion', () => {
+  it('replaces every leg in one go and keeps the number', async () => {
+    const saved = await saveConversion('fix-nini', conversionPayload(NINI))
+    const fixed = await correctConversion('fix-nini-it', saved.conversionId,
+      await revisionOfConversion(saved.conversionId), niniCorrected)
+    expect(fixed.docNo).toBe(saved.docNo)
+    expect(fixed.conversionId).not.toBe(saved.conversionId)
+
+    const old = await db.query<{ voided: boolean; why: string }>(
+      `SELECT voided_at IS NOT NULL AS voided, void_reason AS why FROM pc49.gold_conversion WHERE id = $1`,
+      [saved.conversionId])
+    expect(old.rows[0]).toEqual({ voided: true, why: 'bot 1 oz Other' })
+    expect(await liveLegs(saved.conversionId)).toBe('0')
+
+    const replacement = await db.query<{ corrects: string; legs: string; posted: string }>(
+      `SELECT c.corrects_conversion_id::text AS corrects,
+              (SELECT count(*)::text FROM pc49.gold_txn t WHERE t.conversion_id = c.id) AS legs,
+              (SELECT count(*)::text FROM pc49.gold_txn t
+                WHERE t.conversion_id = c.id AND t.journal_entry_id IS NOT NULL) AS posted
+         FROM pc49.gold_conversion c WHERE c.id = $1`, [fixed.conversionId])
+    expect(replacement.rows[0]).toEqual({ corrects: saved.conversionId, legs: '4', posted: '4' })
+  })
+
+  it('tells the second person to look again rather than overwrite', async () => {
+    const saved = await saveConversion('race-conv', conversionPayload(NINI))
+    const seen = await revisionOfConversion(saved.conversionId)
+    await correctConversion('race-conv-1', saved.conversionId, seen, niniCorrected)
+    await expect(correctConversion('race-conv-2', saved.conversionId, seen, niniCorrected))
+      .rejects.toThrow(/CONFLICT/)
+  })
+
+  it('corrects a loaded conversion under the smallest number its legs carry', async () => {
+    const c = await rawConversion('TRANSFER', '2026-06-03#1')
+    await rawLeg({ type: 'TRANSFER_OUT', gold: '9999', uom: 'LUONG', qty: -1, conversionId: c, doc: 'PC49-2606-777' })
+    await rawLeg({ type: 'TRANSFER_IN', gold: 'GRAIN', uom: 'GRAM', qty: 37.5, conversionId: c, doc: 'PC49-2606-775' })
+    const fixed = await correctConversion('fix-loaded', c, await revisionOfConversion(c), conversionPayload({
+      kind: 'TRANSFER',
+      out: [{ goldTypeCode: '9999', uom: 'LUONG', qty: 1 }],
+      in: [{ goldTypeCode: 'GRAIN', uom: 'GRAM', qty: 37.5 }],
+    }), 'tach phien nap')
+    expect(fixed.docNo).toBe('PC49-2606-775')
+    expect(await liveLegs(c)).toBe('0')
+  })
+
+  it('leaves a refining lot conversion to the refining screen', async () => {
+    const c = await rawConversion('REFINING_SEND')
+    await rawLeg({ type: 'TRANSFER_OUT', gold: 'SG', uom: 'GRAM', qty: -10, conversionId: c })
+    await expect(correctConversion('fix-refining', c, await revisionOfConversion(c),
+      conversionPayload(GRAIN_TO_RP))).rejects.toThrow(/CONVERSION_REFINING/)
+    await expect(voidConversion(c)).rejects.toThrow(/CONVERSION_REFINING/)
+  })
+
+  it('returns the first correction when asked twice', async () => {
+    const saved = await saveConversion('fix-twice-conv', conversionPayload(NINI, { note: 'hai lan sua' }))
+    const seen = await revisionOfConversion(saved.conversionId)
+    const first = await correctConversion('fix-twice-conv-it', saved.conversionId, seen, niniCorrected)
+    const again = await correctConversion('fix-twice-conv-it', saved.conversionId, seen, niniCorrected)
+    expect(again).toEqual({ conversionId: first.conversionId, docNo: first.docNo, repeated: true })
+  })
+})
+
+describe('cancelling a conversion', () => {
+  it('cancels every leg at once and gives the stock back', async () => {
+    const saved = await saveConversion('cancel-conv', conversionPayload(GRAIN_TO_RP, { note: 'huy' }))
+    expect(await voidConversion(saved.conversionId)).toBe(2)
+    const state = await db.query<{ live: string; voided: boolean; grams: string }>(
+      `SELECT (SELECT count(*)::text FROM pc49.gold_txn
+                WHERE conversion_id = $1 AND voided_at IS NULL) AS live,
+              (SELECT voided_at IS NOT NULL FROM pc49.gold_conversion WHERE id = $1) AS voided,
+              (SELECT coalesce(sum(m.qty_gram), 0)::float8::text
+                 FROM pc49.inventory_movement m JOIN pc49.gold_txn t ON t.id = m.source_id
+                WHERE t.conversion_id = $1) AS grams`, [saved.conversionId])
+    expect(state.rows[0]).toEqual({ live: '0', voided: true, grams: '0' })
+    await expect(voidConversion(saved.conversionId)).rejects.toThrow(/CONVERSION_VOIDED/)
+  })
+})
