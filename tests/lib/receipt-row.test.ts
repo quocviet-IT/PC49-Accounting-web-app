@@ -1,0 +1,55 @@
+import { describe, it, expect } from 'vitest'
+import { t, type MessageKey } from '@/lib/i18n'
+import { goldSummary, toReceiptRow } from '@/components/gold/ledgerRow'
+import type { ReceiptLine } from '@/components/gold/types'
+
+const say = (key: MessageKey) => t('vi', key)
+const NAMES: Record<string, string> = { SG: 'Vàng vụn', GRAIN: 'Vàng Grain' }
+const gold = (code: string) => NAMES[code] ?? code
+
+const line = (over: Partial<ReceiptLine>): ReceiptLine => ({
+  id: 'a', lineNo: 1, itemDesc: null, gold_type_code: 'SG', scrap_detail: null, gold_pct: null,
+  uom: 'GRAM', qty: 1, unit_price: 1, amount: -1, blockedCode: null, ...over,
+})
+
+describe('a row of the receipt ledger', () => {
+  it('reads figures that arrive as text as numbers, and names what is missing null', () => {
+    const row = toReceiptRow({
+      receipt_key: 'k1', receipt_id: null, txn_date: '2026-09-16', doc_no: 'PC49-2609-010',
+      txn_type: 'PO', partner_code: 'Nguyen Van A', partner_phone: null, sales_person_code: 'L.Thanh',
+      remarks: null, revision: '3', blocked_code: null, amount: '-2850.00', line_count: 2,
+      lines: [
+        { id: 'a', lineNo: 1, itemDesc: 'Nhẫn 24K (vụn)', goldTypeCode: 'SG', scrapDetail: '19-24k/grs',
+          goldPct: '0.9870', uom: 'GRAM', qty: '9.4000', unitPrice: '101.06382979', amount: '-950.00',
+          blockedCode: null },
+        { id: 'b', lineNo: 2, itemDesc: null, goldTypeCode: 'GRAIN', scrapDetail: null, goldPct: null,
+          uom: 'GRAM', qty: 15.6, unitPrice: 121.79487179, amount: -1900, blockedCode: 'REFINING_SOURCE' },
+      ],
+      payments: [{ seq: 1, amount: '950.00', method: 'CASH' }],
+      sold_by: [{ code: 'L.Thanh', sharePct: '100' }],
+    })
+    expect(row).toMatchObject({ key: 'k1', receiptId: null, revision: 3, amount: -2850, blockedCode: null })
+    expect(row.lines[0]).toEqual({
+      id: 'a', lineNo: 1, itemDesc: 'Nhẫn 24K (vụn)', gold_type_code: 'SG', scrap_detail: '19-24k/grs',
+      gold_pct: 0.987, uom: 'GRAM', qty: 9.4, unit_price: 101.06382979, amount: -950, blockedCode: null,
+    })
+    expect(row.lines[1]).toMatchObject({ itemDesc: null, gold_pct: null, blockedCode: 'REFINING_SOURCE' })
+    expect(row.payments).toEqual([{ seq: 1, amount: 950, method: 'CASH' }])
+    expect(row.soldBy).toEqual([{ code: 'L.Thanh', sharePct: 100 }])
+  })
+})
+
+describe('what a receipt is called in the gold column', () => {
+  it('is the gold type for one item', () => {
+    expect(goldSummary({ lines: [line({})] }, gold, say)).toBe('Vàng vụn')
+  })
+
+  it('counts the items when they are all the same gold', () => {
+    expect(goldSummary({ lines: [line({}), line({ id: 'b' })] }, gold, say)).toBe('Vàng vụn · 2 món')
+  })
+
+  it('says several kinds when they differ', () => {
+    expect(goldSummary({ lines: [line({}), line({ id: 'b', gold_type_code: 'GRAIN' })] }, gold, say))
+      .toBe('Nhiều loại (2 món)')
+  })
+})
