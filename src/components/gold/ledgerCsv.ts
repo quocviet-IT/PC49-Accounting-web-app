@@ -39,7 +39,11 @@ export function ledgerSheet(
         const scrap = [l.scrap_detail, l.gold_pct].filter((x) => x !== null && x !== '').join(' · ')
         const fine = fineGrams(l.uom, l.qty, l.gold_pct)
         return [
-          r.txn_date, r.doc_no, l.lineNo, l.itemDesc, r.txn_type,
+          r.txn_date, r.doc_no, l.lineNo,
+          // A conversion's leg has no description; which side it is on is what
+          // somebody filtering the sheet needs.
+          l.itemDesc ?? (l.side ? t(locale, l.side === 'out' ? 'conversion.side.out' : 'conversion.side.in') : null),
+          r.txn_type,
           r.partner_code, r.partner_phone, sales || null, goldName(l.gold_type_code), scrap || null,
           l.qty, l.uom, toGrams(l.qty, l.uom), fine === null ? null : Math.round(fine * 10000) / 10000,
           l.unit_price, l.amount, i === 0 ? (paid || null) : null, r.remarks,

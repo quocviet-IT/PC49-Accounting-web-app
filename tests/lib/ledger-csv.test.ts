@@ -69,4 +69,24 @@ describe('the gold ledger as a file', () => {
   it('heads the columns in English for an English reader', () => {
     expect(ledgerSheet([], 'en', gold).header.slice(0, 2)).toEqual(['Date', 'Doc no.'])
   })
+
+  it('writes a conversion a line per leg, saying which side each is on', () => {
+    const conversion: ReceiptRow = {
+      ...receipt, key: 'c1', receiptId: null, doc_no: 'PC49-2606-040', txn_type: 'TRANSFER_OUT',
+      partner_code: null, partner_phone: null, sales_person_code: null, soldBy: [], payments: [],
+      remarks: 'Transfer 637.5gr vang Grain ra 17L VRP', amount: 0,
+      conversion: { id: 'c1', kind: 'TRANSFER', varianceNote: null, varianceReason: null },
+      lines: [
+        { ...receipt.lines[0], id: 'o', side: 'out', itemDesc: null, gold_type_code: 'GRAIN',
+          scrap_detail: null, gold_pct: null, qty: -637.5, unit_price: null, amount: 0 },
+        { ...receipt.lines[0], id: 'i', side: 'in', itemDesc: null, gold_type_code: 'RP',
+          scrap_detail: null, gold_pct: null, uom: 'LUONG', qty: 17, unit_price: null, amount: 0 },
+      ],
+    }
+    const rows = ledgerSheet([conversion], 'vi', gold).rows
+    expect(rows.map((r) => [r[1], r[3], r[8], r[10], r[15]])).toEqual([
+      ['PC49-2606-040', 'Ra', 'Vàng Grain', -637.5, 0],
+      ['PC49-2606-040', 'Vào', 'Rồng Phụng', 17, 0],
+    ])
+  })
 })
