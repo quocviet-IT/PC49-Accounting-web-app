@@ -51,7 +51,7 @@ Theo đúng dữ liệu thật:
 Thay đổi:
 - Form: DEPOSIT tự đặt dấu như SALE. Phần thanh toán gọi là **Tiền cọc**, không bắt buộc. Dòng báo thiếu thành **"Còn lại X, trả khi lấy hàng."**
 - `write_gold_receipt`: bỏ `PAYMENT_SHORT`.
-- `post_gold_txn`: phiếu cọc không có khoản tiền nào thì **không tạo bút toán** (trả về null). Kho vẫn tách vàng sang DEPOSIT_HELD bằng trigger như cũ.
+- `post_gold_txn`: phiếu cọc không có khoản tiền nào thì **không tạo bút toán** (trả về null), nhưng tự ghi chuyển động kho, vì chuyển động kho vốn đi theo bút toán (0021). Vàng vẫn được tách sang DEPOSIT_HELD.
 - `v_deposit_status`, sửa theo dữ liệu thật:
   - **deposit_amount** = tiền cọc (các khoản thanh toán của phiếu cọc);
   - **order_amount** = thành tiền phiếu cọc nếu > 0, không thì số lượng × giá chốt, không thì thành tiền phiếu lấy;
