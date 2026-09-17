@@ -118,3 +118,67 @@
 }
 
 .failedFilters { margin-bottom: 16px; }
+
+/* One item of a receipt: a box of its own inside the items section. */
+.line {
+  padding: 10px 12px 0;
+  border: 1px solid var(--pc-border-default);
+  border-radius: 8px;
+  background: var(--pc-surface-muted);
+}
+
+.line + .line {
+  margin-top: 10px;
+}
+
+.lineHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.lineNo {
+  color: var(--pc-text-heading);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.fine {
+  display: block;
+  padding: 4px 0;
+  color: var(--pc-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.addLine {
+  margin: 10px 0 12px;
+}
+
+.gap {
+  margin-top: 12px;
+}
+
+/* The items of a receipt, opened beneath its row in the ledger. */
+.lines {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.lines th,
+.lines td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--pc-border-default);
+  text-align: left;
+}
+
+.lines th {
+  color: var(--pc-text-secondary);
+  font-weight: 600;
+}
+
+.lines .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
