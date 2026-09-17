@@ -97,7 +97,7 @@ export const goldUi = {
     'conversion.addIn': 'Thêm dòng vào',
     'conversion.removeLine': 'Bỏ dòng này',
     'conversion.hint': 'Gõ số lượng không dấu; bên RA hay VÀO quyết định dấu. Tổng gram hai bên phải khớp.',
-    'conversion.raRpHint': 'Ra RP: Vàng Grain ra, Rồng Phụng vào.',
+    'conversion.raRpHint': 'Ra RP: Grain ra, Rong Phung vào.',
     'conversion.balance': 'RA {0} g · VÀO {1} g · Lệch {2} g ({3}%)',
     'conversion.balanced': 'Cân',
     'conversion.overTolerance': 'Vượt mức cho phép {0}%',
@@ -108,7 +108,7 @@ export const goldUi = {
     'conversion.err.unbalanced': 'RA {0} g, VÀO {1} g: lệch {2}%, vượt mức cho phép {3}%. Ghi lý do lệch để lưu.',
     'conversion.err.sides': 'Mỗi bên RA và VÀO có từ 1 đến 30 dòng.',
     'conversion.err.qty': 'Dòng {0} {1} chưa có số lượng.',
-    'conversion.err.raRp': 'Ra RP chỉ có Vàng Grain ra và Rồng Phụng vào.',
+    'conversion.err.raRp': 'Ra RP chỉ có Grain ra và Rong Phung vào.',
     'conversion.err.blocked': 'Dòng {0} {1}: {2}',
   },
   en: {

@@ -118,7 +118,7 @@ try {
   await form.getByLabel('Khách / NCC', { exact: true }).fill(PARTNER)
   const item = form.getByRole('group', { name: 'Món 1', exact: true })
   await item.getByLabel('Mô tả món', { exact: true }).fill('Thoi Grain')
-  await choose(page, item, 'Loại vàng', 'Vàng Grain')
+  await choose(page, item, 'Loại vàng', 'Grain')
   await item.getByLabel('Số lượng', { exact: true }).fill('10')
   await item.getByLabel('Tuổi vàng (0–1)', { exact: true }).fill('0.999')
   await item.getByLabel('Thành tiền', { exact: true }).fill('1000')

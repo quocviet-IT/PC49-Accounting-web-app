@@ -71,17 +71,26 @@ describe('gold types', () => {
     expect(Number(r.rows[0].n)).toBe(0)
   })
 
-  it('calls scrap gold Scrap Gold in Vietnamese too, as the shop does', async () => {
-    // Renamed from "Vàng vụn" on 17-09-2026 (0081), with the three accounts
-    // that carry its name.
+  it('calls every gold type what the Dashboard calls it', async () => {
+    // Renamed on 17-09-2026: Scrap Gold in 0081, the rest in 0085.
     const g = await db.query<{ name_vi: string }>(
-      `SELECT name_vi FROM pc49.gold_type WHERE code = 'SG'`)
-    expect(g.rows).toEqual([{ name_vi: 'Scrap Gold' }])
+      `SELECT name_vi FROM pc49.gold_type ORDER BY sort_order`)
+    expect(g.rows.map((r) => r.name_vi)).toEqual([
+      'Rong Phung', '9999', 'Maple Leaf', 'Credit Suisse', 'American Eagle', 'Other',
+      'Scrap Gold', 'Grain', 'PT',
+    ])
     const a = await db.query<{ code: string; name_vi: string }>(
-      `SELECT code, name_vi FROM pc49.account WHERE gold_type_code = 'SG' ORDER BY code`)
+      `SELECT code, name_vi FROM pc49.account
+        WHERE gold_type_code IN ('RP', 'SG', 'PT') ORDER BY code`)
     expect(a.rows).toEqual([
+      { code: '155PT', name_vi: 'NVL PT' },
       { code: '155SG', name_vi: 'NVL Scrap Gold' },
+      { code: '156RP', name_vi: 'Hàng hoá Rong Phung' },
+      { code: '157PT', name_vi: 'Hàng gửi đi PT' },
+      { code: '157RP', name_vi: 'Hàng gửi đi Rong Phung' },
       { code: '157SG', name_vi: 'Hàng gửi đi Scrap Gold' },
+      { code: '632PT', name_vi: 'Giá vốn PT' },
+      { code: '632RP', name_vi: 'Giá vốn Rong Phung' },
       { code: '632SG', name_vi: 'Giá vốn Scrap Gold' },
     ])
   })

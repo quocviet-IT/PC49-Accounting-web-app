@@ -34,9 +34,9 @@ const SCREEN = `${BASE}/gold-transactions?date=${DAY}`
 const ITEMS = [
   { desc: 'Nhẫn 24K (vụn)', gold: 'Scrap Gold', band: '19-24k/grs', qty: '9.40', purity: '0.987', total: '950' },
   { desc: 'Mũ 24K (vụn)', gold: 'Scrap Gold', band: '19-24k/grs', qty: '7.50', purity: '0.981', total: '825' },
-  { desc: 'Thỏi RCM', gold: 'Vàng Grain', band: null, qty: '15.60', purity: '0.998', total: '1900' },
+  { desc: 'Thỏi RCM', gold: 'Grain', band: null, qty: '15.60', purity: '0.998', total: '1900' },
   { desc: 'Bi 24K (vụn)', gold: 'Scrap Gold', band: '19-24k/grs', qty: '37.50', purity: '0.990', total: '4125' },
-  { desc: 'Xu Suisse 24K', gold: 'Vàng Grain', band: null, qty: '5.00', purity: '0.990', total: '525' },
+  { desc: 'Xu Suisse 24K', gold: 'Grain', band: null, qty: '5.00', purity: '0.990', total: '525' },
   { desc: 'Mặt dây 14K (vụn)', gold: 'Scrap Gold', band: '10-18k/grs', qty: '0.60', purity: '0.597', total: '36' },
 ]
 

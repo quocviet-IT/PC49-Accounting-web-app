@@ -103,10 +103,10 @@ try {
   await form.getByLabel('Ghi chú', { exact: true }).fill('Doi voi Nini')
 
   const out1 = group(form, 'Ra 1')
-  await choose(page, out1, 'Loại vàng', 'Rồng Phụng')
+  await choose(page, out1, 'Loại vàng', 'Rong Phung')
   await out1.getByLabel('Số lượng', { exact: true }).fill('4')
 
-  const ins = [['Credit Suisse', '2'], ['Vàng khác', '1'], ['Vàng Grain', '50']]
+  const ins = [['Credit Suisse', '2'], ['Other', '1'], ['Grain', '50']]
   for (const [i, [gold, qty]] of ins.entries()) {
     if (i > 0) await form.getByRole('button', { name: 'Thêm dòng vào' }).click()
     const line = group(form, `Vào ${i + 1}`)
@@ -176,7 +176,7 @@ try {
   await fix.getByRole('button', { name: 'Thêm dòng vào' }).click()
   const added = group(fix, 'Vào 3')
   await added.waitFor()
-  await choose(page, added, 'Loại vàng', 'Vàng Grain')
+  await choose(page, added, 'Loại vàng', 'Grain')
   await added.getByLabel('Số lượng', { exact: true }).fill('31.105')
   await fix.getByLabel('Lý do sửa', { exact: true }).fill('1 oz khac la Grain')
   await fix.getByRole('button', { name: 'Lưu', exact: true }).first().click()
