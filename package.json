@@ -40,7 +40,8 @@
     "probe:speed": "node --env-file=.env.local scripts/probe-speed.mjs",
     "verify:loading": "node --env-file=.env.local scripts/verify-loading.mjs",
     "verify:ledger": "node --env-file=.env.local scripts/verify-ledger.mjs",
-    "verify:receipt": "node --env-file=.env.local scripts/verify-receipt.mjs"
+    "verify:receipt": "node --env-file=.env.local scripts/verify-receipt.mjs",
+    "verify:conversion": "node --env-file=.env.local scripts/verify-conversion.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",

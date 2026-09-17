@@ -14,3 +14,14 @@ export async function removeReceipts(db, day, partner = null) {
   await db.query(`DELETE FROM pc49.audit_log WHERE entity_type = 'gold_receipt'
                    AND entity_id NOT IN (SELECT id::text FROM pc49.gold_receipt)`)
 }
+
+/**
+ * Takes a check's conversions off the day it wrote them on, after its legs.
+ * A correction points at the conversion it replaced, so that link goes first.
+ */
+export async function removeConversions(db, day) {
+  await db.query('UPDATE pc49.gold_conversion SET corrects_conversion_id = NULL WHERE conv_date = $1', [day])
+  await db.query('DELETE FROM pc49.gold_conversion WHERE conv_date = $1', [day])
+  await db.query(`DELETE FROM pc49.audit_log WHERE entity_type = 'gold_conversion'
+                   AND entity_id NOT IN (SELECT id::text FROM pc49.gold_conversion)`)
+}

@@ -35,14 +35,14 @@ function csvRecords(text) {
 
 const db = new pg.Client({ connectionString: process.env.SUPABASE_DB_URL, ssl: { rejectUnauthorized: false } })
 await db.connect()
-// The screen counts receipts and the file has a line per item (0076).
+// The screen counts receipts and conversions; the file has a line per item or leg (0080).
 const expected = (await db.query(
-  `SELECT count(DISTINCT coalesce(receipt_id, id))::int AS receipts,
+  `SELECT count(DISTINCT coalesce(receipt_id, conversion_id, id))::int AS receipts,
           count(*)::int AS items,
           coalesce(-sum(amount) FILTER (WHERE txn_type IN ('PO', 'PO_VENDOR')), 0)::numeric(18,2)::text AS purchases
      FROM pc49.gold_txn WHERE voided_at IS NULL AND txn_date BETWEEN $1 AND $2`, [FROM, TO])).rows[0]
 const everything = (await db.query(
-  `SELECT count(DISTINCT coalesce(receipt_id, id))::int AS n
+  `SELECT count(DISTINCT coalesce(receipt_id, conversion_id, id))::int AS n
      FROM pc49.gold_txn WHERE voided_at IS NULL`)).rows[0].n
 await db.end()
 

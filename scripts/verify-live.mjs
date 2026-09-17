@@ -74,6 +74,7 @@ await check('row level security on every pc49 table',
 await check('nothing in the books is dated before the ledger begins',
   `SELECT (SELECT count(*)::int FROM pc49.gold_txn WHERE txn_date < '2025-01-01')
         + (SELECT count(*)::int FROM pc49.gold_receipt WHERE txn_date < '2025-01-01')
+        + (SELECT count(*)::int FROM pc49.gold_conversion WHERE conv_date < '2025-01-01')
         + (SELECT count(*)::int FROM pc49.inventory_movement WHERE move_date < '2025-01-01')
         + (SELECT count(*)::int FROM pc49.journal_entry WHERE period < '2025-01')
         + (SELECT count(*)::int FROM pc49.refining_lot WHERE sent_date < '2025-01-01') AS n`, 0)
