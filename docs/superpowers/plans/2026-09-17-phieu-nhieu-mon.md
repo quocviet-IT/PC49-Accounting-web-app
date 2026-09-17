@@ -4660,8 +4660,8 @@ Expected: tất cả PASS / không lỗi. Hỏng ở đâu thì sửa ở task t
 - [ ] **Step 2: Không có dấu vết công cụ AI**
 
 ```bash
-git log origin/main..HEAD --format=%B | grep -ciE 'claude|codex|co-authored'
-git diff origin/main..HEAD | grep -ciE 'claude|codex'
+git log origin/main..HEAD --format=%B | grep -ciE 'cl[a]ude|cod[e]x|co-authored'
+git diff origin/main..HEAD | grep -ciE 'cl[a]ude|cod[e]x'
 ```
 
 Expected: cả hai in `0`. Khác `0`: sửa nội dung hoặc message trước khi đẩy (commit mới sửa file; message thì hỏi người dùng trước khi viết lại lịch sử).
