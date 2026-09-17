@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
 import { createTestDb, asRole } from '../support/db'
+import { SIX_ITEMS, purchaseLine, receiptPayload } from '../support/receipt'
 
 let db: PGlite
 const KT = '11111111-1111-1111-1111-111111111111'
@@ -97,5 +98,134 @@ describe('the receipt and its lines', () => {
     await expect(asRole(db, GS, () => db.query(
       `INSERT INTO pc49.gold_receipt (doc_no, txn_date, txn_type)
        VALUES ('X', '2026-06-02', 'PO')`))).rejects.toThrow(/row-level security/)
+  })
+})
+
+type Saved = { receiptId: string; docNo: string; repeated: boolean }
+
+async function saveReceipt(key: string, body: string, as = KT): Promise<Saved> {
+  const r = await asRole(db, as, () => db.query<{ r: Saved }>(
+    `SELECT pc49.save_gold_receipt($1, $2::jsonb) AS r`, [key, body]))
+  return r.rows[0].r
+}
+
+/** Each item's payments as "amount method + amount method", in item order. */
+async function paidPerItem(receiptId: string) {
+  const r = await db.query<{ paid: string }>(
+    `SELECT coalesce(string_agg(gp.amount::float8::text || ' ' || gp.method::text, ' + '
+                                ORDER BY gp.seq), '') AS paid
+       FROM pc49.gold_txn t
+       LEFT JOIN pc49.gold_txn_payment gp ON gp.txn_id = t.id
+      WHERE t.receipt_id = $1
+      GROUP BY t.line_no ORDER BY t.line_no`, [receiptId])
+  return r.rows.map((row) => row.paid)
+}
+
+describe('saving a receipt of several items', () => {
+  it('writes one receipt and six items under one number, every item posted', async () => {
+    const saved = await saveReceipt('six-items', receiptPayload({ partnerCode: 'SIX' }))
+    const receipt = await db.query<{ doc_no: string; txn_type: string; partner_code: string }>(
+      `SELECT doc_no, txn_type::text, partner_code FROM pc49.gold_receipt WHERE id = $1`,
+      [saved.receiptId])
+    expect(receipt.rows[0]).toEqual({ doc_no: saved.docNo, txn_type: 'PO', partner_code: 'SIX' })
+
+    const lines = await db.query<{
+      line_no: number; doc_no: string; item_desc: string; amount: string; posted: boolean
+    }>(
+      `SELECT line_no, doc_no, item_desc, amount::text, journal_entry_id IS NOT NULL AS posted
+         FROM pc49.gold_txn WHERE receipt_id = $1 ORDER BY line_no`, [saved.receiptId])
+    expect(lines.rows.map((l) => l.line_no)).toEqual([1, 2, 3, 4, 5, 6])
+    expect(new Set(lines.rows.map((l) => l.doc_no))).toEqual(new Set([saved.docNo]))
+    expect(lines.rows.map((l) => l.item_desc)).toEqual(SIX_ITEMS.map((i) => i.itemDesc))
+    expect(lines.rows.reduce((sum, l) => sum + Number(l.amount), 0)).toBe(-8361)
+    expect(lines.rows.every((l) => l.posted)).toBe(true)
+  })
+
+  it('divides the payments as the design says, to the cent', async () => {
+    const saved = await saveReceipt('six-paid', receiptPayload({ partnerCode: 'PAID' }))
+    expect(await paidPerItem(saved.receiptId)).toEqual([
+      '950 CASH', '825 CASH', '1900 CASH', '1325 CASH + 2800 BANKWIRE', '525 BANKWIRE', '36 BANKWIRE',
+    ])
+    const byMethod = await db.query<{ method: string; total: string }>(
+      `SELECT gp.method::text AS method, sum(gp.amount)::float8::text AS total
+         FROM pc49.gold_txn t JOIN pc49.gold_txn_payment gp ON gp.txn_id = t.id
+        WHERE t.receipt_id = $1 GROUP BY gp.method ORDER BY gp.method::text`, [saved.receiptId])
+    expect(byMethod.rows).toEqual([
+      { method: 'BANKWIRE', total: '3361' }, { method: 'CASH', total: '5000' },
+    ])
+  })
+
+  it('leaves an overpayment on the last item, as a single transaction would', async () => {
+    const saved = await saveReceipt('six-over', receiptPayload({
+      partnerCode: 'OVER', payments: [{ amount: 9000, method: 'CASH' }],
+    }))
+    expect((await paidPerItem(saved.receiptId))[5]).toBe('675 CASH')
+  })
+
+  it('refuses a purchase whose payments never reach an item, and names the item', async () => {
+    const count = async () => (await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pc49.gold_receipt`)).rows[0].n
+    const before = await count()
+    await expect(saveReceipt('six-short', receiptPayload({
+      partnerCode: 'SHORT', payments: [{ amount: 8000, method: 'CASH' }],
+    }))).rejects.toThrow(/PAYMENT_SHORT: item 6/)
+    expect(await count()).toBe(before)
+  })
+
+  it('credits the same people with the same shares on every item', async () => {
+    const saved = await saveReceipt('six-staff', receiptPayload({ partnerCode: 'STAFF' }))
+    const shares = await db.query<{ who: string }>(
+      `SELECT string_agg(s.sales_person_code || ' ' || s.share_pct::float8::text, ', '
+                         ORDER BY s.share_pct DESC) AS who
+         FROM pc49.gold_txn t JOIN pc49.gold_txn_sales_person s ON s.txn_id = t.id
+        WHERE t.receipt_id = $1 GROUP BY t.line_no ORDER BY t.line_no`, [saved.receiptId])
+    expect(shares.rows.map((r) => r.who)).toEqual(Array(6).fill('L.Thanh 80, P.Minh 20'))
+  })
+
+  it('is one receipt however many times it is saved', async () => {
+    const body = receiptPayload({ partnerCode: 'TWICE' })
+    const first = await saveReceipt('six-twice', body)
+    const again = await saveReceipt('six-twice', body)
+    expect(first.repeated).toBe(false)
+    expect(again).toEqual({ receiptId: first.receiptId, docNo: first.docNo, repeated: true })
+    const n = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pc49.gold_receipt WHERE partner_code = 'TWICE'`)
+    expect(n.rows[0].n).toBe('1')
+  })
+
+  it('refuses the same key for a different receipt', async () => {
+    await saveReceipt('six-reused', receiptPayload({ partnerCode: 'REUSED' }))
+    await expect(saveReceipt('six-reused', receiptPayload({ partnerCode: 'REUSED', remarks: 'khac' })))
+      .rejects.toThrow(/REQUEST_KEY_REUSED/)
+  })
+
+  it('keeps a deposit to one item', async () => {
+    const two = [SIX_ITEMS[0], SIX_ITEMS[1]].map(purchaseLine)
+    await expect(saveReceipt('deposit-two', receiptPayload({
+      partnerCode: 'DEP', txnType: 'DEPOSIT', lines: two,
+    }))).rejects.toThrow(/RECEIPT_SINGLE/)
+  })
+
+  it('holds thirty items at most', async () => {
+    const many = Array.from({ length: 31 }, () => purchaseLine(SIX_ITEMS[4]))
+    await expect(saveReceipt('thirty-one', receiptPayload({
+      partnerCode: 'MANY', lines: many, payments: [{ amount: 31 * 525, method: 'CASH' }],
+    }))).rejects.toThrow(/RECEIPT_SIZE/)
+  })
+
+  it('refuses items that move in both directions', async () => {
+    const memo = {
+      itemDesc: 'x', goldTypeCode: 'SG', uom: 'GRAM', unitPrice: null, amount: 0,
+      scrapDetail: null, goldPct: null,
+    }
+    await expect(saveReceipt('both-ways', receiptPayload({
+      partnerCode: 'WAYS', txnType: 'MEMO', payments: [],
+      lines: [{ ...memo, qty: 5 }, { ...memo, qty: -5 }],
+    }))).rejects.toThrow(/RECEIPT_DIRECTION/)
+  })
+
+  it('is refused to somebody who may only read', async () => {
+    await expect(saveReceipt('supervisor', receiptPayload({ partnerCode: 'GS' }), GS))
+      .rejects.toThrow()
   })
 })
