@@ -48,12 +48,15 @@ const browser = await chromium.launch()
 async function cleanUp() {
   const inMonth = `txn_date >= '2019-07-01' AND txn_date < '2019-08-01'`
   const txns = await db.query(`SELECT id FROM pc49.gold_txn WHERE ${inMonth}`)
-  await db.query(`UPDATE pc49.gold_txn SET corrects_txn_id = NULL, deposit_ref_id = NULL WHERE ${inMonth}`)
+  await db.query(`UPDATE pc49.gold_txn SET corrects_txn_id = NULL WHERE ${inMonth}`)
   for (const t of txns.rows) {
     await db.query('DELETE FROM pc49.inventory_movement WHERE source_id = $1', [t.id])
     await db.query('DELETE FROM pc49.gold_txn_payment WHERE txn_id = $1', [t.id])
     await db.query('DELETE FROM pc49.gold_txn_sales_person WHERE txn_id = $1', [t.id])
   }
+  // A pickup must name its deposit (0013), so pickups go before deposits
+  // rather than being unhooked from them.
+  await db.query(`DELETE FROM pc49.gold_txn WHERE ${inMonth} AND deposit_ref_id IS NOT NULL`)
   await db.query(`DELETE FROM pc49.gold_txn WHERE ${inMonth}`)
   await db.query(`UPDATE pc49.gold_receipt SET corrects_receipt_id = NULL WHERE ${inMonth}`)
   await db.query(`DELETE FROM pc49.gold_receipt WHERE ${inMonth}`)
