@@ -229,3 +229,160 @@ describe('saving a receipt of several items', () => {
       .rejects.toThrow()
   })
 })
+
+type Corrected = Saved & { replaced?: string }
+
+async function correct(key: string, original: string, revision: number, body: string,
+  reason = 'Bớt món mặt dây'): Promise<Corrected> {
+  const r = await asRole(db, KT, () => db.query<{ r: Corrected }>(
+    `SELECT pc49.correct_gold_receipt($1, $2, $3, $4, $5::jsonb) AS r`,
+    [key, original, revision, reason, body]))
+  return r.rows[0].r
+}
+
+async function cancel(original: string, reason = 'nhập trùng'): Promise<number> {
+  const r = await asRole(db, KT, () => db.query<{ n: number }>(
+    `SELECT pc49.void_gold_receipt($1, $2) AS n`, [original, reason]))
+  return r.rows[0].n
+}
+
+const revisionOf = async (table: 'gold_receipt' | 'gold_txn', id: string) =>
+  (await db.query<{ revision: number }>(
+    `SELECT revision FROM pc49.${table} WHERE id = $1`, [id])).rows[0].revision
+
+/** The same receipt with the pendant taken off: five items, 8,325.00. */
+const fivePayload = (partnerCode: string) => receiptPayload({
+  partnerCode,
+  lines: SIX_ITEMS.slice(0, 5).map(purchaseLine),
+  payments: [{ amount: 5000, method: 'CASH' }, { amount: 3325, method: 'BANKWIRE' }],
+})
+
+/** A transaction saved the way everything was saved before receipts. */
+async function saveLone(key: string, partnerCode: string): Promise<string> {
+  const r = await asRole(db, KT, () => db.query<{ r: { txnId: string } }>(
+    `SELECT pc49.save_gold_transaction($1, $2::jsonb) AS r`,
+    [key, JSON.stringify({
+      txnDate: '2026-06-02', txnType: 'PO', goldTypeCode: 'SG', uom: 'GRAM', qty: 10,
+      unitPrice: 60, amount: -600, partnerCode, scrapDetail: null, goldPct: null,
+      remarks: null, payments: [{ amount: 600, method: 'CASH' }], salesPeople: [],
+    })]))
+  return r.rows[0].r.txnId
+}
+
+const liveItems = async (receiptId: string) => (await db.query<{ n: string }>(
+  `SELECT count(*)::text AS n FROM pc49.gold_txn WHERE receipt_id = $1 AND voided_at IS NULL`,
+  [receiptId])).rows[0].n
+
+describe('correcting a receipt', () => {
+  it('replaces every item in one go and keeps the number', async () => {
+    const saved = await saveReceipt('fix-me', receiptPayload({ partnerCode: 'FIX' }))
+    const oldEntries = await db.query<{ e: string }>(
+      `SELECT journal_entry_id::text AS e FROM pc49.gold_txn WHERE receipt_id = $1`, [saved.receiptId])
+
+    const fixed = await correct('fix-it', saved.receiptId,
+      await revisionOf('gold_receipt', saved.receiptId), fivePayload('FIX'))
+    expect(fixed.docNo).toBe(saved.docNo)
+    expect(fixed.receiptId).not.toBe(saved.receiptId)
+
+    const old = await db.query<{ voided: boolean; why: string }>(
+      `SELECT voided_at IS NOT NULL AS voided, void_reason AS why
+         FROM pc49.gold_receipt WHERE id = $1`, [saved.receiptId])
+    expect(old.rows[0]).toEqual({ voided: true, why: 'Bớt món mặt dây' })
+    expect(await liveItems(saved.receiptId)).toBe('0')
+
+    const reversals = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pc49.journal_entry WHERE reversal_of_id = ANY($1::uuid[])`,
+      [`{${oldEntries.rows.map((r) => r.e).join(',')}}`])
+    expect(reversals.rows[0].n).toBe('6')
+
+    const replacement = await db.query<{ corrects: string; items: string; posted: string }>(
+      `SELECT r.corrects_receipt_id::text AS corrects,
+              (SELECT count(*)::text FROM pc49.gold_txn t WHERE t.receipt_id = r.id) AS items,
+              (SELECT count(*)::text FROM pc49.gold_txn t
+                WHERE t.receipt_id = r.id AND t.journal_entry_id IS NOT NULL) AS posted
+         FROM pc49.gold_receipt r WHERE r.id = $1`, [fixed.receiptId])
+    expect(replacement.rows[0]).toEqual({ corrects: saved.receiptId, items: '5', posted: '5' })
+  })
+
+  it('tells the second person to look again rather than overwrite', async () => {
+    const saved = await saveReceipt('race', receiptPayload({ partnerCode: 'RACE' }))
+    const seen = await revisionOf('gold_receipt', saved.receiptId)
+    await correct('race-first', saved.receiptId, seen, fivePayload('RACE'))
+    await expect(correct('race-second', saved.receiptId, seen, fivePayload('RACE')))
+      .rejects.toThrow(/CONFLICT/)
+  })
+
+  it('refuses while an item sits in a refining lot, and says which item', async () => {
+    const saved = await saveReceipt('in-a-lot', receiptPayload({ partnerCode: 'LOT' }))
+    const fourth = await db.query<{ id: string }>(
+      `SELECT id FROM pc49.gold_txn WHERE receipt_id = $1 AND line_no = 4`, [saved.receiptId])
+    const lot = await db.query<{ id: string }>(
+      `INSERT INTO pc49.refining_lot (lot_code) VALUES ('T.RECEIPT') RETURNING id`)
+    await db.query(`INSERT INTO pc49.refining_lot_source (lot_id, txn_id) VALUES ($1, $2)`,
+      [lot.rows[0].id, fourth.rows[0].id])
+
+    await expect(correct('in-a-lot-fix', saved.receiptId,
+      await revisionOf('gold_receipt', saved.receiptId), fivePayload('LOT')))
+      .rejects.toThrow(/LINE_BLOCKED: item 4 REFINING_SOURCE/)
+    await expect(cancel(saved.receiptId)).rejects.toThrow(/LINE_BLOCKED: item 4 REFINING_SOURCE/)
+    expect(await liveItems(saved.receiptId)).toBe('6')
+  })
+
+  it('corrects a transaction saved before receipts as a receipt of one item', async () => {
+    const loneId = await saveLone('lone-save', 'LONE')
+    const loneDoc = (await db.query<{ doc_no: string }>(
+      `SELECT doc_no FROM pc49.gold_txn WHERE id = $1`, [loneId])).rows[0].doc_no
+
+    const fixed = await correct('lone-fix', loneId, await revisionOf('gold_txn', loneId),
+      receiptPayload({
+        partnerCode: 'LONE', lines: [purchaseLine(SIX_ITEMS[0])],
+        payments: [{ amount: 950, method: 'CASH' }],
+      }))
+    expect(fixed.docNo).toBe(loneDoc)
+    const first = await db.query<{ corrects: string }>(
+      `SELECT corrects_txn_id::text AS corrects FROM pc49.gold_txn
+        WHERE receipt_id = $1 AND line_no = 1`, [fixed.receiptId])
+    expect(first.rows[0].corrects).toBe(loneId)
+    const gone = await db.query<{ voided: boolean }>(
+      `SELECT voided_at IS NOT NULL AS voided FROM pc49.gold_txn WHERE id = $1`, [loneId])
+    expect(gone.rows[0].voided).toBe(true)
+  })
+
+  it('returns the first correction when asked twice', async () => {
+    const saved = await saveReceipt('fix-twice-save', receiptPayload({ partnerCode: 'FIX2' }))
+    const seen = await revisionOf('gold_receipt', saved.receiptId)
+    const body = fivePayload('FIX2')
+    const first = await correct('fix-twice', saved.receiptId, seen, body)
+    const again = await correct('fix-twice', saved.receiptId, seen, body)
+    expect(again).toEqual({ receiptId: first.receiptId, docNo: first.docNo, repeated: true })
+  })
+})
+
+describe('cancelling a receipt', () => {
+  it('cancels every item at once and gives the stock back', async () => {
+    const saved = await saveReceipt('cancel-me', receiptPayload({ partnerCode: 'CANCEL' }))
+    expect(await cancel(saved.receiptId)).toBe(6)
+    const state = await db.query<{ live: string; voided: boolean; grams: string }>(
+      `SELECT (SELECT count(*)::text FROM pc49.gold_txn
+                WHERE receipt_id = $1 AND voided_at IS NULL) AS live,
+              (SELECT voided_at IS NOT NULL FROM pc49.gold_receipt WHERE id = $1) AS voided,
+              (SELECT coalesce(sum(m.qty_gram), 0)::float8::text
+                 FROM pc49.inventory_movement m JOIN pc49.gold_txn t ON t.id = m.source_id
+                WHERE t.receipt_id = $1) AS grams`, [saved.receiptId])
+    expect(state.rows[0]).toEqual({ live: '0', voided: true, grams: '0' })
+  })
+
+  it('cancels a transaction saved before receipts', async () => {
+    const loneId = await saveLone('lone-cancel', 'LONE2')
+    expect(await cancel(loneId)).toBe(1)
+    const gone = await db.query<{ voided: boolean }>(
+      `SELECT voided_at IS NOT NULL AS voided FROM pc49.gold_txn WHERE id = $1`, [loneId])
+    expect(gone.rows[0].voided).toBe(true)
+  })
+
+  it('says a cancelled receipt is already cancelled', async () => {
+    const saved = await saveReceipt('cancel-twice', receiptPayload({ partnerCode: 'CANCEL2' }))
+    await cancel(saved.receiptId)
+    await expect(cancel(saved.receiptId)).rejects.toThrow(/RECEIPT_VOIDED/)
+  })
+})
