@@ -42,6 +42,7 @@
     "verify:ledger": "node --env-file=.env.local scripts/verify-ledger.mjs",
     "verify:receipt": "node --env-file=.env.local scripts/verify-receipt.mjs",
     "verify:settlement": "node --env-file=.env.local scripts/verify-settlement.mjs",
+    "verify:deposit": "node --env-file=.env.local scripts/verify-deposit.mjs",
     "verify:conversion": "node --env-file=.env.local scripts/verify-conversion.mjs"
   },
   "dependencies": {
