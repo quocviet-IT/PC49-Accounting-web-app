@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { TXN_TYPES } from '@/components/gold/types'
 import { MAX_RECEIPT_LINES, SINGLE_LINE_TYPES } from '@/components/gold/receiptLine'
+import { MAX_CONVERSION_LINES } from '@/components/gold/conversionLine'
 
 const PAYMENT_METHODS = ['CASH', 'BANKWIRE', 'ZELLE', 'CHECK'] as const
 
@@ -195,6 +196,116 @@ export async function voidReceipt(input: unknown): Promise<ReceiptVoidResult> {
   }
   const supabase = await createServerSupabase()
   const { data, error } = await supabase.rpc('void_gold_receipt', {
+    p_original: parsed.data.key,
+    p_reason: parsed.data.reason,
+    p_on_date: parsed.data.onDate ?? null,
+  })
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/gold-transactions')
+  return { ok: true, lines: Number(data ?? 0) }
+}
+
+/** One line of a conversion's side: which gold, in its own unit, how much, unsigned. */
+const conversionLineSchema = z.object({
+  goldTypeCode: z.string().min(1),
+  uom: z.enum(['GRAM', 'OZ', 'LUONG']),
+  qty: z.number().positive('quantity must be more than zero'),
+})
+
+const conversionFields = z.object({
+  // Stable for the life of one conversion on screen, as a receipt's is.
+  requestKey: z.string().uuid(),
+  convDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  kind: z.enum(['TRANSFER', 'RA_RP']),
+  partnerCode: z.string().nullable(),
+  note: z.string().nullable(),
+  varianceReason: z.string().trim().nullable().default(null),
+  out: z.array(conversionLineSchema).min(1).max(MAX_CONVERSION_LINES),
+  in: z.array(conversionLineSchema).min(1).max(MAX_CONVERSION_LINES),
+})
+
+const conversionCorrectionSchema = conversionFields.extend({
+  original: z.string().uuid(),
+  expectedRevision: z.number().int(),
+  reason: z.string().trim().min(3, 'say why in a few words'),
+  reversalDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
+})
+
+/** What the database is sent: the conversion without its key. */
+function conversionPayload(c: z.infer<typeof conversionFields>) {
+  return {
+    convDate: c.convDate,
+    kind: c.kind,
+    partnerCode: c.partnerCode,
+    note: c.note,
+    varianceReason: c.varianceReason,
+    out: c.out,
+    in: c.in,
+  }
+}
+
+/**
+ * Saves a conversion: the gold that went out, the gold that came in, weighed
+ * against each other and posted leg by leg, in one transaction (0078).
+ */
+export async function saveConversion(input: unknown): Promise<SaveResult> {
+  const parsed = conversionFields.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Invalid conversion' }
+  }
+  const c = parsed.data
+  const supabase = await createServerSupabase()
+
+  const { data, error } = await supabase.rpc('save_gold_conversion', {
+    p_request_key: c.requestKey,
+    p_payload: conversionPayload(c),
+  })
+  if (error) return { ok: false, message: error.message }
+
+  const result = data as { conversionId: string; docNo: string | null; repeated: boolean }
+  // Filing the partner keeps the suggestions converging on one spelling.
+  const warning = await fileCustomer(supabase, c.partnerCode, null)
+  revalidatePath('/gold-transactions')
+  return { ok: true, id: result.conversionId, docNo: result.docNo, repeated: result.repeated, warning }
+}
+
+/**
+ * Replaces a conversion, every leg of it, with the corrected one (0079). The
+ * revision is the one the screen was showing; CONFLICT if it has moved since.
+ */
+export async function correctConversion(input: unknown): Promise<SaveResult> {
+  const parsed = conversionCorrectionSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Invalid correction' }
+  }
+  const c = parsed.data
+  const supabase = await createServerSupabase()
+
+  const { data, error } = await supabase.rpc('correct_gold_conversion', {
+    p_request_key: c.requestKey,
+    p_original: c.original,
+    p_expected_revision: c.expectedRevision,
+    p_reason: c.reason,
+    p_reversal_date: c.reversalDate,
+    p_payload: conversionPayload(c),
+  })
+  if (error) return { ok: false, message: error.message }
+
+  const result = data as { conversionId: string; docNo: string | null; repeated: boolean }
+  const warning = await fileCustomer(supabase, c.partnerCode, null)
+  revalidatePath('/gold-transactions')
+  return { ok: true, id: result.conversionId, docNo: result.docNo, repeated: result.repeated, warning }
+}
+
+/** Cancels a conversion, every leg of it (0079). */
+export async function voidConversion(input: unknown): Promise<ReceiptVoidResult> {
+  const parsed = receiptVoidSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Invalid request' }
+  }
+  const supabase = await createServerSupabase()
+  const { data, error } = await supabase.rpc('void_gold_conversion', {
     p_original: parsed.data.key,
     p_reason: parsed.data.reason,
     p_on_date: parsed.data.onDate ?? null,

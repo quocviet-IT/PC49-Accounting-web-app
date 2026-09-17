@@ -33,6 +33,14 @@ export function toReceiptRow(r: Record<string, unknown>): ReceiptRow {
     lines: lines.map(toReceiptLine),
     payments: payments.map((p) => ({ seq: Number(p.seq), amount: Number(p.amount), method: String(p.method) })),
     soldBy: soldBy.map((p) => ({ code: String(p.code), sharePct: Number(p.sharePct) })),
+    conversion: r.conversion_id
+      ? {
+          id: String(r.conversion_id),
+          kind: String(r.conversion_kind),
+          varianceNote: text(r.variance_note),
+          varianceReason: text(r.variance_reason),
+        }
+      : null,
   }
 }
 
@@ -49,18 +57,33 @@ function toReceiptLine(l: Record<string, unknown>): ReceiptLine {
     unit_price: figure(l.unitPrice),
     amount: Number(l.amount),
     blockedCode: text(l.blockedCode),
+    side: l.side === 'out' || l.side === 'in' ? l.side : null,
   }
 }
 
 /**
- * The gold column of a receipt: the gold type when every item is the same one
- * (with the count when there are several), "Nhiều loại (n món)" when they differ.
+ * The gold column of a row.
+ *
+ * A receipt: the gold type when every item is the same one (with the count when
+ * there are several), "Nhiều loại (n món)" when they differ. A conversion: the
+ * gold that went out and the gold that came in, "Vàng Grain → Rồng Phụng", or
+ * "Nhiều loại (n ra → m vào)" when either side holds more than one kind.
  */
 export function goldSummary(
-  row: Pick<ReceiptRow, 'lines'>,
+  row: Pick<ReceiptRow, 'lines' | 'conversion'>,
   goldName: (code: string) => string,
   t: (key: MessageKey) => string,
 ): string {
+  if (row.conversion) {
+    const out = row.lines.filter((l) => l.side === 'out')
+    const into = row.lines.filter((l) => l.side === 'in')
+    const kinds = (lines: ReceiptLine[]) => [...new Set(lines.map((l) => l.gold_type_code))]
+    const [outKinds, inKinds] = [kinds(out), kinds(into)]
+    if (outKinds.length === 1 && inKinds.length === 1) {
+      return `${goldName(outKinds[0])} → ${goldName(inKinds[0])}`
+    }
+    return t('conversion.summary').replace('{0}', String(out.length)).replace('{1}', String(into.length))
+  }
   const n = row.lines.length
   if (n === 0) return '—'
   if (new Set(row.lines.map((l) => l.gold_type_code)).size > 1) {
