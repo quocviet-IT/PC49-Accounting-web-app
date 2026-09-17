@@ -112,7 +112,7 @@ async function shownIn(form, label) {
 }
 /** A complete scrap purchase, everything but the payment method touched. */
 async function fillPurchase(form, { total = '250' } = {}) {
-  await selectOption(form, 'Loại vàng', 'Vàng vụn')
+  await selectOption(form, 'Loại vàng', 'Scrap Gold')
   await form.getByLabel('Số lượng', { exact: true }).fill('4.5')
   await form.getByLabel('Thành tiền', { exact: true }).fill(total)
   await form.getByLabel('Khách / NCC', { exact: true }).fill(PARTNER)

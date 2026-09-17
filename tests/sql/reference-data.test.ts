@@ -70,6 +70,21 @@ describe('gold types', () => {
     )
     expect(Number(r.rows[0].n)).toBe(0)
   })
+
+  it('calls scrap gold Scrap Gold in Vietnamese too, as the shop does', async () => {
+    // Renamed from "Vàng vụn" on 17-09-2026 (0081), with the three accounts
+    // that carry its name.
+    const g = await db.query<{ name_vi: string }>(
+      `SELECT name_vi FROM pc49.gold_type WHERE code = 'SG'`)
+    expect(g.rows).toEqual([{ name_vi: 'Scrap Gold' }])
+    const a = await db.query<{ code: string; name_vi: string }>(
+      `SELECT code, name_vi FROM pc49.account WHERE gold_type_code = 'SG' ORDER BY code`)
+    expect(a.rows).toEqual([
+      { code: '155SG', name_vi: 'NVL Scrap Gold' },
+      { code: '157SG', name_vi: 'Hàng gửi đi Scrap Gold' },
+      { code: '632SG', name_vi: 'Giá vốn Scrap Gold' },
+    ])
+  })
 })
 
 describe('chart of accounts', () => {

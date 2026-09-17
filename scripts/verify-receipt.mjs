@@ -32,12 +32,12 @@ const SCREEN = `${BASE}/gold-transactions?date=${DAY}`
 
 /** The six items on the paper: weight, purity, and the amount the receipt says. */
 const ITEMS = [
-  { desc: 'Nhẫn 24K (vụn)', gold: 'Vàng vụn', band: '19-24k/grs', qty: '9.40', purity: '0.987', total: '950' },
-  { desc: 'Mũ 24K (vụn)', gold: 'Vàng vụn', band: '19-24k/grs', qty: '7.50', purity: '0.981', total: '825' },
+  { desc: 'Nhẫn 24K (vụn)', gold: 'Scrap Gold', band: '19-24k/grs', qty: '9.40', purity: '0.987', total: '950' },
+  { desc: 'Mũ 24K (vụn)', gold: 'Scrap Gold', band: '19-24k/grs', qty: '7.50', purity: '0.981', total: '825' },
   { desc: 'Thỏi RCM', gold: 'Vàng Grain', band: null, qty: '15.60', purity: '0.998', total: '1900' },
-  { desc: 'Bi 24K (vụn)', gold: 'Vàng vụn', band: '19-24k/grs', qty: '37.50', purity: '0.990', total: '4125' },
+  { desc: 'Bi 24K (vụn)', gold: 'Scrap Gold', band: '19-24k/grs', qty: '37.50', purity: '0.990', total: '4125' },
   { desc: 'Xu Suisse 24K', gold: 'Vàng Grain', band: null, qty: '5.00', purity: '0.990', total: '525' },
-  { desc: 'Mặt dây 14K (vụn)', gold: 'Vàng vụn', band: '10-18k/grs', qty: '0.60', purity: '0.597', total: '36' },
+  { desc: 'Mặt dây 14K (vụn)', gold: 'Scrap Gold', band: '10-18k/grs', qty: '0.60', purity: '0.597', total: '36' },
 ]
 
 let failures = 0
@@ -123,7 +123,7 @@ try {
     await group.waitFor()
     await group.getByLabel('Mô tả món', { exact: true }).fill(it.desc)
     await choose(page, group, 'Loại vàng', it.gold)
-    if (it.band) await choose(page, group, 'Nhóm vàng vụn', it.band)
+    if (it.band) await choose(page, group, 'Nhóm Scrap Gold', it.band)
     await group.getByLabel('Số lượng', { exact: true }).fill(it.qty)
     await group.getByLabel('Tuổi vàng (0–1)', { exact: true }).fill(it.purity)
     await group.getByLabel('Thành tiền', { exact: true }).fill(it.total)

@@ -105,7 +105,7 @@ try {
   await page.getByRole('button', { name: 'Thêm giao dịch' }).first().click()
   const typed = page.getByRole('dialog', { name: 'Giao dịch mới', exact: true }).last()
   await typed.waitFor()
-  await selectOption(page, typed, 'Loại vàng', 'Vàng vụn')
+  await selectOption(page, typed, 'Loại vàng', 'Scrap Gold')
   await typed.getByLabel('Số lượng', { exact: true }).fill('20')
   await typed.getByLabel('Đơn giá', { exact: true }).fill('600')     // a slipped decimal
   await typed.getByLabel('Khách / NCC', { exact: true }).fill(PARTNER)

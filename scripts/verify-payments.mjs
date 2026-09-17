@@ -115,7 +115,7 @@ try {
   await page.getByRole('button', { name: 'Thêm giao dịch' }).first().click()
   const form = page.getByRole('dialog', { name: 'Giao dịch mới', exact: true }).last()
   await form.waitFor()
-  await selectOption(page, form, 'Loại vàng', 'Vàng vụn')
+  await selectOption(page, form, 'Loại vàng', 'Scrap Gold')
   await form.getByLabel('Số lượng', { exact: true }).fill('40')
   await form.getByLabel('Đơn giá', { exact: true }).fill('62.50')
   await form.getByLabel('Khách / NCC', { exact: true }).fill(PARTNER)
