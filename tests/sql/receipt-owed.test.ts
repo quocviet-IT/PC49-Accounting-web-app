@@ -66,11 +66,15 @@ describe('a purchase not paid in full', () => {
     expect(await booked(saved.receiptId)).toMatchObject({ owed: 0, stock: 8361, cash: 8361 })
   })
 
-  it('still refuses a deposit taken without its deposit', async () => {
-    await expect(save('deposit-unpaid', receiptPayload({
+  it('saves a deposit taken without money, with nothing on the books', async () => {
+    const saved = await save('deposit-unpaid', receiptPayload({
       partnerCode: 'DEP0', txnType: 'DEPOSIT', payments: [],
       lines: [{ itemDesc: 'RP', goldTypeCode: 'RP', uom: 'LUONG', qty: -1, unitPrice: 5000,
                 amount: 5000, scrapDetail: null, goldPct: null }],
-    }))).rejects.toThrow(/PAYMENT_SHORT: item 1/)
+    }))
+    const r = await db.query<{ entry: string | null }>(
+      `SELECT journal_entry_id::text AS entry FROM pc49.gold_txn WHERE receipt_id = $1`,
+      [saved.receiptId])
+    expect(r.rows).toEqual([{ entry: null }])
   })
 })
