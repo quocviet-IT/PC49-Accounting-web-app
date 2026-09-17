@@ -91,3 +91,49 @@ export type LedgerRow = SavedRow & {
   txn_date: string
   partner_phone: string | null
 }
+
+/** One item of a receipt, as the ledger lists it (pc49.gold_receipt_lines, 0076). */
+export type ReceiptLine = {
+  id: string
+  lineNo: number
+  itemDesc: string | null
+  gold_type_code: string
+  scrap_detail: string | null
+  gold_pct: number | null
+  uom: Uom
+  qty: number
+  unit_price: number | null
+  amount: number
+  /** 0071's code when this item cannot be corrected, or null. */
+  blockedCode: string | null
+}
+
+/**
+ * One receipt of the ledger (pc49.gold_receipt_ledger, 0076).
+ *
+ * A row written before receipts existed, or by the loader, a refining lot or a
+ * conversion, is a receipt of one item, and its `key` is its own id. Correcting
+ * and cancelling are asked for by `key` either way.
+ */
+export type ReceiptRow = {
+  key: string
+  receiptId: string | null
+  txn_date: string
+  doc_no: string | null
+  txn_type: string
+  partner_code: string | null
+  partner_phone: string | null
+  sales_person_code: string | null
+  remarks: string | null
+  /** What the screen was showing, so a correction can tell if it has moved. */
+  revision: number
+  /** The first blocked item's code when any item cannot be corrected, or null. */
+  blockedCode: string | null
+  /** What the items come to, signed as stored: a purchase is negative. */
+  amount: number
+  lines: ReceiptLine[]
+  /** What was paid on the receipt, one entry per method, in the order first used. */
+  payments: { seq: number; amount: number; method: string }[]
+  /** Who is credited with it, largest share first. */
+  soldBy: { code: string; sharePct: number }[]
+}
