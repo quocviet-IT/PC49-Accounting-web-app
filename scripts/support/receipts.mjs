@@ -25,3 +25,13 @@ export async function removeConversions(db, day) {
   await db.query(`DELETE FROM pc49.audit_log WHERE entity_type = 'gold_conversion'
                    AND entity_id NOT IN (SELECT id::text FROM pc49.gold_conversion)`)
 }
+
+/**
+ * Takes a check's later payments off the month it paid them in. Called before
+ * that month's entries go: a payment points at its entry and at its reversal.
+ */
+export async function removeSettlements(db, period) {
+  await db.query(`DELETE FROM pc49.gold_receipt_settlement WHERE to_char(pay_date, 'YYYY-MM') = $1`, [period])
+  await db.query(`DELETE FROM pc49.audit_log WHERE entity_type = 'gold_receipt_settlement'
+                   AND entity_id NOT IN (SELECT id::text FROM pc49.gold_receipt_settlement)`)
+}

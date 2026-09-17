@@ -146,7 +146,7 @@ try {
   await settle.getByLabel('Hình thức', { exact: true }).nth(1).click()
   await pickOption(page, 'BANKWIRE')
   check('paid in full, the form shows no difference',
-    (await settle.getByText(/Thanh toán (còn thiếu|nhiều hơn)/).count()) === 0)
+    (await settle.getByText(/Còn nợ|Thanh toán nhiều hơn/).count()) === 0)
 
   await form.getByRole('button', { name: 'Lưu', exact: true }).first().click()
 

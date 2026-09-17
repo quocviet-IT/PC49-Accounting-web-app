@@ -96,8 +96,8 @@ try {
 
   // ---- The exchange, typed once --------------------------------------------
   await page.goto(SCREEN, { waitUntil: 'networkidle' })
-  await page.getByRole('button', { name: 'Quy đổi vàng' }).first().click()
-  const form = page.getByRole('dialog', { name: 'Quy đổi vàng', exact: true }).last()
+  await page.getByRole('button', { name: 'Transfer', exact: true }).first().click()
+  const form = page.getByRole('dialog', { name: 'Transfer — quy đổi vàng', exact: true }).last()
   await form.waitFor()
   await form.getByLabel('Khách / NCC', { exact: true }).fill(PARTNER)
   await form.getByLabel('Ghi chú', { exact: true }).fill('Doi voi Nini')
@@ -157,7 +157,7 @@ try {
   const row = rows.first()
   const rowText = await shown(row)
   check('as a conversion, one line out into three in',
-    rowText.includes('Quy đổi') && rowText.includes('Nhiều loại (1 ra → 3 vào)'), rowText.slice(0, 160))
+    rowText.includes('TRANSFER') && rowText.includes('Nhiều loại (1 ra → 3 vào)'), rowText.slice(0, 160))
   check('moving 150 grams', rowText.includes('150.00 g'))
   await row.locator('.ant-table-row-expand-icon').click()
   const expanded = page.locator('.ant-table-expanded-row').first()
@@ -167,7 +167,7 @@ try {
 
   // ---- Corrected: the ounce of other gold was Grain after all --------------
   await page.getByRole('button', { name: 'Sửa', exact: true }).first().click()
-  const fix = page.getByRole('dialog', { name: 'Sửa quy đổi', exact: true }).last()
+  const fix = page.getByRole('dialog', { name: 'Sửa transfer', exact: true }).last()
   await fix.waitFor()
   check('the correction opens holding every leg',
     (await legs(fix, 'Ra').count()) === 1 && (await legs(fix, 'Vào').count()) === 3)
