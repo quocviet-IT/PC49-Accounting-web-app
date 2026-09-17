@@ -26,16 +26,28 @@ describe('the gold ledger as a file', () => {
     expect(sheet.header).toEqual([
       'Ngày', 'Số CT', 'Món', 'Mô tả món', 'Loại', 'Khách / NCC', 'SĐT khách', 'Sales',
       'Loại vàng', 'Tuổi vàng', 'Số lượng', 'ĐVT', 'Gram', 'Gram tinh', 'Đơn giá',
-      'Thành tiền', 'Thanh toán', 'Ghi chú',
+      'Thành tiền', 'Thanh toán', 'Đã trả', 'Còn nợ', 'Ghi chú',
     ])
     expect(sheet.rows).toEqual([
       ['2026-09-16', 'PC49-2609-010', 1, 'Nhẫn 24K (vụn)', 'PO', 'Nguyen Van A', '090 123 4567',
         'T.Quỳnh 80% · L.Thanh 20%', 'Vàng vụn', '19-24k/grs · 0.987', 9.4, 'GRAM', 9.4, 9.2778,
-        101.06382979, -950, '950 CASH · 1900 BANKWIRE', 'Giao, "gấp"'],
+        101.06382979, -950, '950 CASH · 1900 BANKWIRE', 2850, 0, 'Giao, "gấp"'],
       ['2026-09-16', 'PC49-2609-010', 2, 'Thỏi RCM', 'PO', 'Nguyen Van A', '090 123 4567',
         'T.Quỳnh 80% · L.Thanh 20%', 'Vàng Grain', '0.998', 15.6, 'GRAM', 15.6, 15.5688,
-        121.79487179, -1900, null, 'Giao, "gấp"'],
+        121.79487179, -1900, null, null, null, 'Giao, "gấp"'],
     ])
+  })
+
+  it('says on the first line what was paid, later payments too, and what is owed', () => {
+    const owing: ReceiptRow = {
+      ...receipt,
+      payments: [{ seq: 1, amount: 950, method: 'CASH' }],
+      settlements: [{ id: 's1', payDate: '2026-09-20', amount: 1000, method: 'ZELLE', note: null }],
+      owed: 900,
+    }
+    const [first, second] = ledgerSheet([owing], 'vi', gold).rows
+    expect(first.slice(16, 19)).toEqual(['950 CASH · 1000 ZELLE 2026-09-20', 1950, 900])
+    expect(second.slice(16, 19)).toEqual([null, null, null])
   })
 
   it('adds up, down the amount column, to what the receipts came to', () => {

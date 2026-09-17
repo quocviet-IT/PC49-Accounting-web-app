@@ -15,6 +15,9 @@ export function blockedSentence(code: string | null, t: Translate): string | nul
   return sentence === key ? t('txn.blocked.OTHER') : sentence
 }
 
+const cents = (figure: string) =>
+  Number(figure).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
 /**
  * A refusal from the books, in words the accountant reads.
  *
@@ -51,6 +54,20 @@ export function describeRefusal(message: string, t: Translate): string {
   if (/CONVERSION_RA_RP/.test(message)) return t('conversion.err.raRp')
   if (/CONVERSION_REFINING/.test(message)) return t('txn.blocked.REFINING_LEG')
   if (/CONVERSION_VOIDED/.test(message)) return t('txn.blocked.VOIDED')
+
+  // A later payment's refusals (0083) carry the figures and the days to say.
+  const over = /SETTLEMENT_OVER: owed ([\d.]+) paid ([\d.]+)/.exec(message)
+  if (over) return t('settle.err.over').replace('{0}', cents(over[1])).replace('{1}', cents(over[2]))
+  const early = /SETTLEMENT_DATE: receipt (\d{4}-\d{2}-\d{2})/.exec(message)
+  if (early) return t('settle.err.date').replace('{0}', early[1])
+  const closed = /SETTLEMENT_PERIOD: (\d{4}-\d{2})/.exec(message)
+  if (closed) return t('settle.err.period').replace('{0}', closed[1])
+  if (/SETTLEMENT_KIND/.test(message)) return t('settle.err.kind')
+  if (/SETTLEMENT_AMOUNT/.test(message)) return t('settle.err.amount')
+  if (/SETTLEMENT_OLD_POSTING/.test(message)) return t('settle.err.oldPosting')
+  if (/SETTLEMENT_VOIDED/.test(message)) return t('settle.err.voided')
+  const standing = /RECEIPT_HAS_SETTLEMENTS: (\d+)/.exec(message)
+  if (standing) return t('receipt.err.hasSettlements').replace('{0}', standing[1])
 
   const short = /PAYMENT_SHORT: item (\d+)/.exec(message)
   if (short) return t('receipt.err.paymentShort').replace('{0}', short[1])

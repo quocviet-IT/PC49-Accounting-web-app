@@ -9,6 +9,10 @@ const EMPTY = {
 }
 
 describe('reading the ledger filter from the address', () => {
+  it('takes the receipts still owed as a payment filter', () => {
+    expect(parseLedgerQuery({ method: 'OWED' }).method).toBe('OWED')
+  })
+
   it('shows everything, newest first, when nothing is asked for', () => {
     expect(parseLedgerQuery({})).toEqual(EMPTY)
   })

@@ -41,6 +41,30 @@ describe('a row of the receipt ledger', () => {
   })
 })
 
+describe('what was paid later, and what is owed', () => {
+  it('reads the later payments and what is owed as numbers', () => {
+    const row = toReceiptRow({
+      receipt_key: 'k2', receipt_id: 'k2', txn_date: '2026-09-16', doc_no: 'PC49-2609-011',
+      txn_type: 'PO', revision: 1, amount: '-8361.00', lines: [], sold_by: [],
+      payments: [{ seq: 1, amount: '5000.00', method: 'CASH' }],
+      settlements: [{ id: 's1', payDate: '2026-09-20', amount: '2000.00', method: 'ZELLE', note: null }],
+      owed: '1361.00',
+    })
+    expect(row.settlements).toEqual([
+      { id: 's1', payDate: '2026-09-20', amount: 2000, method: 'ZELLE', note: null },
+    ])
+    expect(row.owed).toBe(1361)
+  })
+
+  it('reads a row without them as owing nothing', () => {
+    const row = toReceiptRow({
+      receipt_key: 'k3', txn_date: '2026-09-16', txn_type: 'PO', lines: [], payments: [], sold_by: [],
+    })
+    expect(row.settlements).toEqual([])
+    expect(row.owed).toBe(0)
+  })
+})
+
 describe('what a receipt is called in the gold column', () => {
   it('is the gold type for one item', () => {
     expect(goldSummary({ lines: [line({})] }, gold, say)).toBe('Vàng vụn')

@@ -17,6 +17,7 @@ export function toReceiptRow(r: Record<string, unknown>): ReceiptRow {
   const lines = (r.lines ?? []) as Record<string, unknown>[]
   const payments = (r.payments ?? []) as { seq: unknown; amount: unknown; method: unknown }[]
   const soldBy = (r.sold_by ?? []) as { code: unknown; sharePct: unknown }[]
+  const settlements = (r.settlements ?? []) as Record<string, unknown>[]
   return {
     key: String(r.receipt_key),
     receiptId: text(r.receipt_id),
@@ -41,6 +42,14 @@ export function toReceiptRow(r: Record<string, unknown>): ReceiptRow {
           varianceReason: text(r.variance_reason),
         }
       : null,
+    settlements: settlements.map((s) => ({
+      id: String(s.id),
+      payDate: String(s.payDate),
+      amount: Number(s.amount),
+      method: String(s.method),
+      note: text(s.note),
+    })),
+    owed: Number(r.owed ?? 0),
   }
 }
 

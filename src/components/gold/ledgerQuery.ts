@@ -19,6 +19,10 @@ export const LEDGER_TXN_TYPES = [
 export const PAGE_SIZES = [20, 50, 100] as const
 export const DEFAULT_PAGE_SIZE = 50
 
+/** Not a way of paying: the receipts something is still owed on (0084). */
+export const OWED = 'OWED'
+export const PAYMENT_FILTERS = [...PAYMENT_METHODS, OWED] as const
+
 export type LedgerStatus = 'correctable' | 'locked'
 
 export type LedgerQuery = {
@@ -82,7 +86,7 @@ export function parseLedgerQuery(params: Params): LedgerQuery {
     type: oneOf(first(params.type), LEDGER_TXN_TYPES),
     gold: code(first(params.gold), 40),
     staff: code(first(params.staff), 40),
-    method: oneOf(first(params.method), PAYMENT_METHODS),
+    method: oneOf(first(params.method), PAYMENT_FILTERS),
     status: oneOf(first(params.status), ['correctable', 'locked'] as const),
     q: (first(params.q) ?? '').trim().slice(0, 100),
     page: Number.isInteger(page) && page >= 1 ? page : 1,

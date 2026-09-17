@@ -86,6 +86,15 @@ export type ConversionInfo = {
   varianceReason: string | null
 }
 
+/** A payment made after the receipt, on its own day (0083). */
+export type Settlement = {
+  id: string
+  payDate: string
+  amount: number
+  method: string
+  note: string | null
+}
+
 /**
  * One receipt of the ledger (pc49.gold_receipt_ledger, 0076).
  *
@@ -116,4 +125,8 @@ export type ReceiptRow = {
   soldBy: { code: string; sharePct: number }[]
   /** Set when the row is a conversion rather than a receipt (0080). */
   conversion?: ConversionInfo | null
+  /** Payments made after the receipt, still standing, oldest first (0084). */
+  settlements?: Settlement[]
+  /** What is still owed on it; nothing when absent (0084). */
+  owed?: number
 }

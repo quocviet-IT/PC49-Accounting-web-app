@@ -33,6 +33,21 @@ describe('a refusal from the books, in the reader’s language', () => {
       .toBe(say('txn.err.noPayments'))
   })
 
+  it('says what is wrong with a later payment', () => {
+    expect(describeRefusal('SETTLEMENT_OVER: owed 3361.00 paid 4000.00', say))
+      .toBe('Số tiền 4,000.00 lớn hơn số còn nợ 3,361.00.')
+    expect(describeRefusal('SETTLEMENT_DATE: receipt 2026-06-02, paid 2026-06-01; …', say))
+      .toBe('Ngày trả không được trước ngày của phiếu (2026-06-02).')
+    expect(describeRefusal('SETTLEMENT_PERIOD: 2026-11 is closed; …', say))
+      .toBe('Tháng 2026-11 đã khoá sổ. Chọn ngày trả trong tháng còn mở.')
+    expect(describeRefusal('SETTLEMENT_KIND: only a purchase …', say)).toBe(say('settle.err.kind'))
+    expect(describeRefusal('SETTLEMENT_AMOUNT: a payment …', say)).toBe(say('settle.err.amount'))
+    expect(describeRefusal('SETTLEMENT_OLD_POSTING: this purchase …', say)).toBe(say('settle.err.oldPosting'))
+    expect(describeRefusal('SETTLEMENT_VOIDED: this payment …', say)).toBe(say('settle.err.voided'))
+    expect(describeRefusal('RECEIPT_HAS_SETTLEMENTS: 2 later payment(s) …', say))
+      .toBe(say('receipt.err.hasSettlements').replace('{0}', '2'))
+  })
+
   it('passes anything else through as it came', () => {
     expect(describeRefusal('the period 2019-10 is closed', say)).toBe('the period 2019-10 is closed')
   })
