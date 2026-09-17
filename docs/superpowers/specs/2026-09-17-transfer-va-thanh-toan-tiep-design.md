@@ -37,6 +37,7 @@ Phiếu bán đã đúng: Nợ 131 / Có 511 đủ giá trị, mỗi khoản tr�
 - `post_gold_txn`, nhánh PO/PO_VENDOR: vẫn một dòng Nợ kho / Có tiền cho mỗi khoản đã trả. Nếu đã trả ít hơn giá trị phiếu, thêm **Nợ kho / Có 331** phần còn lại. Trọng lượng vẫn nằm ở dòng đầu (dòng 331 nếu chưa trả đồng nào).
   - Phiếu trả đủ ghi y như trước: không đổi bút toán nào đang có, không đổi báo cáo.
   - Trả dư giữ như hiện nay (chính sách trả dư còn chờ quyết).
+- Bộ nạp Excel (`post_import_batch`, 0064) giữ nguyên độ khắt khe: dòng nạp là phiếu mua **không có khoản thanh toán nào** vẫn bị nêu tên để người nạp xem lại, không tự thành nợ 331. Ô thanh toán trống trong sheet có thể chỉ là sót.
 - Form: bỏ lỗi "phải có ít nhất một khoản thanh toán" cho phiếu mua, giữ cho đặt cọc. Cảnh báo trả thiếu thành **"Còn nợ {0}. Vẫn lưu được; phần còn lại thanh toán tiếp trên sổ."**
 
 ### 3. Thanh toán tiếp (0083)
