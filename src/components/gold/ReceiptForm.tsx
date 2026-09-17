@@ -59,8 +59,14 @@ const EMPTY_LINE: LineField = {
 /** The figures of an item that follow one another when one is typed. */
 const FIGURES: Typed[] = ['qty', 'goldPct', 'finePrice', 'unitPrice', 'total']
 
-/** The types the books will not post without a payment (post_gold_txn, 0015). */
-const NEEDS_PAYMENT = new Set(['PO', 'PO_VENDOR', 'DEPOSIT'])
+/**
+ * The types refused without a payment. Only a deposit: a purchase or a sale may
+ * be paid later, and what is owed goes to the books as owed (0082, 0083).
+ */
+const NEEDS_PAYMENT = new Set(['DEPOSIT'])
+
+/** Not a kind of receipt: choosing it opens the conversion form (17-09). */
+const TRANSFER = 'TRANSFER'
 
 /** The shares an order divides into, by how many people are on it (B6). */
 function sharesFor(people: string[]): { code: string; sharePct: number }[] {
@@ -91,10 +97,12 @@ const asNumber = (value: number | string | null | undefined): number | null =>
  * the reversal and the replacement happen in one database transaction.
  */
 export function ReceiptForm({
-  open, onClose, onSaved, txnDate, goldTypes, salesPeople, partners, correcting,
+  open, onClose, onSaved, txnDate, goldTypes, salesPeople, partners, correcting, onTransfer,
 }: {
   open: boolean
   onClose: () => void
+  /** "Không có phân loại Transfer": TRANSFER in the type list opens the conversion form, for this day. */
+  onTransfer?: (txnDate: string) => void
   /** Called with the number the receipt was given, and whether the form stays open. */
   onSaved: (docNo: string | null, stayOpen: boolean) => void
   txnDate: string
@@ -118,11 +126,21 @@ export function ReceiptForm({
    */
   const [dirty, setDirty] = useState(false)
   const [confirmClose, setConfirmClose] = useState(false)
+  /** Where the form goes once leaving is confirmed: away, or on to a transfer. */
+  const leaveTo = useRef<'close' | 'transfer'>('close')
   const topRef = useRef<HTMLDivElement>(null)
 
   function requestClose() {
+    leaveTo.current = 'close'
     if (dirty) setConfirmClose(true)
     else onClose()
+  }
+
+  /** On to a conversion: asked first, like closing, when something has been typed. */
+  function requestTransfer() {
+    leaveTo.current = 'transfer'
+    if (dirty) setConfirmClose(true)
+    else onTransfer?.(form.getFieldValue('txnDate'))
   }
 
   // Reloading or closing the tab loses the same input.
@@ -180,6 +198,9 @@ export function ReceiptForm({
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [correcting])
+
+  /** The receipt type before TRANSFER was chosen, to put back when it is. */
+  const lastType = useRef<string>(initial.txnType)
 
   const txnType = (Form.useWatch('txnType', form) ?? initial.txnType) as string
   const lines = (Form.useWatch('lines', form) ?? []) as (LineField | undefined)[]
@@ -276,6 +297,7 @@ export function ReceiptForm({
       // so it cannot be mistaken for a retry of this one.
       requestKey.current = crypto.randomUUID()
       form.resetFields()
+      lastType.current = initial.txnType
       form.setFieldValue('txnDate', v.txnDate)
       setDirty(false)
       setLastSaved(result.docNo)
@@ -312,7 +334,16 @@ export function ReceiptForm({
     >
       <Form<Values> form={form} layout="vertical" initialValues={initial}
                     className={styles.form} scrollToFirstError
-                    onValuesChange={() => { setDirty(true); setValidationError(false) }}>
+                    onValuesChange={(changed: Partial<Values>) => {
+                      if (changed.txnType === TRANSFER) {
+                        form.setFieldValue('txnType', lastType.current)
+                        requestTransfer()
+                        return
+                      }
+                      if (changed.txnType) lastType.current = changed.txnType
+                      setDirty(true)
+                      setValidationError(false)
+                    }}>
         <div ref={topRef} />
         {validationError && (
           <Alert type="error" showIcon role="alert" title={t('txn.form.checkFields')} />
@@ -361,7 +392,10 @@ export function ReceiptForm({
             <Col xs={24} sm={8}>
               <Form.Item name="txnType" label={t('txn.col.type')}
                          rules={[{ required: true, message: t('txn.form.required') }]}>
-                <Select options={TXN_TYPES.map((v) => ({ value: v, label: v }))} />
+                <Select options={[
+                  ...TXN_TYPES.map((v) => ({ value: v, label: v })),
+                  ...(correcting || !onTransfer ? [] : [{ value: TRANSFER, label: t('txn.type.transfer') }]),
+                ]} />
               </Form.Item>
             </Col>
           </Row>
@@ -557,7 +591,7 @@ export function ReceiptForm({
           <Form.List
             name="payments"
             rules={[{
-              // The books refuse a purchase or a deposit with no payment on it.
+              // A deposit needs its deposit; anything else may be paid later.
               validator: async (_, list: PaymentField[] | undefined) => {
                 if (!NEEDS_PAYMENT.has(form.getFieldValue('txnType'))) return
                 const complete = (list ?? []).some((p) => Number(p?.amount ?? 0) > 0 && p?.method)
@@ -631,7 +665,12 @@ export function ReceiptForm({
         okText={t('txn.form.discard')}
         okButtonProps={{ danger: true }}
         cancelText={t('txn.form.keepEditing')}
-        onOk={() => { setConfirmClose(false); setDirty(false); onClose() }}
+        onOk={() => {
+          setConfirmClose(false)
+          setDirty(false)
+          if (leaveTo.current === 'transfer') onTransfer?.(form.getFieldValue('txnDate'))
+          else onClose()
+        }}
         onCancel={() => setConfirmClose(false)}
       >
         {t('txn.form.unsavedBody')}

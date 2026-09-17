@@ -5,7 +5,7 @@ import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Alert, Button, Input, Modal, Select, Space, Tag, Typography } from 'antd'
-import { ArrowLeftRight, Ban, Download, Pencil, Plus } from 'lucide-react'
+import { ArrowLeftRight, Ban, Banknote, Download, Pencil, Plus } from 'lucide-react'
 import { IconAction } from '@/components/ui/IconAction'
 import { TxnTypeTag } from './TxnTypeTag'
 import type { ColumnsType } from 'antd/es/table'
@@ -17,12 +17,14 @@ import { DataTable } from '@/components/ui/DataTable'
 import { ListToolbar } from '@/components/ui/ListToolbar'
 import { ReceiptForm } from './ReceiptForm'
 import { ConversionForm } from './ConversionForm'
+import { SettlementForm } from './SettlementForm'
 import { ReceiptLines } from './ReceiptLines'
 import { goldSummary } from './ledgerRow'
 import { blockedSentence, describeRefusal } from './receiptErrors'
+import { canSettle, owes } from './settlement'
 import { PAYMENT_METHODS, type GoldTypeOption, type ReceiptRow } from './types'
 import {
-  DEFAULT_PAGE_SIZE, LEDGER_TXN_TYPES, PAGE_SIZES, ledgerSearch, presetRange, singleDay,
+  DEFAULT_PAGE_SIZE, LEDGER_TXN_TYPES, OWED, PAGE_SIZES, ledgerSearch, presetRange, singleDay,
   type LedgerQuery, type Preset,
 } from './ledgerQuery'
 import styles from './Txn.module.css'
@@ -82,8 +84,13 @@ export function TxnScreen({
 
   /** Open with no receipt for a fresh one, with a receipt to replace it. */
   const [editing, setEditing] = useState<{ correcting: ReceiptRow | null } | null>(null)
-  /** Open with no row for a fresh conversion, with a conversion row to replace it. */
-  const [converting, setConverting] = useState<{ correcting: ReceiptRow | null } | null>(null)
+  /**
+   * Open with no row for a fresh conversion, with a conversion row to replace
+   * it. A conversion reached from the receipt form's type list keeps its day.
+   */
+  const [converting, setConverting] = useState<{ correcting: ReceiptRow | null; date?: string } | null>(null)
+  /** The receipt whose later payments are open. */
+  const [settling, setSettling] = useState<ReceiptRow | null>(null)
   const [voidRow, setVoidRow] = useState<ReceiptRow | null>(null)
   const [voidReason, setVoidReason] = useState('')
   const [voiding, setVoiding] = useState(false)
@@ -172,7 +179,8 @@ export function TxnScreen({
     </Button>
   )
 
-  // "cai transfer dau?" (17-09): converting gold is entered beside a receipt.
+  // "cai transfer dau?" (17-09): converting gold is entered beside a receipt,
+  // and called Transfer, as the sheets call it ("Không có phân loại Transfer").
   const convertButton = (
     <Button icon={<ArrowLeftRight size={16} aria-hidden />}
             onClick={() => setConverting({ correcting: null })}>
@@ -224,9 +232,10 @@ export function TxnScreen({
     },
     {
       title: t('txn.col.type'), dataIndex: 'txn_type', width: 112,
+      // A conversion is named by its code, as PO and SALE are.
       render: (v: string, r) => (r.conversion
         ? <Tag color="purple" className="pc-txn-type">
-            {t(r.conversion.kind === 'RA_RP' ? 'conversion.kind.RA_RP' : 'conversion.kind.TRANSFER')}
+            {r.conversion.kind === 'RA_RP' ? 'RA_RP' : 'TRANSFER'}
           </Tag>
         : <TxnTypeTag type={v} />),
     },
@@ -303,6 +312,17 @@ export function TxnScreen({
               {money.format(p.amount)} {p.method}
             </Typography.Text>
           ))}
+          {/* Paid later, each on its own day (0083), then what is still owed. */}
+          {(r.settlements ?? []).map((s) => (
+            <Typography.Text key={s.id} type="secondary" style={{ display: 'block' }}>
+              {money.format(s.amount)} {s.method} · {s.payDate}
+            </Typography.Text>
+          ))}
+          {owes(r) && (
+            <Typography.Text type="danger" style={{ display: 'block' }}>
+              {t('receipt.owed').replace('{0}', money.format(r.owed ?? 0))}
+            </Typography.Text>
+          )}
         </>
       )),
     },
@@ -321,9 +341,13 @@ export function TxnScreen({
     },
     {
       // Icons pinned to the right, so Sửa can be pressed without scrolling.
-      title: t('txn.col.actions'), key: 'actions', width: 84, fixed: 'right',
+      title: t('txn.col.actions'), key: 'actions', width: 116, fixed: 'right',
       render: (_: unknown, r) => (
         <Space size={2}>
+          {canSettle(r) && (
+            <IconAction icon={<Banknote size={16} aria-hidden />} label={t('settle.open')}
+                        onClick={() => setSettling(r)} />
+          )}
           <IconAction icon={<Pencil size={16} aria-hidden />} label={t('txn.correct')}
                       disabled={Boolean(r.blockedCode)}
                       disabledReason={blockedSentence(r.blockedCode, t)}
@@ -397,7 +421,10 @@ export function TxnScreen({
             value={query.method}
             aria-label={t('txn.filter.payment')}
             placeholder={t('txn.filter.payment')}
-            options={PAYMENT_METHODS.map((value) => ({ value, label: value }))}
+            options={[
+              ...PAYMENT_METHODS.map((value) => ({ value, label: value })),
+              { value: OWED, label: t('txn.filter.owed') },
+            ]}
             onChange={(value) => go({ method: value ?? null })}
           />
           <Select
@@ -473,6 +500,10 @@ export function TxnScreen({
           partners={partners}
           correcting={editing.correcting}
           onClose={() => setEditing(null)}
+          onTransfer={(date) => {
+            setEditing(null)
+            setConverting({ correcting: null, date })
+          }}
           onSaved={(docNo, stayOpen) => {
             setToast(docNo ? `${t('txn.form.savedAs')} ${docNo}` : t('txn.saved'))
             if (!stayOpen) setEditing(null)
@@ -486,7 +517,7 @@ export function TxnScreen({
           open
           // A correction keeps its day; a fresh conversion takes the day being
           // looked at, or today.
-          convDate={converting.correcting?.txn_date ?? singleDay(query) ?? today}
+          convDate={converting.correcting?.txn_date ?? converting.date ?? singleDay(query) ?? today}
           goldTypes={goldTypes}
           partners={partners}
           flowRules={flowRules}
@@ -496,6 +527,19 @@ export function TxnScreen({
           onSaved={(docNo, stayOpen) => {
             setToast(docNo ? `${t('txn.form.savedAs')} ${docNo}` : t('txn.saved'))
             if (!stayOpen) setConverting(null)
+            router.refresh()
+          }}
+        />
+      )}
+
+      {settling && (
+        <SettlementForm
+          row={settling}
+          today={today}
+          onClose={() => setSettling(null)}
+          onDone={(message) => {
+            setSettling(null)
+            setToast(message)
             router.refresh()
           }}
         />

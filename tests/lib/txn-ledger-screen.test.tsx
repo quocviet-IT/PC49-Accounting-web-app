@@ -47,6 +47,23 @@ const sale: ReceiptRow = {
 }
 
 describe('the gold ledger screen', () => {
+  it('offers Transfer beside a new receipt', () => {
+    expect(text(<TxnScreen {...base} />)).toContain('Xuất Excel Transfer Thêm giao dịch')
+  })
+
+  it('shows what was paid later and what is still owed on a row', () => {
+    const owing: ReceiptRow = {
+      ...sale, key: '9', doc_no: 'PC49-2609-020',
+      payments: [{ seq: 1, amount: 3000, method: 'CASH' }],
+      settlements: [{ id: 's1', payDate: '2026-09-20', amount: 1000, method: 'ZELLE', note: null }],
+      owed: 1425,
+    }
+    const html = text(<TxnScreen {...base} rows={[owing]}
+      totals={{ count: 1, purchases: 0, sales: 5425, grams: {} }} />)
+    expect(html).toContain('1,000.00 ZELLE · 2026-09-20')
+    expect(html).toContain('Còn nợ 1,425.00')
+  })
+
   it('says the ledger could not be read, and offers nothing to type into', () => {
     const html = text(<TxnScreen {...base} loadFailed />)
     expect(html).toContain('Không tải được dữ liệu')
@@ -118,7 +135,7 @@ describe('the gold ledger screen', () => {
     }
     const html = text(<TxnScreen {...base} rows={[conversion]}
       totals={{ count: 1, purchases: 0, sales: 0, grams: {} }} />)
-    expect(html).toContain('Quy đổi vàng')
+    expect(html).toContain('PC49-2606-040 TRANSFER ')
     expect(html).toContain('PC49-2606-040')
     expect(html).toContain('GRAIN → Rồng Phụng')
     expect(html).toContain('637.50 g')

@@ -315,3 +315,63 @@ export async function voidConversion(input: unknown): Promise<ReceiptVoidResult>
   revalidatePath('/gold-transactions')
   return { ok: true, lines: Number(data ?? 0) }
 }
+
+const settlementSchema = z.object({
+  // Stable for the life of one payment on screen, so pressing Save twice is one payment.
+  requestKey: z.string().uuid(),
+  key: z.string().uuid(),
+  payDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  amount: z.number().positive('the amount must be more than zero'),
+  method: z.enum(PAYMENT_METHODS),
+  note: z.string().trim().max(500).nullable().default(null),
+})
+
+export type SettlementResult =
+  | { ok: true; id: string; owed: number; repeated: boolean }
+  | { ok: false; message: string }
+
+/**
+ * Records a payment made after the receipt, on the day it was made, and posts
+ * it (0083). The receipt itself is not touched.
+ */
+export async function saveSettlement(input: unknown): Promise<SettlementResult> {
+  const parsed = settlementSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Invalid payment' }
+  }
+  const s = parsed.data
+  const supabase = await createServerSupabase()
+  const { data, error } = await supabase.rpc('save_receipt_settlement', {
+    p_request_key: s.requestKey,
+    p_receipt_key: s.key,
+    p_payload: { payDate: s.payDate, amount: s.amount, method: s.method, note: s.note },
+  })
+  if (error) return { ok: false, message: error.message }
+
+  const result = data as { settlementId: string; owed: number | string; repeated: boolean }
+  revalidatePath('/gold-transactions')
+  return { ok: true, id: result.settlementId, owed: Number(result.owed), repeated: result.repeated }
+}
+
+const settlementVoidSchema = z.object({
+  id: z.string().uuid(),
+  reason: z.string().trim().min(3, 'say why in a few words'),
+})
+
+/** Cancels a later payment: its entry reversed on its own day (0083). */
+export async function voidSettlement(input: unknown): Promise<{ ok: true } | { ok: false; message: string }> {
+  const parsed = settlementVoidSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Invalid request' }
+  }
+  const supabase = await createServerSupabase()
+  const { error } = await supabase.rpc('void_receipt_settlement', {
+    p_id: parsed.data.id,
+    p_reason: parsed.data.reason,
+    p_on_date: null,
+  })
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/gold-transactions')
+  return { ok: true }
+}
