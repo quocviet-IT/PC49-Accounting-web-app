@@ -72,6 +72,18 @@ export type ReceiptLine = {
   amount: number
   /** 0071's code when this item cannot be corrected, or null. */
   blockedCode: string | null
+  /** Which side of a conversion the leg is on (0080); absent or null on a receipt. */
+  side?: 'out' | 'in' | null
+}
+
+/** What makes a ledger row a conversion (0080). */
+export type ConversionInfo = {
+  id: string
+  kind: string
+  /** Written by the database when the two sides are further apart than the tolerance (0014). */
+  varianceNote: string | null
+  /** Written by the person who saved it, explaining the difference. */
+  varianceReason: string | null
 }
 
 /**
@@ -102,4 +114,6 @@ export type ReceiptRow = {
   payments: { seq: number; amount: number; method: string }[]
   /** Who is credited with it, largest share first. */
   soldBy: { code: string; sharePct: number }[]
+  /** Set when the row is a conversion rather than a receipt (0080). */
+  conversion?: ConversionInfo | null
 }
