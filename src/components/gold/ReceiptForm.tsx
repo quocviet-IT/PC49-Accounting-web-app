@@ -60,10 +60,10 @@ const EMPTY_LINE: LineField = {
 const FIGURES: Typed[] = ['qty', 'goldPct', 'finePrice', 'unitPrice', 'total']
 
 /**
- * The types refused without a payment. Only a deposit: a purchase or a sale may
- * be paid later, and what is owed goes to the books as owed (0082, 0083).
+ * The types typed on this form. A pickup is not among them: it is written from
+ * the deposit it collects, with the "Lấy hàng" action on that row (0087).
  */
-const NEEDS_PAYMENT = new Set(['DEPOSIT'])
+const ENTRY_TYPES = TXN_TYPES.filter((v) => v !== 'PICKUP')
 
 /** Not a kind of receipt: choosing it opens the conversion form (17-09). */
 const TRANSFER = 'TRANSFER'
@@ -393,7 +393,7 @@ export function ReceiptForm({
               <Form.Item name="txnType" label={t('txn.col.type')}
                          rules={[{ required: true, message: t('txn.form.required') }]}>
                 <Select options={[
-                  ...TXN_TYPES.map((v) => ({ value: v, label: v })),
+                  ...ENTRY_TYPES.map((v) => ({ value: v, label: v })),
                   ...(correcting || !onTransfer ? [] : [{ value: TRANSFER, label: t('txn.type.transfer') }]),
                 ]} />
               </Form.Item>
@@ -587,18 +587,12 @@ export function ReceiptForm({
         </section>
 
         <section className={styles.section} aria-labelledby="txn-settle-heading">
-          <h3 id="txn-settle-heading" className={styles.sectionHeading}>{t('txn.form.settle')}</h3>
-          <Form.List
-            name="payments"
-            rules={[{
-              // A deposit needs its deposit; anything else may be paid later.
-              validator: async (_, list: PaymentField[] | undefined) => {
-                if (!NEEDS_PAYMENT.has(form.getFieldValue('txnType'))) return
-                const complete = (list ?? []).some((p) => Number(p?.amount ?? 0) > 0 && p?.method)
-                if (!complete) throw new Error(t('txn.form.paymentRequired'))
-              },
-            }]}
-          >
+          <h3 id="txn-settle-heading" className={styles.sectionHeading}>
+            {t(txnType === 'DEPOSIT' ? 'receipt.depositPaid' : 'txn.form.settle')}
+          </h3>
+          {/* Nothing is refused for its money: a purchase or a sale may be paid
+              later (0082), and a deposit taken with nothing down (0086). */}
+          <Form.List name="payments">
             {(fields, { add, remove }, { errors }) => (
               <>
                 {fields.map((field) => (
@@ -650,7 +644,8 @@ export function ReceiptForm({
             <Alert type="warning" showIcon role="status" className={styles.gap}
                    title={gap > 0
                      ? t('receipt.gap.over').replace('{0}', money.format(gap))
-                     : t('receipt.gap.under').replace('{0}', money.format(-gap))} />
+                     : t(txnType === 'DEPOSIT' ? 'receipt.gap.depositLeft' : 'receipt.gap.under')
+                       .replace('{0}', money.format(-gap))} />
           )}
 
           <Form.Item name="remarks" label={t('txn.col.remarks')} style={{ marginTop: 16 }}>

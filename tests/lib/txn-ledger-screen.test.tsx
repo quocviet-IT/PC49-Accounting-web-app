@@ -51,6 +51,27 @@ describe('the gold ledger screen', () => {
     expect(text(<TxnScreen {...base} />)).toContain('Xuất Excel Transfer Thêm giao dịch')
   })
 
+  it('says on a deposit what is left and that it waits, and on a pickup when the deposit was taken', () => {
+    const deposit: ReceiptRow = {
+      ...sale, key: 'd', doc_no: 'PC49-2609-005', txn_type: 'DEPOSIT', amount: 5300,
+      payments: [{ seq: 1, amount: 1000, method: 'CASH' }],
+      deposit: { role: 'deposit', orderValue: 5300, paid: 1000, settledBy: null, pickupDate: null,
+                 pickupDoc: null, depositDate: null, depositDoc: null },
+    }
+    const pickup: ReceiptRow = {
+      ...sale, key: 'p', doc_no: 'PC49-2609-021', txn_type: 'PICKUP', amount: 5300,
+      payments: [{ seq: 1, amount: 4300, method: 'CASH' }],
+      deposit: { role: 'pickup', orderValue: 5300, paid: 1000, settledBy: null, pickupDate: null,
+                 pickupDoc: null, depositDate: '2026-09-08', depositDoc: 'PC49-2609-005' },
+    }
+    const html = text(<TxnScreen {...base} rows={[pickup, deposit]}
+      totals={{ count: 2, purchases: 0, sales: 5300, grams: {} }} />)
+    expect(html).toContain('Chờ lấy hàng')
+    expect(html).toContain('Còn lại 4,300.00')
+    expect(html).toContain('Cọc 2026-09-08 PC49-2609-005')
+    expect(html).toContain('Đã cọc 1,000.00')
+  })
+
   it('shows what was paid later and what is still owed on a row', () => {
     const owing: ReceiptRow = {
       ...sale, key: '9', doc_no: 'PC49-2609-020',

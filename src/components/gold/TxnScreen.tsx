@@ -5,7 +5,7 @@ import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Alert, Button, Input, Modal, Select, Space, Tag, Typography } from 'antd'
-import { ArrowLeftRight, Ban, Banknote, Download, Pencil, Plus } from 'lucide-react'
+import { ArrowLeftRight, Ban, Banknote, Download, PackageCheck, Pencil, Plus } from 'lucide-react'
 import { IconAction } from '@/components/ui/IconAction'
 import { TxnTypeTag } from './TxnTypeTag'
 import type { ColumnsType } from 'antd/es/table'
@@ -18,6 +18,8 @@ import { ListToolbar } from '@/components/ui/ListToolbar'
 import { ReceiptForm } from './ReceiptForm'
 import { ConversionForm } from './ConversionForm'
 import { SettlementForm } from './SettlementForm'
+import { PickupForm } from './PickupForm'
+import { canPickUp, leftToPay } from './pickup'
 import { ReceiptLines } from './ReceiptLines'
 import { goldSummary } from './ledgerRow'
 import { blockedSentence, describeRefusal } from './receiptErrors'
@@ -91,6 +93,8 @@ export function TxnScreen({
   const [converting, setConverting] = useState<{ correcting: ReceiptRow | null; date?: string } | null>(null)
   /** The receipt whose later payments are open. */
   const [settling, setSettling] = useState<ReceiptRow | null>(null)
+  /** The deposit whose customer has come for the gold. */
+  const [pickingUp, setPickingUp] = useState<ReceiptRow | null>(null)
   const [voidRow, setVoidRow] = useState<ReceiptRow | null>(null)
   const [voidReason, setVoidReason] = useState('')
   const [voiding, setVoiding] = useState(false)
@@ -307,6 +311,17 @@ export function TxnScreen({
       render: (v: number, r) => (r.conversion ? '—' : (
         <>
           <div><Money value={v} /></div>
+          {/* A deposit: what is left to pay at pickup. A pickup: what was put down (0087). */}
+          {r.deposit?.role === 'deposit' && !r.deposit.settledBy && leftToPay(r.deposit) !== null && (
+            <Typography.Text type="secondary" style={{ display: 'block' }}>
+              {t('pickup.leftShort').replace('{0}', money.format(leftToPay(r.deposit)!))}
+            </Typography.Text>
+          )}
+          {r.deposit?.role === 'pickup' && (
+            <Typography.Text type="secondary" style={{ display: 'block' }}>
+              {t('pickup.depositedShort').replace('{0}', money.format(r.deposit.paid))}
+            </Typography.Text>
+          )}
           {r.payments.map((p) => (
             <Typography.Text key={p.seq} type="secondary" style={{ display: 'block' }}>
               {money.format(p.amount)} {p.method}
@@ -335,6 +350,17 @@ export function TxnScreen({
               {t('conversion.variance')}
             </Tag>
           )}
+          {/* Which day the order was taken, and which day it was collected. */}
+          {r.deposit?.role === 'deposit' && (
+            r.deposit.settledBy === 'PICKUP'
+              ? <><Tag color="green">{t('pickup.done').replace('{0}', r.deposit.pickupDate ?? '')}</Tag>{r.deposit.pickupDoc} </>
+              : r.deposit.settledBy === 'CANCEL'
+                ? <Tag>{t('pickup.cancelled')}</Tag>
+                : <Tag color="gold">{t('pickup.waiting')}</Tag>
+          )}
+          {r.deposit?.role === 'pickup' && (
+            <><Tag color="green">{t('pickup.ofDeposit').replace('{0}', r.deposit.depositDate ?? '')}</Tag>{r.deposit.depositDoc} </>
+          )}
           {v ?? ''}
         </>
       ),
@@ -344,6 +370,10 @@ export function TxnScreen({
       title: t('txn.col.actions'), key: 'actions', width: 116, fixed: 'right',
       render: (_: unknown, r) => (
         <Space size={2}>
+          {canPickUp(r) && (
+            <IconAction icon={<PackageCheck size={16} aria-hidden />} label={t('pickup.open')}
+                        onClick={() => setPickingUp(r)} />
+          )}
           {canSettle(r) && (
             <IconAction icon={<Banknote size={16} aria-hidden />} label={t('settle.open')}
                         onClick={() => setSettling(r)} />
@@ -539,6 +569,20 @@ export function TxnScreen({
           onClose={() => setSettling(null)}
           onDone={(message) => {
             setSettling(null)
+            setToast(message)
+            router.refresh()
+          }}
+        />
+      )}
+
+      {pickingUp && (
+        <PickupForm
+          row={pickingUp}
+          today={today}
+          goldName={goldName}
+          onClose={() => setPickingUp(null)}
+          onDone={(message) => {
+            setPickingUp(null)
             setToast(message)
             router.refresh()
           }}

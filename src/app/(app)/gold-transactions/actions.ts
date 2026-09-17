@@ -375,3 +375,36 @@ export async function voidSettlement(input: unknown): Promise<{ ok: true } | { o
   revalidatePath('/gold-transactions')
   return { ok: true }
 }
+
+const pickupSchema = z.object({
+  // Stable for the life of one pickup on screen, so pressing Save twice is one pickup.
+  requestKey: z.string().uuid(),
+  key: z.string().uuid(),
+  pickupDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  orderValue: z.number().positive().nullable().default(null),
+  payments: z.array(paymentSchema).max(20),
+  remarks: z.string().trim().max(500).nullable().default(null),
+})
+
+/**
+ * Records the customer collecting a deposit's gold (0087): a pickup of its
+ * own, on its day, pointing at the deposit, with what was handed over then.
+ */
+export async function savePickup(input: unknown): Promise<SaveResult> {
+  const parsed = pickupSchema.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Invalid pickup' }
+  }
+  const p = parsed.data
+  const supabase = await createServerSupabase()
+  const { data, error } = await supabase.rpc('save_gold_pickup', {
+    p_request_key: p.requestKey,
+    p_deposit: p.key,
+    p_payload: { pickupDate: p.pickupDate, orderValue: p.orderValue, payments: p.payments, remarks: p.remarks },
+  })
+  if (error) return { ok: false, message: error.message }
+
+  const result = data as { receiptId: string; docNo: string | null; repeated: boolean }
+  revalidatePath('/gold-transactions')
+  return { ok: true, id: result.receiptId, docNo: result.docNo, repeated: result.repeated }
+}
