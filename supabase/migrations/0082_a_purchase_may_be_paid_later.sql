@@ -254,6 +254,41 @@ BEGIN
   RETURN jsonb_build_object('receiptId', v_receipt, 'docNo', v_doc, 'firstTxnId', v_first);
 END $$;
 
+-- 0064's body, kept as strict as it was for a loaded purchase with no payment
+-- at all. The entry screen now saves one as owed on purpose; a sheet leaves the
+-- payment cells blank by mistake as often as on purpose, and nobody is there to
+-- ask. So the loader still names the row for somebody to look at, rather than
+-- turning a blank cell into a debt to the seller.
+CREATE OR REPLACE FUNCTION pc49.post_import_batch(p_batch_id uuid)
+RETURNS TABLE (row_no int, txn_id uuid, error text)
+LANGUAGE plpgsql SET search_path = pc49, public AS $$
+DECLARE
+  r record;
+BEGIN
+  FOR r IN
+    SELECT i.row_no AS rn, t.id AS tid, t.txn_type
+      FROM pc49.import_row i
+      JOIN pc49.gold_txn t ON t.id = i.committed_ref
+     WHERE i.batch_id = p_batch_id
+       AND i.status = 'COMMITTED'
+       AND t.journal_entry_id IS NULL
+       AND t.voided_at IS NULL
+     ORDER BY t.txn_date, i.row_no
+  LOOP
+    BEGIN
+      IF r.txn_type IN ('PO', 'PO_VENDOR')
+         AND NOT EXISTS (SELECT 1 FROM pc49.gold_txn_payment gp WHERE gp.txn_id = r.tid) THEN
+        RAISE EXCEPTION 'transaction % has no payments recorded; a loaded purchase is not booked as owed without one',
+          r.tid;
+      END IF;
+      PERFORM pc49.post_gold_txn(r.tid);
+    EXCEPTION WHEN others THEN
+      row_no := r.rn; txn_id := r.tid; error := SQLERRM;
+      RETURN NEXT;
+    END;
+  END LOOP;
+END $$;
+
 NOTIFY pgrst, 'reload schema';
 
 INSERT INTO pc49.schema_migrations (version) VALUES ('0082_a_purchase_may_be_paid_later')
