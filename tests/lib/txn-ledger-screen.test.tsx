@@ -8,7 +8,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ReactElement } from 'react'
-import type { LedgerRow } from '@/components/gold/types'
+import type { ReceiptRow } from '@/components/gold/types'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: () => {}, push: () => {}, replace: () => {} }),
@@ -30,17 +30,20 @@ const base = {
   goldTypes: [{ code: 'RP', name_vi: 'Rồng Phụng', name_en: 'Rong Phung', native_uom: 'LUONG' as const }],
   salesPeople: [],
   partners: [],
-  rows: [] as LedgerRow[],
+  rows: [] as ReceiptRow[],
   totals: { count: 0, purchases: 0, sales: 0, grams: {} },
 }
 
-const sale: LedgerRow = {
-  id: '1', txn_date: '2026-01-08', doc_no: 'PC49-2601-028', txn_type: 'SALE',
-  partner_code: 'Thuc Trinh', partner_phone: null, sales_person_code: 'T.Quỳnh',
-  gold_type_code: 'RP', scrap_detail: null, gold_pct: null, uom: 'LUONG', qty: -1,
-  unit_price: 5425, amount: 5425, remarks: null,
+const sale: ReceiptRow = {
+  key: '1', receiptId: null, txn_date: '2026-01-08', doc_no: 'PC49-2601-028', txn_type: 'SALE',
+  partner_code: 'Thuc Trinh', partner_phone: null, sales_person_code: 'T.Quỳnh', remarks: null,
+  revision: 1, blockedCode: null, amount: 5425,
+  lines: [{
+    id: '1', lineNo: 1, itemDesc: null, gold_type_code: 'RP', scrap_detail: null, gold_pct: null,
+    uom: 'LUONG', qty: -1, unit_price: 5425, amount: 5425, blockedCode: null,
+  }],
   payments: [{ seq: 1, amount: 5425, method: 'CASH' }],
-  soldBy: [{ code: 'T.Quỳnh', sharePct: 100 }], revision: 1, blockedCode: null,
+  soldBy: [{ code: 'T.Quỳnh', sharePct: 100 }],
 }
 
 describe('the gold ledger screen', () => {
@@ -67,7 +70,7 @@ describe('the gold ledger screen', () => {
 
   it('says in the reader’s language why a row cannot be corrected', () => {
     // The database answers with a code; the sentence is the screen's to write.
-    const leg = { ...sale, id: '2', doc_no: 'PC49-2601-029', blockedCode: 'CONVERSION_LEG' }
+    const leg = { ...sale, key: '2', doc_no: 'PC49-2601-029', blockedCode: 'CONVERSION_LEG' }
     const html = renderToStaticMarkup(
       <LocaleProvider initialLocale="vi"><TxnScreen {...base} rows={[leg]} /></LocaleProvider>)
     expect(html).toContain('data-tip="Đây là một vế của lần quy đổi; hãy sửa lần quy đổi đó"')
@@ -80,5 +83,24 @@ describe('the gold ledger screen', () => {
     const html = renderToStaticMarkup(
       <LocaleProvider initialLocale="vi"><TxnScreen {...base} query={q} /></LocaleProvider>)
     expect(html).toContain('href="/gold-transactions/export?from=2026-01-01&amp;to=2026-01-31"')
+  })
+
+  it('lists a receipt of several items as one row, named for what is on it', () => {
+    const receipt: ReceiptRow = {
+      ...sale, key: '3', receiptId: '3', doc_no: 'PC49-2609-010', txn_type: 'PO', amount: -2850,
+      lines: [
+        { ...sale.lines[0], id: 'a', lineNo: 1, itemDesc: 'Nhẫn 24K (vụn)', gold_type_code: 'SG',
+          uom: 'GRAM', qty: 9.4, gold_pct: 0.987, unit_price: 101.06382979, amount: -950 },
+        { ...sale.lines[0], id: 'b', lineNo: 2, itemDesc: 'Thỏi RCM', gold_type_code: 'GRAIN',
+          uom: 'GRAM', qty: 15.6, gold_pct: 0.998, unit_price: 121.79487179, amount: -1900 },
+      ],
+    }
+    const html = text(<TxnScreen {...base} rows={[receipt]}
+      totals={{ count: 1, purchases: 2850, sales: 0, grams: {} }} />)
+    expect(html).toContain('PC49-2609-010')
+    expect(html).toContain('Nhiều loại (2 món)')
+    expect(html).toContain('25.00 g')
+    expect(html).toContain('-2,850.00')
+    expect(html).toContain('Số phiếu')
   })
 })

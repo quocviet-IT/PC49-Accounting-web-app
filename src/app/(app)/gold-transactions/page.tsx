@@ -4,7 +4,7 @@ import { getCurrentUser } from '@/lib/auth/currentUser'
 import { can } from '@/lib/auth/roles'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { parseLedgerQuery, rpcArgs } from '@/components/gold/ledgerQuery'
-import { toLedgerRow } from '@/components/gold/ledgerRow'
+import { toReceiptRow } from '@/components/gold/ledgerRow'
 
 export default async function GoldTransactionsPage({
   searchParams,
@@ -34,16 +34,15 @@ export default async function GoldTransactionsPage({
         .eq('is_active', true)
         .order('sort_order'),
       supabase.from('sales_person').select('code').eq('is_active', true).order('code'),
-      // Who has been traded with, and how to reach them. Offered as suggestions
-      // on the form so the codes converge on one spelling instead of drifting.
+      // Who has been traded with, and how to reach them, offered as suggestions
+      // so the codes converge on one spelling instead of drifting.
       supabase.from('partner').select('code, phone').eq('is_active', true).order('code'),
-      // One page, with the count of everything the filter matched (0068). The
-      // database pages and filters, so opening the ledger never means sending
-      // every transaction ever recorded to the browser.
-      supabase.rpc('gold_txn_ledger',
+      // One page of receipts, with the count of every receipt the filter
+      // matched (0076). The database pages and filters.
+      supabase.rpc('gold_receipt_ledger',
         { ...args, p_limit: query.size, p_offset: (query.page - 1) * query.size }),
       // The totals of the whole filter, not of the page on screen.
-      supabase.rpc('gold_txn_ledger_totals', args),
+      supabase.rpc('gold_receipt_ledger_totals', args),
     ])
 
   const totals = ((totalsResult.data ?? []) as Record<string, unknown>[])[0]
@@ -56,13 +55,11 @@ export default async function GoldTransactionsPage({
       // is how the same purchase gets typed in twice.
       loadFailed={Boolean(ledgerResult.error || totalsResult.error || goldTypesResult.error)}
       goldTypes={(goldTypesResult.data ?? []) as GoldTypeOption[]}
-      // These two are suggestions, not facts on the screen, so a catalogue that
-      // did not load degrades the typing aid and asserts nothing false.
       salesPeople={(salesResult.data ?? []).map((s: { code: string }) => s.code)}
       partners={(partnerResult.data ?? []) as { code: string; phone: string | null }[]}
-      rows={((ledgerResult.data ?? []) as Record<string, unknown>[]).map(toLedgerRow)}
+      rows={((ledgerResult.data ?? []) as Record<string, unknown>[]).map(toReceiptRow)}
       totals={{
-        count: Number(totals?.transaction_count ?? 0),
+        count: Number(totals?.receipt_count ?? 0),
         purchases: Number(totals?.purchases ?? 0),
         sales: Number(totals?.sales ?? 0),
         grams: (totals?.grams_by_gold ?? {}) as Record<string, number>,

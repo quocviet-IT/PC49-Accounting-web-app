@@ -10,24 +10,27 @@ import { IconAction } from '@/components/ui/IconAction'
 import { TxnTypeTag } from './TxnTypeTag'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocale } from '@/lib/i18n/provider'
-import type { MessageKey } from '@/lib/i18n'
 import { toGrams } from '@/lib/domain/units'
-import { voidTransaction } from '@/app/(app)/gold-transactions/actions'
+import { voidReceipt } from '@/app/(app)/gold-transactions/actions'
 import { Page, Stat, Stats, LoadFailed, money, weight } from '@/components/ledger/Ledger'
 import { DataTable } from '@/components/ui/DataTable'
 import { ListToolbar } from '@/components/ui/ListToolbar'
-import { TxnForm } from './TxnForm'
-import { PAYMENT_METHODS, type GoldTypeOption, type LedgerRow } from './types'
+import { ReceiptForm } from './ReceiptForm'
+import { ReceiptLines } from './ReceiptLines'
+import { goldSummary } from './ledgerRow'
+import { blockedSentence, describeRefusal } from './receiptErrors'
+import { PAYMENT_METHODS, type GoldTypeOption, type ReceiptRow } from './types'
 import {
   DEFAULT_PAGE_SIZE, LEDGER_TXN_TYPES, PAGE_SIZES, ledgerSearch, presetRange, singleDay,
   type LedgerQuery, type Preset,
 } from './ledgerQuery'
 import styles from './Txn.module.css'
 
-export type { GoldTypeOption, SavedRow, LedgerRow } from './types'
+export type { GoldTypeOption, ReceiptRow } from './types'
 
-/** What the whole filter matched, not the page on screen (0068). */
+/** What the whole filter matched, not the page on screen (0076). */
 export type LedgerTotals = {
+  /** Receipts, not items. */
   count: number
   purchases: number
   sales: number
@@ -43,15 +46,13 @@ function Money({ value }: { value: number }) {
 }
 
 /**
- * The gold ledger: every transaction, newest first, filtered as asked.
+ * The gold ledger: every receipt, newest first, filtered as asked.
  *
- * It used to be one day at a time. The filter now lives in the address and is
- * applied by the database, so a range of a year is as quick to open as a day,
- * a view can be sent to somebody, and the file behind "Xuất Excel" holds
- * exactly the rows the filter means.
- *
- * Entry still happens on a form, not across a row: recording one purchase is
- * one task, and it gets one dialog.
+ * One row per receipt, as the paper has one number, one customer and one
+ * payment; its items open beneath it. A transaction from before receipts is a
+ * receipt of one item and reads exactly as it did. The filter lives in the
+ * address and is applied by the database (0076), so the file behind
+ * "Xuất Excel" holds exactly what the filter means.
  */
 export function TxnScreen({
   query, today, goldTypes, salesPeople, partners, rows, totals, loadFailed = false,
@@ -62,23 +63,20 @@ export function TxnScreen({
   goldTypes: GoldTypeOption[]
   salesPeople: string[]
   partners: { code: string; phone: string | null }[]
-  rows: LedgerRow[]
+  rows: ReceiptRow[]
   totals: LedgerTotals
   /**
-   * The ledger, its totals, or the gold types did not arrive.
-   *
-   * Nothing to type into is offered in that case. An empty list on a day that
-   * actually has transactions invites somebody to enter them again, and a
-   * duplicated purchase is a real loss of money.
+   * The ledger, its totals, or the gold types did not arrive. Nothing to type
+   * into is offered then: an empty list invites somebody to enter the day again.
    */
   loadFailed?: boolean
 }) {
   const { locale, t } = useLocale()
   const router = useRouter()
 
-  /** Open with no row for a fresh transaction, with a row to replace it. */
-  const [editing, setEditing] = useState<{ correcting: LedgerRow | null } | null>(null)
-  const [voidRow, setVoidRow] = useState<LedgerRow | null>(null)
+  /** Open with no receipt for a fresh one, with a receipt to replace it. */
+  const [editing, setEditing] = useState<{ correcting: ReceiptRow | null } | null>(null)
+  const [voidRow, setVoidRow] = useState<ReceiptRow | null>(null)
   const [voidReason, setVoidReason] = useState('')
   const [voiding, setVoiding] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -105,18 +103,6 @@ export function TxnScreen({
     return () => clearTimeout(timer)
   }, [search, query, router])
 
-  /**
-   * Why a row cannot be corrected, in the reader's language. The database
-   * answers with a code; a code nobody has written a sentence for yet still
-   * reads as a refusal rather than as the code itself.
-   */
-  const blockedText = (code: string | null) => {
-    if (!code) return null
-    const key = ('txn.blocked.' + code) as MessageKey
-    const sentence = t(key)
-    return sentence === key ? t('txn.blocked.OTHER') : sentence
-  }
-
   const goldName = (code: string) => {
     const g = goldTypes.find((x) => x.code === code)
     return g ? (locale === 'vi' ? g.name_vi : g.name_en) : code
@@ -133,9 +119,7 @@ export function TxnScreen({
   })
 
   /**
-   * Which days are being looked at.
-   *
-   * Native date inputs rather than Ant Design's, because these are the
+   * Which days are being looked at. Native date inputs, because these are the
    * controls that have to keep working on the screen that says a read failed.
    */
   const dateFilters = (
@@ -180,7 +164,7 @@ export function TxnScreen({
     </Button>
   )
 
-  // The same filter, without the page: the file is every matching row.
+  // The same filter, without the page: the file is every matching receipt.
   const exportButton = (
     <Button icon={<Download size={16} aria-hidden />}
             href={`/gold-transactions/export${ledgerSearch(query, { page: 1, size: DEFAULT_PAGE_SIZE })}`}>
@@ -191,17 +175,18 @@ export function TxnScreen({
   async function confirmVoid() {
     if (!voidRow) return
     setVoiding(true)
-    const result = await settleAction(() => voidTransaction({ id: voidRow.id, reason: voidReason }))
+    const result = await settleAction(() => voidReceipt({ key: voidRow.key, reason: voidReason }))
     setVoiding(false)
-    if (!result.ok) { setNotice(isThrew(result) ? describeThrew(result, t) : result.message); return }
+    if (!result.ok) {
+      setNotice(isThrew(result) ? describeThrew(result, t) : describeRefusal(result.message, t))
+      return
+    }
     setVoidRow(null)
     setVoidReason('')
     router.refresh()
   }
 
   if (loadFailed) {
-    // The heading and the date range stay: somebody has to be able to see what
-    // failed and look at another range without a reload.
     return (
       <Page titleKey="txn.title">
         <div className={styles.failedFilters}>{dateFilters}</div>
@@ -210,10 +195,11 @@ export function TxnScreen({
     )
   }
 
-  // Widths are the design; the columns without one share what is left. Naming
-  // a width on the figures is what stops a long customer name squeezing an
-  // amount into two lines.
-  const columns: ColumnsType<LedgerRow> = [
+  /** The only item of a receipt of one, or null. */
+  const onlyItem = (r: ReceiptRow) => (r.lines.length === 1 ? r.lines[0] : null)
+
+  // Widths are the design; the columns without one share what is left.
+  const columns: ColumnsType<ReceiptRow> = [
     { title: t('txn.date'), dataIndex: 'txn_date', width: 104 },
     {
       title: t('txn.col.doc'), dataIndex: 'doc_no', width: 132,
@@ -235,37 +221,50 @@ export function TxnScreen({
     {
       title: t('txn.col.sales'), dataIndex: 'sales_person_code', width: 100,
       render: (v: string | null, r) => (r.soldBy.length > 1
-        // Everybody on it, not just the leading name.
         ? <>{r.soldBy.map((p) => <div key={p.code}>{p.code} {p.sharePct}%</div>)}</>
         : (v ?? '—')),
     },
     {
-      title: t('txn.col.gold'), dataIndex: 'gold_type_code', width: 124,
-      render: (v: string, r) => (
-        <>
-          <div>{goldName(v)}</div>
-          {(r.scrap_detail || r.gold_pct !== null) && (
-            <Typography.Text type="secondary">
-              {[r.scrap_detail, r.gold_pct].filter((x) => x !== null && x !== '').join(' · ')}
-            </Typography.Text>
-          )}
-        </>
-      ),
+      title: t('txn.col.gold'), key: 'gold', width: 150,
+      render: (_: unknown, r) => {
+        const only = onlyItem(r)
+        return (
+          <>
+            <div>{goldSummary(r, goldName, t)}</div>
+            {only && (only.scrap_detail || only.gold_pct !== null) && (
+              <Typography.Text type="secondary">
+                {[only.scrap_detail, only.gold_pct].filter((x) => x !== null && x !== '').join(' · ')}
+              </Typography.Text>
+            )}
+          </>
+        )
+      },
     },
     {
-      title: t('txn.col.qty'), dataIndex: 'qty', width: 104, align: 'right',
-      render: (v: number, r) => (
-        <>
-          <div>{weight.format(v)}</div>
-          {r.uom !== 'GRAM' && (
-            <Typography.Text type="secondary">{weight.format(toGrams(v, r.uom))} g</Typography.Text>
-          )}
-        </>
-      ),
+      title: t('txn.col.qty'), key: 'qty', width: 104, align: 'right',
+      render: (_: unknown, r) => {
+        const only = onlyItem(r)
+        if (!only) {
+          // Items counted in different units add up in grams.
+          const grams = r.lines.reduce((sum, l) => sum + toGrams(l.qty, l.uom), 0)
+          return <>{weight.format(grams)} g</>
+        }
+        return (
+          <>
+            <div>{weight.format(only.qty)}</div>
+            {only.uom !== 'GRAM' && (
+              <Typography.Text type="secondary">{weight.format(toGrams(only.qty, only.uom))} g</Typography.Text>
+            )}
+          </>
+        )
+      },
     },
     {
-      title: t('txn.col.price'), dataIndex: 'unit_price', width: 92, align: 'right',
-      render: (v: number | null) => (v === null ? '—' : money.format(v)),
+      title: t('txn.col.price'), key: 'price', width: 92, align: 'right',
+      render: (_: unknown, r) => {
+        const only = onlyItem(r)
+        return only && only.unit_price !== null ? money.format(only.unit_price) : '—'
+      },
     },
     {
       title: t('txn.col.amount'), dataIndex: 'amount', width: 136, align: 'right',
@@ -282,15 +281,13 @@ export function TxnScreen({
     },
     { title: t('txn.col.remarks'), dataIndex: 'remarks', ellipsis: true },
     {
-      // Icons pinned to the right: the words on every row pushed this column
-      // off a 1440px screen, so Sửa could not be pressed without scrolling.
+      // Icons pinned to the right, so Sửa can be pressed without scrolling.
       title: t('txn.col.actions'), key: 'actions', width: 84, fixed: 'right',
       render: (_: unknown, r) => (
         <Space size={2}>
-          {/* Greyed out with the reason rather than offered and then refused:
-              the books may have closed over it. */}
           <IconAction icon={<Pencil size={16} aria-hidden />} label={t('txn.correct')}
-                      disabled={Boolean(r.blockedCode)} disabledReason={blockedText(r.blockedCode)}
+                      disabled={Boolean(r.blockedCode)}
+                      disabledReason={blockedSentence(r.blockedCode, t)}
                       onClick={() => setEditing({ correcting: r })} />
           <IconAction icon={<Ban size={16} aria-hidden />} label={t('txn.void')} danger
                       onClick={() => setVoidRow(r)} />
@@ -399,10 +396,16 @@ export function TxnScreen({
         </div>
       )}
 
-      <DataTable<LedgerRow>
-        rowKey="id"
+      <DataTable<ReceiptRow>
+        rowKey="key"
         columns={columns}
         dataSource={rows}
+        // A receipt of several items opens to show them; a receipt of one
+        // already shows everything on its row.
+        expandable={{
+          rowExpandable: (r) => r.lines.length > 1,
+          expandedRowRender: (r) => <ReceiptLines row={r} goldName={goldName} />,
+        }}
         emptyTitle={hasFilters ? t('txn.filter.empty') : t('txn.empty.all')}
         emptyAction={hasFilters
           ? <Button onClick={clearFilters}>{t('txn.filter.clear')}</Button>
@@ -419,10 +422,10 @@ export function TxnScreen({
       />
 
       {editing && (
-        <TxnForm
+        <ReceiptForm
           open
-          // Looking at one day, a new transaction goes on that day, as the day
-          // screen always did; otherwise on today. A correction keeps its day.
+          // Looking at one day, a new receipt goes on that day; otherwise on
+          // today. A correction keeps its day.
           txnDate={editing.correcting?.txn_date ?? singleDay(query) ?? today}
           goldTypes={goldTypes}
           salesPeople={salesPeople}
@@ -447,13 +450,13 @@ export function TxnScreen({
         onCancel={() => { setVoidRow(null); setVoidReason('') }}
       >
         {/* The reason is asked for because the database demands one, and
-            because a cancellation nobody explained is the row somebody
-            re-types next month. */}
+            because a cancellation nobody explained is re-typed next month.
+            Every item of the receipt goes. */}
         <p>{t('txn.voidWhy')}</p>
         {voidRow && (
           <p>
             <TxnTypeTag type={voidRow.txn_type} />
-            {voidRow.txn_date} · {goldName(voidRow.gold_type_code)} · {weight.format(voidRow.qty)}
+            {voidRow.txn_date} · {voidRow.doc_no ?? '—'} · {goldSummary(voidRow, goldName, t)}
             {' · '}{money.format(voidRow.amount)}
           </p>
         )}
