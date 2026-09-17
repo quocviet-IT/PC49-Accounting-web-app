@@ -162,14 +162,15 @@ describe('saving a receipt of several items', () => {
     expect((await paidPerItem(saved.receiptId))[5]).toBe('675 CASH')
   })
 
-  it('refuses a purchase whose payments never reach an item, and names the item', async () => {
-    const count = async () => (await db.query<{ n: string }>(
-      `SELECT count(*)::text AS n FROM pc49.gold_receipt`)).rows[0].n
-    const before = await count()
-    await expect(saveReceipt('six-short', receiptPayload({
+  it('saves a purchase whose payments stop short of the last item, every item posted', async () => {
+    const saved = await saveReceipt('six-short', receiptPayload({
       partnerCode: 'SHORT', payments: [{ amount: 8000, method: 'CASH' }],
-    }))).rejects.toThrow(/PAYMENT_SHORT: item 6/)
-    expect(await count()).toBe(before)
+    }))
+    expect((await paidPerItem(saved.receiptId))[5]).toBe('')
+    const posted = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pc49.gold_txn
+        WHERE receipt_id = $1 AND journal_entry_id IS NOT NULL`, [saved.receiptId])
+    expect(posted.rows[0].n).toBe('6')
   })
 
   it('credits the same people with the same shares on every item', async () => {

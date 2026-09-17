@@ -215,3 +215,27 @@ describe('the five transactions of 1 January 2026', () => {
     expect(byAcct['1121CK'].cr).toBe(6105)
   })
 })
+
+describe('what is not paid yet', () => {
+  it('owes the seller the part of a purchase not paid', async () => {
+    const t = await enter(
+      { date: '2026-01-05', type: 'PO', gold: 'SG', uom: 'GRAM', qty: 10, price: 60, amount: -600,
+        partner: 'OWED1' },
+      [{ amount: 400, method: 'CASH' }],
+    )
+    const lines = await linesOf(await post(t))
+    expect(lines.map((l) => [l.dr, l.cr, Number(l.amount), l.g === null ? null : Number(l.g)]))
+      .toEqual([['155SG', '1111', 400, 10], ['155SG', '331', 200, null]])
+  })
+
+  it('posts a purchase with nothing paid against the seller, carrying the weight', async () => {
+    const t = await enter(
+      { date: '2026-01-05', type: 'PO', gold: 'SG', uom: 'GRAM', qty: 10, price: 60, amount: -600,
+        partner: 'OWED2' },
+      [],
+    )
+    const lines = await linesOf(await post(t))
+    expect(lines.map((l) => [l.dr, l.cr, Number(l.amount), Number(l.g)]))
+      .toEqual([['155SG', '331', 600, 10]])
+  })
+})
