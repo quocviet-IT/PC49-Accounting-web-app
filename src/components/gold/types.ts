@@ -7,34 +7,6 @@ export type GoldTypeOption = {
   native_uom: Uom
 }
 
-export type SavedRow = {
-  id: string
-  doc_no: string | null
-  txn_type: string
-  partner_code: string | null
-  sales_person_code: string | null
-  gold_type_code: string
-  scrap_detail: string | null
-  gold_pct: number | null
-  uom: Uom
-  qty: number
-  unit_price: number | null
-  amount: number
-  remarks: string | null
-  /** How it was settled, in the order it was entered. */
-  payments: { seq: number; amount: number; method: string }[]
-  /** Who is credited with it, largest share first. */
-  soldBy: { code: string; sharePct: number }[]
-  /** What the screen was showing, so a correction can tell if it has moved. */
-  revision: number
-  /**
-   * Why this row cannot be corrected here, as the database's code
-   * (pc49.correction_blocked_code, 0071), or null if it can. The screen writes
-   * the sentence, in the reader's language.
-   */
-  blockedCode: string | null
-}
-
 /**
  * The kinds of movement this screen writes.
  *
@@ -84,12 +56,6 @@ export const MAX_PAYMENTS = 20
 export function amountOf(qty: number, price: number | null): number {
   if (price === null) return 0
   return Math.round(-qty * price * 100) / 100
-}
-
-/** A row of the whole ledger: a saved row with its day and its customer's phone. */
-export type LedgerRow = SavedRow & {
-  txn_date: string
-  partner_phone: string | null
 }
 
 /** One item of a receipt, as the ledger lists it (pc49.gold_receipt_lines, 0076). */
