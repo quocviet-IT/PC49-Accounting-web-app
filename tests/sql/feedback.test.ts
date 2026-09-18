@@ -274,3 +274,53 @@ describe('where a screenshot may be written', () => {
     }
   })
 })
+
+describe('what is waiting on the reports screen', () => {
+  const unseen = async (who: string) => Number((await asRole(db, who, () =>
+    db.query<{ n: number }>(`SELECT pc49.feedback_unseen() AS n`))).rows[0].n)
+  const markSeen = (who: string) =>
+    asRole(db, who, () => db.query(`SELECT pc49.mark_feedback_seen()`))
+
+  async function fileAs(who: string, description: string) {
+    const r = await asRole(db, who, () => db.query<{ id: string }>(
+      `INSERT INTO pc49.feedback_report (kind, impact, description, page_url, page_route, reporter_id)
+       VALUES ('BROKEN', 'MINOR', $1, '/prices', '/prices', $2) RETURNING id`, [description, who]))
+    return r.rows[0].id
+  }
+
+  it('counts, for an administrator, what nobody has picked up yet', async () => {
+    const before = await unseen(BOSS)
+    const id = await fileAs(CLERK, 'unseen: a new one for the queue')
+    expect(await unseen(BOSS)).toBe(before + 1)
+    await triage(`SELECT pc49.set_feedback_status($1, 'LOOKING')`, [id])
+    expect(await unseen(BOSS)).toBe(before)
+  })
+
+  it('counts, for the reporter, their own reports that moved since they looked', async () => {
+    const id = await fileAs(CLERK, 'unseen: mine')
+    await markSeen(CLERK)
+    expect(await unseen(CLERK)).toBe(0)
+    await triage(`SELECT pc49.set_feedback_status($1, 'FIXED', 'done')`, [id])
+    expect(await unseen(CLERK)).toBe(1)
+    await markSeen(CLERK)
+    expect(await unseen(CLERK)).toBe(0)
+  })
+
+  it('does not count somebody else’s report as the reporter’s news', async () => {
+    const id = await fileAs(BOSS, 'unseen: the boss’s own')
+    await markSeen(CLERK)
+    await triage(`SELECT pc49.set_feedback_status($1, 'FIXED', 'done')`, [id])
+    expect(await unseen(CLERK)).toBe(0)
+  })
+
+  it('keeps when each person last looked to themselves', async () => {
+    await markSeen(CLERK)
+    await markSeen(BOSS)
+    const seen = await asRole(db, CLERK, () => db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM pc49.feedback_seen`))
+    expect(seen.rows[0].n).toBe('1')
+    await expect(asRole(db, CLERK, () => db.query(
+      `INSERT INTO pc49.feedback_seen (user_id, seen_at) VALUES ($1, now())`, [BOSS])))
+      .rejects.toThrow(/row-level security/)
+  })
+})
