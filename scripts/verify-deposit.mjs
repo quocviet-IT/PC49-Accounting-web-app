@@ -6,9 +6,11 @@
 //
 // One luong of Rong Phung is ordered at 5,300.00 with 1,000.00 down, the
 // quantity typed without a sign. A second order is taken with nothing down.
-// A week on the first is picked up from its row with 3,000.00 paid: the pickup
-// has its own day and number, the deposit says when it was collected, and
-// 1,300.00 is owed. The pickup is cancelled and the deposit waits again.
+// Two days on the customer adds 500.00 by Zelle, the gold not yet collected
+// (0089). A week on the first is picked up from its row with 3,000.00 paid:
+// the pickup has its own day and number, the deposit says when it was
+// collected, and 800.00 is owed. The pickup is cancelled and the deposit waits
+// again.
 //
 //   npm run verify:deposit      (a server up; PC49_BASE_URL for Production)
 //
@@ -158,14 +160,38 @@ try {
   const waiting = await shown(rowOf(page, deposit.doc_no))
   check('the deposit waits, and says what is left', waiting.includes('Chờ lấy hàng') && waiting.includes('Còn lại 4,300.00'),
     waiting.slice(0, 200))
+
+  // ---- 500.00 more by Zelle, the gold not yet collected ---------------------
+  // "Đơn đặt cọc chưa có tính năng khách chỉ trả thêm tiền chứ chưa pickup" (0089)
+  await rowOf(page, deposit.doc_no).getByRole('button', { name: 'Thêm tiền cọc', exact: true }).click()
+  const more = page.getByRole('dialog', { name: `Thêm tiền cọc — ${deposit.doc_no}`, exact: true }).last()
+  await more.waitFor()
+  await more.getByLabel('Ngày trả', { exact: true }).fill('2019-07-10')
+  await more.getByLabel('Số tiền', { exact: true }).fill('500')
+  await choose(page, more, 'Hình thức', 'ZELLE')
+  await more.getByRole('button', { name: 'Lưu lần trả', exact: true }).click()
+  const added = await untilRowIs(db,
+    `SELECT e.entry_date::text AS day, jl.debit_account AS dr, jl.credit_account AS cr,
+            jl.amount_usd::float8 AS amount
+       FROM pc49.gold_receipt_settlement s
+       JOIN pc49.journal_entry e ON e.id = s.journal_entry_id
+       JOIN pc49.journal_line jl ON jl.entry_id = e.id
+      WHERE s.receipt_key = $1 AND s.voided_at IS NULL`, [deposit.receipt_id], (r) => r.amount === 500)
+  check('money added to the deposit is booked on its day, cash against the customer',
+    added !== null && added.day === '2019-07-10' && added.dr === '1121ZL' && added.cr === '131',
+    added ? `${added.day} ${added.dr}/${added.cr} ${added.amount}` : '(nothing booked)')
+  await page.goto(MONTH, { waitUntil: 'networkidle' })
+  const topped = await shown(rowOf(page, deposit.doc_no))
+  check('and the deposit row says less is left', topped.includes('Còn lại 3,800.00'), topped.slice(0, 200))
+
   await rowOf(page, deposit.doc_no).getByRole('button', { name: 'Lấy hàng', exact: true }).click()
   const pick = page.getByRole('dialog', { name: `Lấy hàng — ${deposit.doc_no}`, exact: true }).last()
   await pick.waitFor()
   check('the pickup shows the order from its deposit',
-    (await shown(pick)).includes('5,300.00') && (await shown(pick)).includes('4,300.00'))
+    (await shown(pick)).includes('5,300.00') && (await shown(pick)).includes('3,800.00'))
   await pick.getByLabel('Ngày lấy', { exact: true }).fill(PICKUP_DAY)
   await pick.getByLabel('Số tiền', { exact: true }).first().fill('3000')
-  check('paying less says what will be owed', (await shown(pick)).includes('Còn nợ 1,300.00'))
+  check('paying less says what will be owed', (await shown(pick)).includes('Còn nợ 800.00'))
   await pick.getByRole('button', { name: 'Lưu', exact: true }).click()
 
   const pickup = await untilRowIs(db,
@@ -178,7 +204,7 @@ try {
     pickup !== null && pickup.day === PICKUP_DAY, pickup ? `${pickup.doc_no} ${pickup.day}` : '(nothing saved)')
   if (!pickup) throw new Error('the pickup did not save')
   check('under its own number', pickup.doc_no !== deposit.doc_no)
-  check('for the whole order, 1,300.00 still owed', pickup.amount === 5300 && pickup.owed === 1300,
+  check('for the whole order, 800.00 still owed', pickup.amount === 5300 && pickup.owed === 800,
     `${pickup.amount} / ${pickup.owed}`)
 
   await page.goto(MONTH, { waitUntil: 'networkidle' })
@@ -186,7 +212,7 @@ try {
   check('the deposit says when it was picked up', collected.includes(`Đã lấy ${PICKUP_DAY}`), collected.slice(0, 200))
   const pickupRow = await shown(rowOf(page, pickup.doc_no))
   check('the pickup says when the deposit was taken, and what is owed',
-    pickupRow.includes(`Cọc ${DAY}`) && pickupRow.includes('Còn nợ 1,300.00'), pickupRow.slice(0, 200))
+    pickupRow.includes(`Cọc ${DAY}`) && pickupRow.includes('Còn nợ 800.00'), pickupRow.slice(0, 200))
 
   // ---- The pickup cancelled: the deposit waits again -----------------------
   await rowOf(page, pickup.doc_no).getByRole('button', { name: 'Huỷ', exact: true }).click()
