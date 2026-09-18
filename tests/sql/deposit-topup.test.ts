@@ -103,6 +103,17 @@ describe('adding to a deposit before the gold is collected', () => {
       .rejects.toThrow(/PICKUP_TAKEN: 2026-06-10/)
   })
 
+  it('lets the pickup be cancelled after money was added, the deposit waiting again', async () => {
+    const d = await save('add-7', depositOf('ADD7', 1000))
+    await addTo('add-7-more', d.receiptId, { payDate: '2026-06-05', amount: 500 })
+    const p = await pickUp('add-7-pick', d.receiptId,
+      { pickupDate: '2026-06-10', payments: [{ amount: 3000, method: 'CASH' }] })
+    await asRole(db, KT, () => db.query(`SELECT pc49.void_gold_receipt($1, 'nhap nham')`, [p.receiptId]))
+    expect(await one<{ d: Record<string, unknown> }>(
+      `SELECT pc49.gold_receipt_deposit($1) AS d`, [d.receiptId]))
+      .toMatchObject({ d: { settledBy: null, paid: 1500 } })
+  })
+
   it('is not capped when nobody recorded what the order comes to', async () => {
     const d = await save('add-6', depositOf('ADD6', 500, {
       lines: [{ itemDesc: 'RP', goldTypeCode: 'RP', uom: 'LUONG', qty: -1, unitPrice: null,

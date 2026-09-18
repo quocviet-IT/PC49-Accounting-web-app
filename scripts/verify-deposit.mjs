@@ -224,7 +224,9 @@ try {
   const reopened = await untilRowIs(db,
     `SELECT count(*)::int AS live FROM pc49.gold_txn WHERE deposit_ref_id = $1 AND voided_at IS NULL`,
     [deposit.id], (r) => r.live === 0)
-  check('cancelling the pickup takes it off the books', reopened !== null)
+  // What the screen said, when it did not go through.
+  const said = reopened ? '' : (await page.locator('.ant-alert, .ant-modal').allTextContents()).join(' | ')
+  check('cancelling the pickup takes it off the books', reopened !== null, said.slice(0, 240))
   await page.goto(MONTH, { waitUntil: 'networkidle' })
   check('and the deposit waits again', (await shown(rowOf(page, deposit.doc_no))).includes('Chờ lấy hàng'))
 } finally {
