@@ -37,8 +37,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // a flag that quietly reads false.
   if (user.mustChangePassword) redirect('/password')
 
+  // What is waiting on the reports screen for this reader (0088). A read that
+  // fails is no badge, never a broken shell: the badge is a nudge, and the
+  // screen it points to says for itself when it could not load.
+  const { data: unseen, error: unseenError } = await supabase.rpc('feedback_unseen')
+
   return (
-    <AppShell role={user.role} email={user.email}>
+    <AppShell role={user.role} email={user.email}
+              unseen={unseenError ? 0 : Number(unseen ?? 0)}>
       {children}
     </AppShell>
   )

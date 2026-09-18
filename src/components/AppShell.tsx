@@ -23,6 +23,7 @@ import { LocaleSwitch } from '@/components/LocaleSwitch'
 import { ThemeToggle } from '@/components/theme/ThemeToggle'
 import { ReportDialog } from '@/components/feedback/ReportDialog'
 import { NavPending } from '@/components/NavPending'
+import { NavCount, NavDot } from '@/components/NavBadge'
 
 const { Header, Sider, Content } = Layout
 
@@ -124,8 +125,14 @@ function useMediaQuery(query: string, onServer: boolean): boolean {
 const ROOMY = '(min-width: 1440px)'
 
 export function AppShell({
-  role, email, children,
-}: { role: Role | null; email?: string; children: ReactNode }) {
+  role, email, unseen = 0, children,
+}: {
+  role: Role | null
+  email?: string
+  /** What is waiting on the reports screen for this reader (0088). */
+  unseen?: number
+  children: ReactNode
+}) {
   const { t } = useLocale()
   const pathname = usePathname()
   const router = useRouter()
@@ -142,6 +149,8 @@ export function AppShell({
   const activeKey = activePage?.key ?? ''
   const activeGroup = activePage ? findActiveGroup(activePage.key) : undefined
 
+  const unseenLabel = t('fb.unseen').replace('{0}', String(unseen))
+
   const menuItems = items.map((item) =>
     isNavGroup(item)
       ? {
@@ -156,8 +165,19 @@ export function AppShell({
         }
       : {
           key: item.key,
-          icon: ICONS[item.key],
-          label: <Link href={item.key}>{t(item.labelKey)}<NavPending /></Link>,
+          // The reports screen calls its reader back when something there is
+          // waiting for them: a count beside it, a dot on the icon when the
+          // menu is folded (spec 2026-09-18).
+          icon: item.key === '/feedback'
+            ? <NavDot count={unseen} label={unseenLabel}>{ICONS[item.key]}</NavDot>
+            : ICONS[item.key],
+          label: (
+            <Link href={item.key}>
+              {t(item.labelKey)}
+              {item.key === '/feedback' && <NavCount count={unseen} label={unseenLabel} />}
+              <NavPending />
+            </Link>
+          ),
         },
   )
 

@@ -138,3 +138,15 @@ export async function triageReport(input: unknown): Promise<FileResult> {
   revalidatePath('/feedback')
   return { ok: true, screenshotStored: false }
 }
+
+/**
+ * Opening the reports screen is looking at it (spec 2026-09-18): from now the
+ * menu stops calling this person back until something else moves (0088).
+ */
+export async function markFeedbackSeen(): Promise<{ ok: boolean }> {
+  const supabase = await createServerSupabase()
+  const { error } = await supabase.rpc('mark_feedback_seen')
+  if (error) return { ok: false }
+  revalidatePath('/feedback')
+  return { ok: true }
+}

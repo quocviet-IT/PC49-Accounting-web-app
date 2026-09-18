@@ -90,6 +90,8 @@
    loud. The other two are quiet on purpose. */
 .blocking { color: var(--pc-money-negative); font-weight: 600; }
 .minor { color: var(--pc-text-faint); }
+/* A report of theirs that moved since the reader last looked (0088). */
+.updated { font-size: 12px; font-weight: 600; color: var(--pc-money-negative); }
 
 
 /* Stacked. The note box is on every row now, not only on a decline, and side by

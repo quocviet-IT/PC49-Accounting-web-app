@@ -20,6 +20,13 @@ export default async function FeedbackPage({
     : null
 
   const supabase = await createServerSupabase()
+
+  // When this reader last looked, read before the screen marks it looked at,
+  // so the very visit that clears the badge still shows what moved (0088). Not
+  // read, it is unknown rather than never: marking every report as news would
+  // be worse than marking none.
+  const { data: seenAt, error: seenError } = await supabase.rpc('feedback_seen_at')
+
   let query = supabase
     .from('feedback_report')
     .select('id, kind, impact, description, status, page_url, page_route, page_title, reporter_role, triage_note, triaged_at, created_at, reporter_id, screenshot_path')
@@ -59,6 +66,7 @@ export default async function FeedbackPage({
     createdAt: r.created_at as string,
     screenshotUrl: links.get(r.screenshot_path as string) ?? null,
     mine: r.reporter_id === user.id,
+    changedAt: (r.triaged_at as string) ?? null,
   }))
 
   // Counts for the tabs, so somebody can see there is a queue without opening
@@ -79,6 +87,7 @@ export default async function FeedbackPage({
       status={status}
       counts={counts}
       canTriage={user.role === 'ADMIN'}
+      seenAt={seenError ? undefined : ((seenAt as string | null) ?? null)}
     />
   )
 }

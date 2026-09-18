@@ -2,12 +2,12 @@
 
 import { describeThrew, isThrew, settleAction } from '@/lib/ui/settleAction'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLocale } from '@/lib/i18n/provider'
 import { Page, Section, Empty, Frame, ledger, LoadFailed } from '@/components/ledger/Ledger'
-import { triageReport } from '@/app/(app)/feedback/actions'
+import { markFeedbackSeen, triageReport } from '@/app/(app)/feedback/actions'
 import styles from './Feedback.module.css'
 
 export type ReportRow = {
@@ -25,6 +25,8 @@ export type ReportRow = {
   screenshotUrl: string | null
   /** Whether this reader filed it, which is what makes the list personal. */
   mine: boolean
+  /** When its status last moved; null while it has not. */
+  changedAt: string | null
 }
 
 const STATUSES = ['NEW', 'LOOKING', 'FIXED', 'DECLINED'] as const
@@ -38,12 +40,18 @@ const STATUSES = ['NEW', 'LOOKING', 'FIXED', 'DECLINED'] as const
  * visibly happens to what they filed.
  */
 export function FeedbackQueue({
-  rows, status, counts, canTriage, loadFailed = false,
+  rows, status, counts, canTriage, seenAt, loadFailed = false,
 }: {
   rows: ReportRow[]
   status: string | null
   counts: Record<string, number>
   canTriage: boolean
+  /**
+   * When this reader last opened the screen, read before this visit marks it
+   * (0088): their reports that moved since then are marked as updated. Null or
+   * "-infinity" is never; absent is unknown, which marks nothing.
+   */
+  seenAt?: string | null
   /**
    * The queue did not arrive. An empty queue means every report has been dealt
    * with — which is the one thing this screen must not say wrongly, since it
@@ -52,6 +60,23 @@ export function FeedbackQueue({
   loadFailed?: boolean
 }) {
   const { t } = useLocale()
+  const router = useRouter()
+
+  // Opening this screen is looking at it: marked once, then the shell is read
+  // again so the badge on the menu goes out at once (spec 2026-09-18).
+  const marked = useRef(false)
+  useEffect(() => {
+    if (marked.current) return
+    marked.current = true
+    void markFeedbackSeen().then((r) => { if (r.ok) router.refresh() })
+  }, [router])
+
+  /** When the reader last looked: never is -Infinity, unknown is +Infinity. */
+  const since = seenAt === undefined ? Infinity
+    : seenAt === null || Number.isNaN(Date.parse(seenAt)) ? -Infinity : Date.parse(seenAt)
+  /** The reader's own report, moved since they last looked. */
+  const updated = (r: ReportRow) =>
+    r.mine && r.changedAt !== null && Date.parse(r.changedAt) > since
 
   return (
     <Page titleKey="fb.queue" noteKey={canTriage ? 'fb.queueNote' : 'fb.mineNote'}>
@@ -136,6 +161,12 @@ export function FeedbackQueue({
                         : <span className={ledger.badge}>
                             {t(`fb.status.${r.status}` as never)}
                           </span>}
+                      {updated(r) && (
+                        <>
+                          <br />
+                          <span className={styles.updated}>{t('fb.updated')}</span>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}
