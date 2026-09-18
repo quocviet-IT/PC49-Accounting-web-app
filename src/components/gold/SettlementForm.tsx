@@ -13,6 +13,7 @@ import { IconAction } from '@/components/ui/IconAction'
 import { money } from '@/components/ledger/Ledger'
 import { describeRefusal } from './receiptErrors'
 import { owes, paidSoFar } from './settlement'
+import { leftToPay } from './pickup'
 import { PAYMENT_METHODS, type ReceiptRow, type Settlement } from './types'
 import styles from './Txn.module.css'
 
@@ -55,9 +56,14 @@ export function SettlementForm({ row, today, onClose, onDone }: {
   /** Pressing Save twice, or again after a lost answer, is still one payment. */
   const requestKey = useRef<string>(crypto.randomUUID())
 
-  const owed = row.owed ?? 0
+  // On a deposit this is money added before the gold is collected (0089): what
+  // is left is the order less what was put down, and nothing is owed as such.
+  const deposit = row.txn_type === 'DEPOSIT' ? row.deposit ?? null : null
+  const open = deposit?.role === 'deposit' && !deposit.settledBy
+  const left = open && deposit ? leftToPay(deposit) : 0
+  const owed = deposit ? (left ?? 0) : (row.owed ?? 0)
   const later = row.settlements ?? []
-  const canPay = owes(row)
+  const canPay = deposit ? open && (left === null || left >= 0.005) : owes(row)
   const doc = row.doc_no ?? '—'
 
   const refused = (result: { ok: false; message: string }) =>
@@ -85,7 +91,7 @@ export function SettlementForm({ row, today, onClose, onDone }: {
       refused(result)
       return
     }
-    onDone(t('settle.saved').replace('{0}', doc))
+    onDone(t(deposit ? 'settle.depositSaved' : 'settle.saved').replace('{0}', doc))
   }
 
   async function cancel() {
@@ -105,7 +111,7 @@ export function SettlementForm({ row, today, onClose, onDone }: {
     <Modal
       open
       width={640}
-      title={t('settle.title').replace('{0}', doc)}
+      title={t(deposit ? 'settle.depositTitle' : 'settle.title').replace('{0}', doc)}
       onCancel={onClose}
       mask={{ closable: false }}
       destroyOnHidden
@@ -122,12 +128,21 @@ export function SettlementForm({ row, today, onClose, onDone }: {
       {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 12 }} />}
 
       <Space size={32} wrap style={{ marginBottom: 16 }}>
-        <Figure label={t('settle.receiptTotal')} value={money.format(Math.abs(row.amount))} />
-        <Figure label={t('settle.paid')} value={money.format(paidSoFar(row))} />
-        <Figure label={t('settle.owed')} value={money.format(owed)} danger={canPay} />
+        {deposit
+          ? <>
+              <Figure label={t('pickup.orderValue')}
+                      value={deposit.orderValue === null ? '—' : money.format(deposit.orderValue)} />
+              <Figure label={t('pickup.deposited')} value={money.format(paidSoFar(row))} />
+              <Figure label={t('pickup.left')} value={left === null ? '—' : money.format(left)} />
+            </>
+          : <>
+              <Figure label={t('settle.receiptTotal')} value={money.format(Math.abs(row.amount))} />
+              <Figure label={t('settle.paid')} value={money.format(paidSoFar(row))} />
+              <Figure label={t('settle.owed')} value={money.format(owed)} danger={canPay} />
+            </>}
       </Space>
 
-      <h3 className={styles.sectionHeading}>{t('settle.atCounter')}</h3>
+      <h3 className={styles.sectionHeading}>{t(deposit ? 'settle.depositAtCounter' : 'settle.atCounter')}</h3>
       {row.payments.length === 0
         ? <Typography.Paragraph type="secondary">{t('settle.noneAtCounter')}</Typography.Paragraph>
         : (
@@ -138,7 +153,7 @@ export function SettlementForm({ row, today, onClose, onDone }: {
           </ul>
         )}
 
-      <h3 className={styles.sectionHeading}>{t('settle.later')}</h3>
+      <h3 className={styles.sectionHeading}>{t(deposit ? 'settle.depositLater' : 'settle.later')}</h3>
       {later.length === 0
         ? <Typography.Paragraph type="secondary">{t('settle.noneLater')}</Typography.Paragraph>
         : (
@@ -173,13 +188,15 @@ export function SettlementForm({ row, today, onClose, onDone }: {
       {canPay
         ? (
           <section aria-labelledby="settle-new-heading">
-            <h3 id="settle-new-heading" className={styles.sectionHeading}>{t('settle.new')}</h3>
+            <h3 id="settle-new-heading" className={styles.sectionHeading}>
+              {t(deposit ? 'settle.depositNew' : 'settle.new')}
+            </h3>
             <Form<Values>
               form={form}
               layout="vertical"
               initialValues={{
                 payDate: today < row.txn_date ? row.txn_date : today,
-                amount: owed,
+                amount: deposit && left === null ? null : owed,
                 method: 'CASH',
                 note: '',
               }}
@@ -211,7 +228,10 @@ export function SettlementForm({ row, today, onClose, onDone }: {
             </Form>
           </section>
         )
-        : <Alert type="success" showIcon title={t('settle.paidUp')} />}
+        : <Alert type="success" showIcon
+                 title={deposit?.settledBy
+                   ? t('pickup.done').replace('{0}', deposit.pickupDate ?? '')
+                   : t('settle.paidUp')} />}
     </Modal>
   )
 }

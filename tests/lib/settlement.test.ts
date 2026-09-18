@@ -2,10 +2,28 @@ import { describe, it, expect } from 'vitest'
 import { canSettle, owes, paidSoFar } from '@/components/gold/settlement'
 import type { ReceiptRow } from '@/components/gold/types'
 
-type Settleable = Pick<ReceiptRow, 'txn_type' | 'conversion' | 'owed' | 'settlements'>
+type Settleable = Pick<ReceiptRow, 'txn_type' | 'conversion' | 'owed' | 'settlements' | 'deposit'>
 const row = (over: Partial<Settleable> = {}): Settleable =>
-  ({ txn_type: 'PO', conversion: null, owed: 0, settlements: [], ...over })
+  ({ txn_type: 'PO', conversion: null, owed: 0, settlements: [], deposit: null, ...over })
 const later = { id: 's', payDate: '2026-09-20', amount: 5, method: 'CASH', note: null }
+const open = {
+  role: 'deposit' as const, orderValue: 5300, paid: 1000, settledBy: null, pickupDate: null,
+  pickupDoc: null, depositDate: null, depositDoc: null,
+}
+
+describe('adding to a deposit', () => {
+  it('is offered on a deposit nobody has collected, while something is left to pay', () => {
+    expect(canSettle(row({ txn_type: 'DEPOSIT', deposit: open }))).toBe(true)
+    expect(canSettle(row({ txn_type: 'DEPOSIT', deposit: { ...open, orderValue: null } }))).toBe(true)
+  })
+
+  it('is not offered once it is collected or paid in full, unless something was added to cancel', () => {
+    expect(canSettle(row({ txn_type: 'DEPOSIT', deposit: { ...open, settledBy: 'PICKUP' } }))).toBe(false)
+    expect(canSettle(row({ txn_type: 'DEPOSIT', deposit: { ...open, paid: 5300 } }))).toBe(false)
+    expect(canSettle(row({ txn_type: 'DEPOSIT', deposit: { ...open, paid: 5300 }, settlements: [later] })))
+      .toBe(true)
+  })
+})
 
 describe('paying the rest of a receipt later', () => {
   it('is offered on a purchase or a sale that still owes', () => {

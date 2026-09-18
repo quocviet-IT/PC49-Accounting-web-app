@@ -72,6 +72,26 @@ describe('the gold ledger screen', () => {
     expect(html).toContain('Đã cọc 1,000.00')
   })
 
+  it('says how much of each gold came in and how much went out, in its unit and in grams', () => {
+    const html = text(<TxnScreen {...base} rows={[sale]}
+      totals={{ count: 1, purchases: 0, sales: 5425, grams: {},
+                moves: { RP: { in: 2, inGrams: 75, out: 1, outGrams: 37.5 } } }} />)
+    expect(html).toContain('Rồng Phụng: Nhập 2.00 L (75.00 g) · Xuất 1.00 L (37.50 g)')
+  })
+
+  it('offers to add to a deposit nobody has collected', () => {
+    const deposit: ReceiptRow = {
+      ...sale, key: 'd', doc_no: 'PC49-2609-005', txn_type: 'DEPOSIT', amount: 5300,
+      payments: [{ seq: 1, amount: 1000, method: 'CASH' }],
+      deposit: { role: 'deposit', orderValue: 5300, paid: 1000, settledBy: null, pickupDate: null,
+                 pickupDoc: null, depositDate: null, depositDoc: null },
+    }
+    const html = renderToStaticMarkup(<LocaleProvider initialLocale="vi"><TxnScreen {...base} rows={[deposit]}
+      totals={{ count: 1, purchases: 0, sales: 0, grams: {} }} /></LocaleProvider>)
+    expect(html).toContain('Thêm tiền cọc')
+    expect(html).toContain('Lấy hàng')
+  })
+
   it('shows what was paid later and what is still owed on a row', () => {
     const owing: ReceiptRow = {
       ...sale, key: '9', doc_no: 'PC49-2609-020',

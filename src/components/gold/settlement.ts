@@ -1,3 +1,4 @@
+import { leftToPay } from './pickup'
 import type { ReceiptRow } from './types'
 
 /**
@@ -15,12 +16,24 @@ export const owes = (row: Pick<ReceiptRow, 'owed'>) => (row.owed ?? 0) >= 0.005
 /**
  * Whether a row offers "Thanh toán tiếp": a purchase or a sale that still owes,
  * or one paid up by later payments, one of which may yet need cancelling.
+ *
+ * On a deposit it is "Thêm tiền cọc" (0089): offered while nobody has collected
+ * the gold and something is left of the order, or nobody recorded its value.
  */
 export function canSettle(
-  row: Pick<ReceiptRow, 'txn_type' | 'conversion' | 'owed' | 'settlements'>,
+  row: Pick<ReceiptRow, 'txn_type' | 'conversion' | 'owed' | 'settlements' | 'deposit'>,
 ): boolean {
-  if (row.conversion || !SETTLEABLE_TYPES.has(row.txn_type)) return false
-  return owes(row) || (row.settlements ?? []).length > 0
+  if (row.conversion) return false
+  const later = (row.settlements ?? []).length > 0
+  if (row.txn_type === 'DEPOSIT') {
+    const info = row.deposit
+    if (later) return true
+    if (info?.role !== 'deposit' || info.settledBy) return false
+    const left = leftToPay(info)
+    return left === null || left >= 0.005
+  }
+  if (!SETTLEABLE_TYPES.has(row.txn_type)) return false
+  return owes(row) || later
 }
 
 /** Everything paid on a receipt so far, at the counter and since, to the cent. */

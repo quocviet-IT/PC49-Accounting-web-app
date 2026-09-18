@@ -72,6 +72,13 @@ export default async function GoldTransactionsPage({
         purchases: Number(totals?.purchases ?? 0),
         sales: Number(totals?.sales ?? 0),
         grams: (totals?.grams_by_gold ?? {}) as Record<string, number>,
+        // In and out apart, each in its own unit and in grams (0089).
+        moves: Object.fromEntries(
+          Object.entries((totals?.moves_by_gold ?? {}) as Record<string, Record<string, unknown>>)
+            .map(([code, m]) => [code, {
+              in: Number(m.in ?? 0), inGrams: Number(m.inGrams ?? 0),
+              out: Number(m.out ?? 0), outGrams: Number(m.outGrams ?? 0),
+            }])),
       }}
     />
   )

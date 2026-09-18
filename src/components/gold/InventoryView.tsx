@@ -6,6 +6,8 @@ import { Search } from 'lucide-react'
 import { useLocale } from '@/lib/i18n/provider'
 import { matchesSearch } from '@/lib/ui/list'
 import { Page, Empty, Grams, money, weight, ledger, LoadFailed } from '@/components/ledger/Ledger'
+import type { Uom } from '@/lib/domain/units'
+import { nativeText } from './weightText'
 import { DataTable } from '@/components/ui/DataTable'
 import { ListToolbar } from '@/components/ui/ListToolbar'
 import styles from './InventoryView.module.css'
@@ -22,6 +24,23 @@ export type StockRow = {
 
 export function filterInventoryRows(rows: StockRow[], query: string) {
   return rows.filter((row) => matchesSearch(query, [row.code, row.nameVi, row.nameEn, row.uom]))
+}
+
+/**
+ * A holding in the unit its gold is counted in, the grams beneath.
+ *
+ * "Bảng tồn kho, thể hiện đơn vị tính L, Oz nhưng số tồn đang thể hiện là gr"
+ * (18-09-2026). Stock is kept in grams; each gold has one unit, so the grams go
+ * back into it exactly. Gold counted in grams is written once.
+ */
+function Holding({ grams, uom }: { grams: number; uom: string }) {
+  if (uom !== 'LUONG' && uom !== 'OZ') return <Grams value={grams} />
+  return (
+    <>
+      <div>{nativeText(grams, uom as Uom)}</div>
+      <div className={ledger.muted}>{weight.format(grams)} g</div>
+    </>
+  )
 }
 
 export function InventoryView({ rows, period, asOf, movements, stockFailed = false, movementFailed = false }: {
@@ -44,16 +63,17 @@ export function InventoryView({ rows, period, asOf, movements, stockFailed = fal
   const stockColumns: TableColumnsType<StockRow> = [
     { title: t('inv.goldType'), key: 'name', width: 240, render: (_, row) => locale === 'vi' ? row.nameVi : row.nameEn },
     { title: t('inv.native'), dataIndex: 'uom', width: 120, render: (value: string) => <span className={ledger.muted}>{value}</span> },
-    { title: t('inv.book'), dataIndex: 'book', width: 150, align: 'right', render: (value: number) => <Grams value={value} /> },
-    { title: t('inv.physical'), dataIndex: 'physical', width: 150, align: 'right', render: (value: number) => <Grams value={value} /> },
-    { title: t('inv.total'), dataIndex: 'total', width: 150, align: 'right', render: (value: number) => <Grams value={value} /> },
+    { title: t('inv.book'), dataIndex: 'book', width: 150, align: 'right', render: (value: number, row) => <Holding grams={value} uom={row.uom} /> },
+    { title: t('inv.physical'), dataIndex: 'physical', width: 150, align: 'right', render: (value: number, row) => <Holding grams={value} uom={row.uom} /> },
+    { title: t('inv.total'), dataIndex: 'total', width: 150, align: 'right', render: (value: number, row) => <Holding grams={value} uom={row.uom} /> },
   ]
+  const uomOf = (code: string) => rows.find((row) => row.code === code)?.uom ?? 'GRAM'
   const movementColumns: TableColumnsType<MovementRow> = [
     { title: t('inv.goldType'), key: 'name', width: 220, render: (_, row) => <>{nameOf(row.code)} <span className={ledger.muted}>{row.code}</span></> },
-    { title: t('inv.opening'), dataIndex: 'opening', width: 150, align: 'right', render: (value: number) => weight.format(value) },
-    { title: t('inv.receipt'), dataIndex: 'receipt', width: 150, align: 'right', render: (value: number) => <Grams value={value} /> },
-    { title: t('inv.issue'), dataIndex: 'issue', width: 150, align: 'right', render: (value: number) => <Grams value={-Math.abs(value)} /> },
-    { title: t('inv.closing'), dataIndex: 'closing', width: 150, align: 'right', render: (value: number) => weight.format(value) },
+    { title: t('inv.opening'), dataIndex: 'opening', width: 150, align: 'right', render: (value: number, row) => <Holding grams={value} uom={uomOf(row.code)} /> },
+    { title: t('inv.receipt'), dataIndex: 'receipt', width: 150, align: 'right', render: (value: number, row) => <Holding grams={value} uom={uomOf(row.code)} /> },
+    { title: t('inv.issue'), dataIndex: 'issue', width: 150, align: 'right', render: (value: number, row) => <Holding grams={-Math.abs(value)} uom={uomOf(row.code)} /> },
+    { title: t('inv.closing'), dataIndex: 'closing', width: 150, align: 'right', render: (value: number, row) => <Holding grams={value} uom={uomOf(row.code)} /> },
     { title: t('inv.adjustment'), dataIndex: 'adjustment', width: 180, align: 'right', render: (value: number) => <span className={value === 0 ? ledger.muted : undefined}>{value === 0 ? '—' : money.format(value)}</span> },
   ]
 

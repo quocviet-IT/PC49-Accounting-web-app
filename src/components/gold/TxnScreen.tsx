@@ -10,7 +10,8 @@ import { IconAction } from '@/components/ui/IconAction'
 import { TxnTypeTag } from './TxnTypeTag'
 import type { ColumnsType } from 'antd/es/table'
 import { useLocale } from '@/lib/i18n/provider'
-import { toGrams } from '@/lib/domain/units'
+import { toGrams, type Uom } from '@/lib/domain/units'
+import { weightText } from './weightText'
 import { voidConversion, voidReceipt } from '@/app/(app)/gold-transactions/actions'
 import { Page, Stat, Stats, LoadFailed, money, weight } from '@/components/ledger/Ledger'
 import { DataTable } from '@/components/ui/DataTable'
@@ -33,6 +34,9 @@ import styles from './Txn.module.css'
 
 export type { GoldTypeOption, ReceiptRow } from './types'
 
+/** How much of one gold came in and went out, in its own unit and in grams. */
+export type GoldMove = { in: number; inGrams: number; out: number; outGrams: number }
+
 /** What the whole filter matched, not the page on screen (0076). */
 export type LedgerTotals = {
   /** Receipts, not items. */
@@ -40,6 +44,11 @@ export type LedgerTotals = {
   purchases: number
   sales: number
   grams: Record<string, number>
+  /**
+   * For each gold, how much came in and how much went out, in its own unit and
+   * in grams (0089). A deposit moves nothing until its gold is collected.
+   */
+  moves?: Record<string, GoldMove>
 }
 
 const PRESETS: Preset[] = ['today', 'last7', 'thisMonth', 'lastMonth', 'thisYear', 'all']
@@ -375,7 +384,7 @@ export function TxnScreen({
                         onClick={() => setPickingUp(r)} />
           )}
           {canSettle(r) && (
-            <IconAction icon={<Banknote size={16} aria-hidden />} label={t('settle.open')}
+            <IconAction icon={<Banknote size={16} aria-hidden />} label={t(r.txn_type === 'DEPOSIT' ? 'settle.depositOpen' : 'settle.open')}
                         onClick={() => setSettling(r)} />
           )}
           <IconAction icon={<Pencil size={16} aria-hidden />} label={t('txn.correct')}
@@ -391,7 +400,11 @@ export function TxnScreen({
     },
   ]
 
-  const grams = Object.entries(totals.grams)
+  // In and out apart, each in its own unit with the grams beside it (18-09:
+  // "chưa tách ra nhập bao nhiêu, xuất bao nhiêu … cần có thêm đvt gốc").
+  const moves = Object.entries(totals.moves ?? {})
+  const uomOf = (code: string) =>
+    (goldTypes.find((g) => g.code === code)?.native_uom ?? 'GRAM') as Uom
 
   return (
     <Page titleKey="txn.title" actions={<Space wrap>{exportButton}{convertButton}{newButton}</Space>}>
@@ -481,13 +494,20 @@ export function TxnScreen({
               note={t('txn.total.filtered')} tone="in" />
       </Stats>
 
-      {grams.length > 0 && (
+      {moves.length > 0 && (
         <div className={styles.summaryRow}>
           <Space size={4} wrap>
             <Typography.Text type="secondary">{t('txn.total.movement')}</Typography.Text>
-            {grams.map(([code, g]) => (
-              <Tag key={code} color={g > 0 ? 'green' : 'red'}>
-                {goldName(code)} {weight.format(g)} g
+            {moves.map(([code, m]) => (
+              <Tag key={code}>
+                {goldName(code)}:
+                {m.inGrams !== 0 && (
+                  <span className="pc-in"> {t('txn.move.in')} {weightText(m.inGrams, uomOf(code), m.in)}</span>
+                )}
+                {m.inGrams !== 0 && m.outGrams !== 0 && ' ·'}
+                {m.outGrams !== 0 && (
+                  <span className="pc-out"> {t('txn.move.out')} {weightText(m.outGrams, uomOf(code), m.out)}</span>
+                )}
               </Tag>
             ))}
           </Space>
