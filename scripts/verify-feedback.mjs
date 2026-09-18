@@ -46,6 +46,14 @@ const storage = process.env.SUPABASE_SERVICE_ROLE_KEY
   : null
 const browser = await chromium.launch()
 
+// Opening the reports screen marks it looked at (0088), and these are accounts
+// people may use. What they had seen is put back afterwards, so a check does
+// not quietly clear somebody's badge.
+const ACCOUNTS = ['accountant@ctyhp.vn', 'admin@ctyhp.vn']
+const seenBefore = await db.query(
+  `SELECT s.user_id, s.seen_at FROM pc49.feedback_seen s
+     JOIN auth.users u ON u.id = s.user_id WHERE u.email = ANY($1)`, [ACCOUNTS])
+
 try {
   // ---- The accountant hits something and says so ---------------------------
   const ktCtx = await browser.newContext()
@@ -138,7 +146,8 @@ try {
   // carries the same name and would be found first otherwise.
   await kt.locator('.ant-modal-footer').getByRole('button', { name: 'Đóng' }).click()
   await kt.locator('.ant-modal-wrap').waitFor({ state: 'hidden' })
-  await kt.getByRole('link', { name: 'Báo lỗi', exact: true }).click()
+  // By how the name starts: with something waiting, it goes on to say how much (0088).
+  await kt.getByRole('link', { name: /^Báo lỗi/ }).first().click()
   await kt.waitForURL(`${BASE}/feedback`)
   // The address changes before the page it names has been drawn, and the two
   // checks below read the page. So the report itself is what is waited for.
@@ -163,9 +172,18 @@ try {
   await ktCtx.close()
 
   // ---- The administrator triages -------------------------------------------
-  const adCtx = await browser.newContext()
+  // Wide enough that the menu opens with its labels, where the count sits.
+  const adCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   const ad = await openPage(adCtx)
   await signIn(ad, BASE, 'admin@ctyhp.vn', PASSWORD.ADMIN)
+
+  // Called to the queue from anywhere, before opening it (0088).
+  await ad.goto(`${BASE}/`, { waitUntil: 'networkidle' })
+  const waiting = ad.locator('.pc-shell__nav .pc-nav-count')
+  check('an administrator is shown a count of new reports on the menu',
+    (await waiting.count()) > 0 && Number((await waiting.first().textContent()) ?? 0) >= 1,
+    (await waiting.count()) > 0 ? `${await waiting.first().textContent()}` : '(no badge)')
+
   await ad.goto(`${BASE}/feedback`, { waitUntil: 'networkidle' })
 
   const queue = (await ad.locator('body').textContent()) ?? ''
@@ -257,6 +275,30 @@ try {
 
   await ad.screenshot({ path: 'feedback.png', fullPage: true })
   await adCtx.close()
+
+  // ---- The reporter is called back -----------------------------------------
+  // "Người báo không biết gì tiếp theo": the report they filed was declined
+  // after they last looked, so the menu says so, the screen marks it, and
+  // opening the screen is looking at it (0088).
+  const backCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const back = await openPage(backCtx)
+  await signIn(back, BASE, 'accountant@ctyhp.vn', PASSWORD.KT)
+  await back.goto(`${BASE}/`, { waitUntil: 'networkidle' })
+  const called = back.locator('.pc-shell__nav .pc-nav-count')
+  check('the reporter is shown on the menu that their report moved',
+    (await called.count()) > 0, (await called.count()) > 0 ? `${await called.first().textContent()}` : '(no badge)')
+  await back.getByRole('link', { name: /^Báo lỗi/ }).first().click()
+  await back.waitForURL(`${BASE}/feedback`)
+  await back.waitForFunction((said) => (document.body.textContent ?? '').includes(said),
+    SAID, { timeout: 20000 }).catch(() => {})
+  const theirs = back.locator('tr').filter({ hasText: SAID })
+  check('and the screen marks which one', ((await theirs.textContent()) ?? '').includes('Mới cập nhật'))
+  const cleared = await until(async () => {
+    await back.goto(`${BASE}/`, { waitUntil: 'networkidle' })
+    return (await back.locator('.pc-shell__nav .pc-nav-count').count()) === 0 ? true : null
+  }, { timeout: 20000 })
+  check('and once they have looked, the menu stops calling them', cleared === true)
+  await backCtx.close()
 } finally {
   await browser.close()
   // The client's database is not a scratch pad.
@@ -271,6 +313,13 @@ try {
     await storage.from('feedback-screenshots').remove(files.rows.map((r) => r.p))
   }
   await db.query(`DELETE FROM pc49.feedback_report WHERE description LIKE 'verify-feedback:%'`)
+  await db.query(
+    `DELETE FROM pc49.feedback_seen s USING auth.users u
+      WHERE u.id = s.user_id AND u.email = ANY($1)`, [ACCOUNTS])
+  for (const r of seenBefore.rows) {
+    await db.query('INSERT INTO pc49.feedback_seen (user_id, seen_at) VALUES ($1, $2)',
+      [r.user_id, r.seen_at])
+  }
 
   // Scoped to this run's own rows. A demo dataset or a real report filed by
   // somebody is not this check's mess to answer for.
